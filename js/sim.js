@@ -1800,7 +1800,8 @@ export class Sim {
           const st = this.state[j];
           const ok = want === 1 ? (st === ST.ZOMBIE)
             : want === 2 ? (st === ST.CIV || st === ST.FLEE || st === ST.FIGHT || st === ST.INFECTED)
-              : want === 4 ? (st === ST.CIV || st === ST.FLEE || st === ST.FIGHT || st === ST.INFECTED)
+              : want === 4 ? (st === ST.CIV || st === ST.FLEE || st === ST.FIGHT || st === ST.INFECTED ||
+                              st === ST.POLICE || st === ST.SOLDIER)
                 : want === 5 ? (st === ST.CIV || st === ST.FLEE || st === ST.FIGHT ||
                                 st === ST.INFECTED || st === ST.WILD)          // 丧尸的猎物：人和野兽
                   : want === 6 ? (st === ST.CIV || st === ST.FLEE || st === ST.FIGHT ||
@@ -2057,8 +2058,9 @@ export class Sim {
       if (doPerception(i)) {
         if (st === ST.ZOMBIE) {
           this.nearC[i] = this.findNearest(i, 4, 60);
-        } else if (st === ST.POLICE) {
-          this.nearZ[i] = this.findNearest(i, 1, 46);
+        } else if (st === ST.POLICE || st === ST.SOLDIER) {
+          // 士兵看得更远（步枪 + 训练），警察 46m、士兵 60m
+          this.nearZ[i] = this.findNearest(i, 1, st === ST.SOLDIER ? 60 : 46);
           // 警察有电台，默认知道；但零号病人模式下连他们也不知道（还没发生任何事）
           // 警察有电台，但只有"城里真的还有丧尸"时他们才知道
           if (!this.longInc && this.stats.zombie > 0 && this.aware[i] < 3) this.setAware(i, 3);
@@ -2276,6 +2278,17 @@ export class Sim {
           // 死线优先：到点就地转身。必须放在最前面 —— 下面"去医院"那条分支会 break，
           // 放在末尾的话发烧的人一路走向医院，永远轮不到变身。
           if (this.time >= this.riseAt[i]) { this.beginTurn(i); break; }
+          // 带枪的人（警察/士兵/持枪平民）在潜伏期里仍然会还击 —— 不会因为被咬就当场缴械
+          if (this.armed[i] && this.nearZ[i] >= 0) {
+            const zz = this.nearZ[i];
+            const zdx = this.px[zz] - this.px[i], zdz = this.pz[zz] - this.pz[i];
+            this.heading[i] = Math.atan2(zdz, zdx);
+            this.cool[i] -= cdt;
+            if (this.cool[i] <= 0 && zdx * zdx + zdz * zdz < 30 * 30) {
+              this.cool[i] = 0.55;
+              this.fireWeapon(i, zz);
+            }
+          }
           this.timer[i] -= cdt;    // 潜伏倒计时按真实时间走（远处 5Hz 更新时步长已补偿）
           // ---- 发病阶段（M6）：潜伏期最后 40% 开始发烧 ----
           if (!this.sick[i] && this.incTot[i] > 0 && this.timer[i] < this.incTot[i] * 0.25) {
@@ -2458,9 +2471,15 @@ export class Sim {
               this.setGoal(i, GOAL.HOLD, st.x, st.z);
             }
             if (mustReturn && dHome > 18) {
-              this.move(i, st.x - this.px[i], st.z - this.pz[i], this.spd[i], cdt);
               const zz = this.nearZ[i];
-              if (zz >= 0 && this.cool[i] <= 0) { this.cool[i] = 0.5; this.fireWeapon(i, zz); }
+              if (zz >= 0) {
+                // 有威胁：先转身、够近就停下打，再继续往回走
+                const zdx = this.px[zz] - this.px[i], zdz = this.pz[zz] - this.pz[i];
+                this.heading[i] = Math.atan2(zdz, zdx);
+                if (this.cool[i] <= 0) { this.cool[i] = 0.5; this.fireWeapon(i, zz); }
+                if (zdx * zdx + zdz * zdz < 12 * 12) break;    // 12m 内先解决眼前的
+              }
+              this.move(i, st.x - this.px[i], st.z - this.pz[i], this.spd[i], cdt);
               break;
             }
             // 平静期：驻局的警员也不许乱跑，离局 45m 就往回走（否则开局半小时全飘走了）
@@ -2489,9 +2508,14 @@ export class Sim {
             if (gp) {
               const dx = gp[0] - this.px[i], dz = gp[1] - this.pz[i];
               if (dx * dx + dz * dz > 36) {
-                this.move(i, dx, dz, this.spd[i], cdt);
                 const zz = this.nearZ[i];
-                if (zz >= 0 && this.cool[i] <= 0) { this.cool[i] = 0.5; this.fireWeapon(i, zz); }
+                if (zz >= 0) {
+                  const zdx = this.px[zz] - this.px[i], zdz = this.pz[zz] - this.pz[i];
+                  this.heading[i] = Math.atan2(zdz, zdx);
+                  if (this.cool[i] <= 0) { this.cool[i] = 0.5; this.fireWeapon(i, zz); }
+                  if (zdx * zdx + zdz * zdz < 12 * 12) break;  // 12m 内先打，不赶路
+                }
+                this.move(i, dx, dz, this.spd[i], cdt);
                 break;
               }
             }
