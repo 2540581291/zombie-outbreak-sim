@@ -115,6 +115,8 @@ export function profileFor(sim, i) {
     aware: aw,
     awareText,                  // 知情程度
     vip: !!(sim.vip && sim.vip[i]),
+    hp: Math.max(0, Math.round(sim.hp[i])),
+    hpMax: Math.max(1, Math.round(Math.max(100, sim.hp[i]))),
     vipEscort: (sim.vip && sim.vip[i] && sim.vipStage) ? (() => {
       const st = sim.vipStage[i], gl = sim.vipGoal[i];
       if (sim.vipDone && sim.vipDone[i]) return '已安置（护送完成）';

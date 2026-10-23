@@ -409,3 +409,50 @@ export function buildSatelliteGround(city, meta, tex) {
 
 
 
+
+// ---------------- 建筑名中文化 ----------------
+// OSM 的名字是德语/日语/英语，游戏里一律显示中文：
+//   认识的词根走词典，不认识的按"类型 + 序号"生成，保证不出现拉丁字母。
+export const KIND_CN = {
+  police: '警察局', hospital: '医院', school: '学校', market: '超市',
+  transit: '车站', pharmacy: '药店', gov: '政府大楼', fire: '消防站',
+};
+const WORD_CN = [
+  [/polizei|police/i, '警察局'], [/krankenhaus|hospital|clinic/i, '医院'],
+  [/schule|school|gymnasium|lycee/i, '学校'], [/universit|hochschule|college/i, '学院'],
+  [/markt|market|supermarkt|kaufhaus|store|shop/i, '超市'],
+  [/bahnhof|station|hauptbahnhof|u-bahn|s-bahn/i, '车站'],
+  [/apotheke|pharmacy|drogerie/i, '药店'], [/rathaus|amt|behörde|ministerium/i, '政府大楼'],
+  [/feuerwehr|fire/i, '消防站'], [/kirche|church|dom|kapelle/i, '教堂'],
+  [/museum/i, '博物馆'], [/theater|oper|bühne/i, '剧院'], [/bibliothek|library/i, '图书馆'],
+  [/park|garten|grün/i, '公园'], [/hotel/i, '酒店'], [/bank/i, '银行'],
+  [/restaurant|café|cafe|imbiss/i, '餐馆'], [/tankstelle/i, '加油站'],
+  [/friedhof|cemetery/i, '墓地'], [/post/i, '邮局'], [/bad|schwimm/i, '游泳馆'],
+];
+
+/** 给一座城市的所有 POI/街道名换成中文（就地修改） */
+export function localizeCityNames(city) {
+  if (!city) return city;
+  const isLatin = (s) => /[A-Za-zÀ-ÿĀ-ſ]/.test(s) || /[\u3040-\u30ff]/.test(s);
+  const byKind = new Map();
+  const list = city.pois || [];
+  for (const p of list) {
+    const kind = KIND_CN[p.k] || '建筑';
+    byKind.set(kind, (byKind.get(kind) || 0) + 1);
+    const n = byKind.get(kind);
+    const raw = p.n || '';
+    if (!isLatin(raw)) continue;            // 已经是中文就不动
+    let hit = null;
+    for (const [re, cn] of WORD_CN) { if (re.test(raw)) { hit = cn; break; } }
+    p.n = hit ? (hit + ' ' + n + ' 号') : (kind + ' ' + n + ' 号');
+  }
+  // 街道名
+  if (Array.isArray(city.streets)) {
+    let i = 0;
+    for (const s of city.streets) {
+      if (typeof s === 'string' && isLatin(s)) city.streets[i] = '第 ' + (++i) + ' 街';
+      else if (s && typeof s.n === 'string' && isLatin(s.n)) s.n = '第 ' + (++i) + ' 街';
+    }
+  }
+  return city;
+}

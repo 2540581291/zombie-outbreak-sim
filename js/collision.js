@@ -102,17 +102,36 @@ export async function loadCollision(city) {
       }
       if (tail === 0) { this.doorDist = null; return 0; }
       const cols = this.cols, rows = this.rows, grid = this.grid;
+      // doorOf[cell] = 离这个格子最近的"门"的格子号（BFS 传播，O(1) 查询门的位置）
+      const doorOf = new Int32Array(n).fill(-1);
+      for (let i = 0; i < n; i++) if (dist[i] === 0) doorOf[i] = i;
       while (head < tail) {
         const k = queue[head++];
         const d = dist[k] + 1;
+        const src = doorOf[k];
         const x = k % cols, y = (k / cols) | 0;
-        if (x > 0) { const j = k - 1; if (dist[j] < 0 && (grid[j] & CL.WALK)) { dist[j] = d; queue[tail++] = j; } }
-        if (x + 1 < cols) { const j = k + 1; if (dist[j] < 0 && (grid[j] & CL.WALK)) { dist[j] = d; queue[tail++] = j; } }
-        if (y > 0) { const j = k - cols; if (dist[j] < 0 && (grid[j] & CL.WALK)) { dist[j] = d; queue[tail++] = j; } }
-        if (y + 1 < rows) { const j = k + cols; if (dist[j] < 0 && (grid[j] & CL.WALK)) { dist[j] = d; queue[tail++] = j; } }
+        if (x > 0) { const j = k - 1; if (dist[j] < 0 && (grid[j] & CL.WALK)) { dist[j] = d; doorOf[j] = src; queue[tail++] = j; } }
+        if (x + 1 < cols) { const j = k + 1; if (dist[j] < 0 && (grid[j] & CL.WALK)) { dist[j] = d; doorOf[j] = src; queue[tail++] = j; } }
+        if (y > 0) { const j = k - cols; if (dist[j] < 0 && (grid[j] & CL.WALK)) { dist[j] = d; doorOf[j] = src; queue[tail++] = j; } }
+        if (y + 1 < rows) { const j = k + cols; if (dist[j] < 0 && (grid[j] & CL.WALK)) { dist[j] = d; doorOf[j] = src; queue[tail++] = j; } }
       }
       this.doorDist = dist;
+      this.doorOf = doorOf;
       return tail;
+    },
+
+    /** 离我最近的那扇门在哪（世界坐标）；已经在门口或查不到就返回 null */
+    doorPoint(x, z) {
+      const of = this.doorOf;
+      if (!of) return null;
+      const c = this.idx(x, z);
+      if (c < 0) return null;
+      const k = of[c];
+      if (k < 0) return null;
+      if (this.doorDist && this.doorDist[c] === 0) return null;   // 已经站在门上
+      const cols = this.cols, cell = this.cell, halfW = this.halfW, halfH = this.halfH;
+      const cx = k % cols, cy = (k / cols) | 0;
+      return { x: -halfW + (cx + 0.5) * cell, z: halfH - (cy + 0.5) * cell };
     },
 
     /** 门场梯度：朝邻居里距离更小的方向走；没有更小的就返回 null */

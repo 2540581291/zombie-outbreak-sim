@@ -148,6 +148,8 @@ export function openReport(sim) {
     ['经费支出', fmtMoney(sim.spentTotal || 0), ''],
     ['开火次数', st.shots.toLocaleString(), ''],
     ['坚持时长', fmtTime(sim.time), ''],
+    ['撤离人数', ((sim.saved || 0)).toLocaleString() + (sim.scoreData ? '　评分 ' + sim.scoreData().grade : ''), 'saved'],
+    ['撤离回款', fmtMoney(sim.budgetBack || 0), ''],
   ].map(([k, v, cls]) =>
     `<div class="rp-row ${cls}"><span>${k}</span><b>${v}</b></div>`
   ).join('');

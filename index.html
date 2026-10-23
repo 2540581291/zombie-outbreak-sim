@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>生化危机模拟器 · ZOS-R</title>
 <link rel="stylesheet" href="css/style.css" />
+<link rel="stylesheet" href="css/topbar.css" />
   <link rel="stylesheet" href="css/panel.css" />
 <script>
   // 把 console.error / 运行时错误写进 title，便于无头诊断
@@ -53,16 +54,39 @@
     <button class="spd" data-spd="16">16×</button>
   </div>
   <div class="tb-right">
-    <span class="tb-stat"><i class="dot civ"></i><b id="n-civ">0</b><em>民</em></span>
-    <span class="tb-stat"><i class="dot inf"></i><b id="n-inf">0</b><em>潜</em></span>
-    <span class="tb-stat"><i class="dot zomb"></i><b id="n-zomb">0</b><em>尸</em></span>
-    <span class="tb-stat"><i class="dot dead"></i><b id="n-dead">0</b><em>亡</em></span>
-    <span class="tb-stat" title="知道出事了的人（电话 / 网络 / 亲眼看见）"><i class="dot info"></i><b id="n-aware">0</b><em>知情</em><span id="heat" title="网络热度"><i></i></span></span>
-    <span class="tb-stat" title="混乱度 = 知情值×1 + 感染值×2（上限 100）"><i class="dot chaos"></i><b id="n-chaos">0</b><em>混乱</em></span>
-    <span class="tb-stat" title="本局唯一的撤离口：平民跑到这条边就算逃出城"><i class="dot exit"></i><b id="n-exit">—</b><em>撤离口</em></span>
-    <button class="tb-btn" id="btn-sound" title="声音开关">🔊 声音</button>
-    <button class="tb-btn" id="btn-overview" title="全体人员总览（O）">📊 总览</button>
-    <button class="tb-btn" id="btn-report" title="结算本局">📋 战报</button>
+    <!-- 人口（计数） -->
+    <span class="tb-group">
+      <span class="tb-stat" title="还活着的平民"><i class="dot civ"></i><b id="n-civ">0</b><em>民</em></span>
+      <span class="tb-stat" title="已感染、还没尸变的人"><i class="dot inf"></i><b id="n-inf">0</b><em>潜</em></span>
+      <span class="tb-stat" title="丧尸"><i class="dot zomb"></i><b id="n-zomb">0</b><em>尸</em></span>
+      <span class="tb-stat" title="死亡人数"><i class="dot dead"></i><b id="n-dead">0</b><em>亡</em></span>
+    </span>
+    <span class="tb-div"></span>
+    <!-- 状态（百分比条）：混乱 → 感染 → 知情，点一下看明细 -->
+    <span class="tb-group tb-gauges">
+      <span class="tb-gauge clickable" id="g-chaos" title="混乱度 = 知情值×0.5 + 感染值×2（上限 100）· 点击查看明细">
+        <span class="tg-top"><i class="dot chaos"></i><em>混乱</em><b id="n-chaos">0</b></span>
+        <span class="tg-bar"><i id="bar-chaos"></i></span>
+      </span>
+      <span class="tb-gauge clickable" id="g-infect" title="感染率 = 已感染人数 / 总人口 · 点击查看明细">
+        <span class="tg-top"><i class="dot inf"></i><em>感染</em><b id="n-infect">0%</b></span>
+        <span class="tg-bar"><i id="bar-infect"></i></span>
+      </span>
+      <span class="tb-gauge clickable" id="g-aware" title="知道出事了的人 · 点击查看明细">
+        <span class="tg-top"><i class="dot info"></i><em>知情</em><b id="n-aware">0%</b></span>
+        <span class="tg-bar"><i id="bar-aware"></i></span>
+      </span>
+    </span>
+    <span class="tb-div"></span>
+    <!-- 撤离口（方向，不是计数） -->
+    <span class="tb-exit" title="本局唯一的撤离口：平民跑到这条边就算逃出城">
+      <em>撤离口</em><b id="n-exit">—</b>
+    </span>
+    <button class="tb-btn" id="btn-sound" title="声音开关">🔊</button>
+    <button class="tb-btn" id="btn-force" title="武力状态明细">武力</button>
+    <button class="tb-btn" id="btn-sanit" title="卫生状态明细">卫生</button>
+    <button class="tb-btn" id="btn-overview" title="全体人员总览（O）">总览</button>
+    <button class="tb-btn" id="btn-report" title="结算本局">战报</button>
     <span class="tb-fps" id="fps">—</span>
   </div>
 </div>

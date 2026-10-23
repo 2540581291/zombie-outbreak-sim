@@ -75,3 +75,33 @@ export function hasGunAtHome(i) { return h(i, 21) < 0.12; }
 
 /** 性格：0 = 胆小，1 = 莽 */
 export function braveOf(i) { return h(i, 22); }
+
+// ---------------- 四个性格属性（0–100） ----------------
+// 政府信任 / 家庭责任 / 意志 / 勇猛
+// 不是纯随机：职业、年龄会先定一个基准，再加个人噪声，
+// 保证"人设"和"身份"对得上（警察不会普遍不信任政府）。
+export const ATTR_ROLE = {
+  civilian: { trust: 50, family: 60, will: 50, courage: 45 },
+  police:   { trust: 65, family: 60, will: 70, courage: 60 },
+  soldier:  { trust: 68, family: 55, will: 75, courage: 70 },
+  vip:      { trust: 80, family: 45, will: 60, courage: 35 },
+};
+
+export function attrFor(i, role = 'civilian') {
+  const base = ATTR_ROLE[role] || ATTR_ROLE.civilian;
+  const age = ageOf(i);
+  const noise = (salt) => (h(i, salt) - 0.5) * 24;   // ±12
+  let trust = base.trust + noise(61);
+  let family = base.family + noise(62);
+  let will = base.will + noise(63);
+  let courage = base.courage + noise(64);
+  if (age > 65) { trust += 12; courage -= 12; }
+  else if (age < 25) { trust -= 8; courage += 8; will += 4; }
+  if (age >= 30 && age <= 50) family += 8;            // 有孩子的年纪
+  return {
+    trust: Math.max(5, Math.min(95, Math.round(trust))),
+    family: Math.max(5, Math.min(95, Math.round(family))),
+    will: Math.max(5, Math.min(95, Math.round(will))),
+    courage: Math.max(5, Math.min(95, Math.round(courage))),
+  };
+}

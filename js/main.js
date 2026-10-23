@@ -2,9 +2,9 @@
 //  ZOS-R · 主程序：装配、相机、循环、UI
 // ============================================================
 import * as THREE from 'three';
-import { buildCity, buildSatelliteGround } from './city.js';
+import { buildCity, buildSatelliteGround, localizeCityNames } from './city.js';
 import { TiledGround } from './ground.js';
-import { buildNav, Sim, ST } from './sim.js';
+import { buildNav, Sim, ST, GOAL } from './sim.js';
 import { loadCollision, collisionStats } from './collision.js';
 import { applyLayerPatch } from './layerpatch.js';
 import { AgentRenderer } from './agents.js';
@@ -13,6 +13,7 @@ import { profileFor } from './people.js';
 import { stockText } from './storage.js';
 import { AudioEngine } from './audio.js';
 import { openReport, closeReport, isReportOpen } from './report.js';
+import { openForce, openSanit, openChaosInfo, openInfectInfo, openAwareInfo } from './status.js';
 import { openOverview, close as closeOverview, toggle as toggleOverview, isOpen as overviewIsOpen } from './overview.js';
 import { SpriteView } from '../src/sprite/index.js';
 import { TerrainOverlay } from './overlay.js';
@@ -287,6 +288,71 @@ function pickAgent(clientX, clientY) {
 
 let escapeMark = null;      // 逃离线的绿色光带
 
+// 选中角色的行走路径（虚线折线）
+let pathLine = null;
+let pathRing = null;
+let pathKey = '';
+
+function ensurePathGfx() {
+  if (pathLine) return;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3 * 260), 3));
+  const mat = new THREE.LineDashedMaterial({
+    color: 0x59d0ff, dashSize: 7, gapSize: 5, transparent: true, opacity: 0.9, depthTest: false,
+  });
+  pathLine = new THREE.Line(geo, mat);
+  pathLine.frustumCulled = false;
+  pathLine.renderOrder = 6;
+  pathLine.visible = false;
+  scene.add(pathLine);
+
+  pathRing = new THREE.Mesh(
+    new THREE.RingGeometry(4, 7.5, 24),
+    new THREE.MeshBasicMaterial({ color: 0x59d0ff, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthTest: false }));
+  pathRing.rotation.x = -Math.PI / 2;
+  pathRing.renderOrder = 6;
+  pathRing.visible = false;
+  scene.add(pathRing);
+}
+
+/** 每帧刷新：选中谁就画谁的行走路径 */
+function updatePathLine() {
+  ensurePathGfx();
+  if (!sim || selected < 0) { pathLine.visible = false; pathRing.visible = false; return; }
+  const g = sim.goal[selected];
+  let tp = sim.goalPoint(selected, g);
+  if (!tp && g === GOAL.FLEE) tp = sim.escapePoint(selected);
+  if (!tp) { pathLine.visible = false; pathRing.visible = false; return; }
+
+  const key = selected + ':' + Math.round(tp[0]) + ':' + Math.round(tp[1]) + ':' + g;
+  if (key !== pathKey) {
+    pathKey = key;
+    const pts = sim.previewPath(selected, tp[0], tp[1]);
+    const arr = pathLine.geometry.attributes.position.array;
+    const n = Math.min(259, (pts ? pts.length : 0));
+    arr[0] = sim.px[selected]; arr[1] = 2.2; arr[2] = sim.pz[selected];
+    for (let k = 0; k < n; k++) {
+      arr[(k + 1) * 3] = pts[k][0];
+      arr[(k + 1) * 3 + 1] = 2.2;
+      arr[(k + 1) * 3 + 2] = pts[k][1];
+    }
+    if (!pts) {
+      arr[3] = tp[0]; arr[4] = 2.2; arr[5] = tp[1];
+    }
+    pathLine.geometry.setDrawRange(0, (pts ? n : 1) + 1);
+    pathLine.geometry.attributes.position.needsUpdate = true;
+    pathLine.computeLineDistances();
+  }
+  // 起点跟人走
+  const pa = pathLine.geometry.attributes.position.array;
+  pa[0] = sim.px[selected]; pa[1] = 2.2; pa[2] = sim.pz[selected];
+  pathLine.geometry.attributes.position.needsUpdate = true;
+  pathLine.visible = true;
+  pathRing.position.set(tp[0], 2.2, tp[1]);
+  pathRing.visible = true;
+}
+
+
 /** 把"逃离线"画出来（2D / 3D 都看得见） */
 function buildEscapeMarker() {
   if (!sim || !sim.escapeLine) return;
@@ -394,7 +460,38 @@ function agentRules(i, p) {
     </div>`).join('');
 }
 
-function renderPlace() {
+/** 当前状态：一排小标签（不再是长条） */
+  function stateChips(i, p) {
+    const chips = [];
+    const add = (t, cls) => chips.push('<span class="ac-chip ' + (cls || '') + '">' + t + '</span>');
+    const chaos = sim.chaos || 0;
+    const isPolice = p.state === ST.POLICE || p.state === ST.SOLDIER;
+
+    // 身份类
+    if (p.vip) add('要员', 'vip');
+    if (isPolice) add('警务', 'pol');
+    if (sim.armed[i]) add('持枪', 'hot');
+
+    // 触发类（是/否，不再画长条）
+    if (sim.sick && sim.sick[i]) add('已发病', 'bad');
+    if (sim.state[i] === ST.INFECTED) add('已感染', 'bad');
+    const fam = sim.familyAlive ? sim.familyAlive(i) : 0;
+    if (fam === 0) add('家人全无', 'bad');
+    else add('家人 ' + fam + ' 人');
+    if (sim.homeHasGun && sim.homeHasGun(i)) add('家里有枪', 'warm');
+
+    // 全局门槛只做"提一句"，不再是这个人的属性
+    if (chaos >= 50) add('全城避难令', 'warm');
+    else if (chaos >= 20) add('警局戒备', 'warm');
+
+    // 链
+    const step = sim.chainStep ? sim.chainStep[i] : 0;
+    if (step) add('第 ' + step + ' / 3 步', 'step');
+
+    return chips.join('');
+  }
+
+  function renderPlace() {
   const p = placeView;
   const kind = KIND_NAME[p.k] || '地点';
   document.getElementById('ac-name').textContent = p.n || kind;
@@ -414,6 +511,52 @@ function renderPlace() {
     `<div class="ac-sec">地点信息</div>` +
     rows.map(([k, v]) => `<div class="ac-row"><span>${k}</span><em>${v}</em></div>`).join('');
 }
+
+  // ---------- 行动溯源 + 属性条（P0.3 / P0.4） ----------
+  function bar(v, max, cls) {
+    const pct = Math.max(0, Math.min(100, (v / max) * 100));
+    return `<div class="ac-bar ${cls || ''}"><i style="width:${pct.toFixed(0)}%"></i></div>`;
+  }
+
+  function attrBlock(i) {
+    const rows = [
+      ['政府信任', sim.trust[i]],
+      ['家庭责任', sim.familyDuty[i]],
+      ['意志', sim.willpower[i]],
+      ['勇猛', sim.courage[i]],
+    ];
+    return `<div class="ac-sec">性格（0–100）</div>` +
+      rows.map(([k, v]) => `
+        <div class="ac-row"><span>${k}</span><em>${v}</em></div>
+        ${bar(v, 100)}`).join('');
+  }
+
+  function explainBlock(i) {
+    if (!sim.explain) return '';
+    const ex = sim.explain(i);
+    const top = ex.candidates[0];
+    const second = ex.candidates[1];
+    if (!top) return '';
+    const parts = top.parts
+      .slice()
+      .sort((a, b) => Math.abs(b.v) - Math.abs(a.v))
+      .map((p) => `
+        <div class="ac-row"><span style="flex:0 0 108px">${p.k}</span>
+          <em style="color:${p.v >= 0 ? '#8fd18a' : '#e2827a'}">${p.v >= 0 ? '+' : ''}${p.v.toFixed(2)}</em></div>`)
+      .join('');
+    const secondTxt = second
+      ? `第二名 ${second.name} ${second.score.toFixed(2)}（差 ${(top.score - second.score).toFixed(2)}）`
+      : '没有竞争者';
+    const excl = ex.excluded.length
+      ? ex.excluded.map((e) => `${e.name}（${e.why}）`).join('、')
+      : '无';
+    return `
+      <div class="ac-sec">行动溯源（为什么是他现在这个行动）</div>
+      <div class="ac-row"><span>当前</span><em><b>${top.name}</b> · 分 ${top.score.toFixed(2)}</em></div>
+      <div class="ac-row"><span>对比</span><em>${secondTxt}</em></div>
+      ${parts}
+      <div class="ac-row"><span>排除</span><em style="color:#7d8b99">${excl}</em></div>`;
+  }
 
 function renderAgentCard() {
   if (!sim || selected < 0) return;
@@ -447,6 +590,8 @@ function renderAgentCard() {
     ${p.social ? `<div class="ac-row"><span>行程</span><em>${p.social}</em></div>` : ''}
     ${p.awareText ? `<div class="ac-row"><span>知情</span><em>${p.awareText}</em></div>` : ''}
     ${p.vipEscort ? `<div class="ac-row"><span>护送</span><em>${p.vipEscort}</em></div>` : ''}
+    <div class="ac-row"><span>血量</span><em>${p.hp} / ${p.hpMax}</em></div>
+    <div class="ac-bar ${p.hp / p.hpMax < 0.35 ? 'on' : ''}"><i style="width:${Math.min(100, (p.hp / p.hpMax) * 100).toFixed(0)}%"></i></div>
     <div class="ac-row"><span>武器</span><em>${p.weaponTxt
       ? `${p.weaponTxt} · <b>${p.mag}${p.reserve ? '/' + p.reserve : ''}</b> · 熟练 ${p.skillPct}%`
       : '徒手'}</em></div>
@@ -468,7 +613,8 @@ function renderAgentCard() {
 
   document.getElementById('ac-body').innerHTML =
     sec1 + sec2 + sec3 + sec4 +
-    `<div class="ac-sec">行动逻辑（条件满足就点亮）</div>` + agentRules(selected, p);
+    `<div class="ac-sec">当前状态</div>` + stateChips(selected, p) +
+    attrBlock(selected) + explainBlock(selected);
 }
 
 function hoverAt(e) {
@@ -664,8 +810,36 @@ const sPop = $('s-pop'), sZ0 = $('s-z0'), sZspd = $('s-zspd'), sInc = $('s-inc')
 const sArm = $('s-arm'), sPol = $('s-pol'), sPacc = $('s-pacc');
 const sDog = $('s-dog'), sCat = $('s-cat'), sBear = $('s-bear'), sTiger = $('s-tiger'), sAinf = $('s-ainf');
 
+// 难度档：一次调四组参数（人口 / 初始尸 / 持枪率 / 警力）
+// 城市名中文化
+const CITY_CN = {
+  berlin: '柏林·米特', tokyo: '东京·千代田', zhengzhou: '郑州·金水',
+  nanyang: '南阳·卧龙', zhenping: '镇平',
+};
+function cnCity(id, fallback) {
+  const k = String(id || '').toLowerCase();
+  for (const key of Object.keys(CITY_CN)) if (k.includes(key)) return CITY_CN[key];
+  return fallback || id || '未知城市';
+}
+
+const DIFF_PRESET = {
+  easy:      { pop: 0.6, zomb: 0.6, armed: 1.6, police: 1.4 },
+  normal:    { pop: 1.0, zomb: 1.0, armed: 1.0, police: 1.0 },
+  nightmare: { pop: 1.4, zomb: 1.7, armed: 0.6, police: 0.65 },
+};
+function applyDifficulty(p) {
+  const q = new URLSearchParams(location.search).get('diff') || 'normal';
+  const d = DIFF_PRESET[q] || DIFF_PRESET.normal;
+  p.population = Math.max(200, Math.round(p.population * d.pop));
+  p.initialZombies = Math.max(1, Math.round(p.initialZombies * d.zomb));
+  p.armedRate = Math.min(0.9, p.armedRate * d.armed);
+  p.police = Math.max(4, Math.round(p.police * d.police));
+  p.difficulty = q;
+  return p;
+}
+
 function readParams() {
-  return {
+  const p = {
     seed,
     population: +sPop.value,
     initialZombies: +sZ0.value,
@@ -691,6 +865,7 @@ function readParams() {
     carriers: MOPT.carriers,
     waves: MOPT.waves, waveInterval: MOPT.waveInterval, waveCount: MOPT.waveCount,
   };
+  return applyDifficulty(p);
 }
 function syncLabels() {
   $('v-pop').textContent = (+sPop.value).toLocaleString();
@@ -1026,6 +1201,17 @@ selectTool('select');
 
 // ---------- 档案卡按钮 / 地点点击 ----------
 {
+  const bindGauge = (id, fn) => {
+    const el = document.getElementById(id);
+    if (el) { el.style.cursor = 'pointer'; el.onclick = () => { if (sim) fn(sim); }; }
+  };
+  bindGauge("g-chaos", openChaosInfo);
+  bindGauge("g-infect", openInfectInfo);
+  bindGauge("g-aware", openAwareInfo);
+  const bf = document.getElementById('btn-force');
+  if (bf) bf.onclick = () => { if (sim) openForce(sim); };
+  const bs = document.getElementById('btn-sanit');
+  if (bs) bs.onclick = () => { if (sim) openSanit(sim); };
   const c = document.getElementById('ac-close');
   if (c) c.onclick = (ev) => { ev.stopPropagation(); deselectAgent(); };
 
@@ -1246,6 +1432,7 @@ async function boot() {
 
   setL(52, '构建几何体…');
   await new Promise(r => setTimeout(r, 30));
+  localizeCityNames(city);   // 建筑名一律中文
   const { group, buildingMat } = buildCity(city);
   scene.add(group);
   cityRef.mat = buildingMat;
@@ -1297,6 +1484,14 @@ async function boot() {
   layerEdit = new LayerEditor({
     scene, renderer, getCamera: activeCamera, nav, overlay,
     cityId: CID, fileOps: layerFileOps, baseGrid: nav.grid.slice(),
+    // 手绘墙之后：门场要重建（否则出门路线是旧的），被墙盖住的人要挪出来
+    onChange: () => {
+      try {
+        nav.buildDoorField();
+        const n = sim ? sim.evictFromWalls() : 0;
+        if (n) console.log('[ZOS-R] 手绘后挪出墙体 ' + n + ' 人');
+      } catch (err) { console.warn('[ZOS-R] 手绘后处理失败：', err); }
+    },
   });
   console.log('[ZOS-R] 地形图层：不可通行 ' + overlay.stats.block.toLocaleString() +
     ' / ' + overlay.stats.total.toLocaleString() + ' 格 (' + overlay.stats.pct.toFixed(1) + '%)');
@@ -1452,7 +1647,7 @@ async function boot() {
     if (l) l.style.display = 'none';
   }, 650);
 
-  $('tb-city').textContent = city.name;
+  $('tb-city').textContent = cnCity(CID, city.name);
   {
     const tb = $('topbar');
     const b = document.createElement('button');
@@ -1482,7 +1677,7 @@ async function boot() {
       for (const c of cityIndex) {
         const o = document.createElement('option');
         o.value = c.id;
-        o.textContent = c.name;
+        o.textContent = cnCity(c.id, c.name);
         if (c.id === CID) o.selected = true;
         sel.appendChild(o);
       }
@@ -1565,6 +1760,7 @@ function loop(t) {
   if (keys.has('KeyR')) rig.pitch = Math.min(1.52, rig.pitch + dtReal * 0.7);
   if (keys.has('KeyF')) rig.pitch = Math.max(0.18, rig.pitch - dtReal * 0.7);
   clampTarget();
+  updatePathLine();
   if (!FIXCAM) applyCamera();
 
   // 模拟
@@ -1658,6 +1854,15 @@ function loop(t) {
     $('n-inf').textContent = sim.stats.infected.toLocaleString();
     $('n-zomb').textContent = sim.stats.zombie.toLocaleString();
     $('n-dead').textContent = sim.stats.dead.toLocaleString();
+    // 三条状态条（混乱 → 感染 → 知情）
+    const gauge = (id, v) => { const e = $(id); if (e) e.style.width = Math.max(0, Math.min(100, v)) + "%"; };
+    gauge("bar-chaos", sim.chaos || 0);
+    gauge("bar-infect", (sim.infectRate || 0) * 100);
+    gauge("bar-aware", (sim.awareRate || 0) * 100);
+    const setPct = (id, v) => { const e = $(id); if (e) e.textContent = Math.round(v) + "%"; };
+    setPct("n-infect", (sim.infectRate || 0) * 100);
+    setPct("n-aware", (sim.awareRate || 0) * 100);
+    if ($("n-chaos")) $("n-chaos").textContent = Math.round(sim.chaos || 0);
     if ($('n-exit') && sim.escapeSide) {
       const side = sim.escapeLine ? sim.escapeLine() : null;
       $('n-exit').textContent = side ? side.name : '—';

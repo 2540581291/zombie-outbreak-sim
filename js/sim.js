@@ -4,7 +4,7 @@
 // ============================================================
 
 import { SP, TEAM, SPECIES, SPECIAL_KINDS, CIV_KINDS, ANIMAL_KINDS, WILD_KINDS } from './species.js';
-import { jobOf, jobFor, ageOf, braveOf, JOB_POI, h } from './profiles.js';
+import { jobOf, jobFor, ageOf, braveOf, JOB_POI, h, attrFor } from './profiles.js';
 import { buildFamilies } from './family.js';
 import { WPN, WEAPONS, ROLE_WEAPON, skillFor, weaponOf } from './weapons.js';
 import { makeStock, makeStationStock, makeHomeStock, takeWeapon, hasWeapon, stockText } from './storage.js';
@@ -26,7 +26,7 @@ export const ST = {
 const NMAX = 62000;
 
 // 潜伏期两套常量（决策 3）：默认 8 秒；零号病人模式 10–30 分钟
-export const INCFG = { quick: 8, long: [600, 1800] };
+export const INCFG = { quick: 8, bite: [60, 120], contact: [360, 1440], long: [600, 1800] };
 
 // 一天 24 分钟：1 模拟秒 = 1 游戏分钟，1440 秒 = 24 小时（整数关系，不用换算）
 export const DAY_SECONDS = 1440;
@@ -36,7 +36,7 @@ export const TIME_SEGS = [
 ];
 
 // 混乱度权重（0-100 上限）：知情值 1% → 1 点，感染值 1% → 2 点
-export const CHAOS_W = { aware: 1, infect: 2, cap: 100 };
+export const CHAOS_W = { aware: 0.5, infect: 2, cap: 100 };   // 知情值算半个混乱
 
 // 个体的「社会目标」：和身体状态（state）正交
 export const GOAL = {
@@ -223,10 +223,22 @@ export class Sim {
     this.homeStocks = new Map();                 // 家庭军械库：household id → stock
     this.stationOf = new Uint16Array(NMAX);      // 警员属于哪个警局（1 起，0 = 无）
     // ---- 要员护送（M9）----
+    // ---- 四个性格属性（P0.1）----
+    this.trust = new Uint8Array(NMAX);           // 政府信任 0-100
+    this.familyDuty = new Uint8Array(NMAX);      // 家庭责任
+    this.willpower = new Uint8Array(NMAX);       // 意志
+    this.courage = new Uint8Array(NMAX);         // 勇猛
+    this.infRoute = new Uint8Array(NMAX);        // 感染路线：0 无 / 1 咬伤 / 2 接触
+    this.ill = new Uint8Array(NMAX);             // 1 = 有普通病（要去看医生）
+    this.arrGoal = new Uint8Array(NMAX);         // 已经对哪个目标执行过 arrive（防止每帧重复触发）
+    this.chainStep = new Uint8Array(NMAX);       // 行动链：0 无 / 1 接家人 / 2 取枪 / 3 避难或撤离
+    this.exposedAt = new Float32Array(NMAX);     // 上一次被"接触类感染者"贴住的时刻（0 = 没被贴）
+    this.expStart = new Float32Array(NMAX);      // 这段连续接触是什么时候开始的
     this.escortOf = new Uint8Array(NMAX);        // 该警员在护送哪位要员（0 = 不在护送）
     this.vipStage = new Uint8Array(NMAX);        // 要员护送阶段：0 无 / 1 四人小队去警局 / 2 八人小队出城
     this.vipGoal = new Uint8Array(NMAX);         // 1 = 去警局，2 = 逃出城
     this.vipDone = new Uint8Array(NMAX);         // 1 = 已经安置好（撤离）
+    this.vipStation = new Uint8Array(NMAX);      // 1 = 已经送进警察局（还没撤离）
     this.patrol = new Uint8Array(NMAX);          // 1 = 巡警（开局 10% 散在城里）
     this.eventSeq = 0;
     // ---- 社会层（M1）：家 / 工作地 / 当前目标 ----
@@ -337,7 +349,11 @@ export class Sim {
     this.noises.length = 0; this.alarms.length = 0; this.deathAlarms.length = 0; this.eventSeq = 0; this.nextDispatch = 0;
     this.homeStocks.clear();
     this.stationOf.fill(0); this.patrol.fill(0);
-    this.escortOf.fill(0); this.vipStage.fill(0); this.vipGoal.fill(0); this.vipDone.fill(0);
+    this.escortOf.fill(0); this.vipStage.fill(0); this.vipGoal.fill(0); this.vipDone.fill(0); this.vipStation.fill(0);
+    this.trust.fill(0); this.familyDuty.fill(0); this.willpower.fill(0); this.courage.fill(0);
+    this.infRoute.fill(0); this.exposedAt.fill(0); this.expStart.fill(0);
+    this.ill.fill(0); this.chainStep.fill(0); this.arrGoal.fill(0);
+    this.lastSaved = 0; this.budgetBack = 0;
     this.stam.fill(1); this.armed.fill(0); this.state.fill(0); this.ammo.fill(0);
     this.stuck.fill(0);
     this.side.fill(1);
@@ -453,6 +469,11 @@ export class Sim {
     // ---- 家庭军械库（M8）：每个家庭按哈希决定有没有枪、有多少子弹 ----
     for (let hid = 0; hid < this.nHh; hid++) {
       this.homeStocks.set(hid, makeHomeStock(h(hid, 51), rng, P.homeGunRate));
+    }
+
+    // 3% 的人有普通病（不是感染）：爆发前去过医院，医院门口本来就会有人
+    for (let i = 0; i < k; i++) {
+      if (this.state[i] === ST.CIV && h(i, 91) < 0.03) this.ill[i] = 1;
     }
 
     // ---- 社会层（M1）：家 / 工作地 ----
@@ -665,7 +686,7 @@ export class Sim {
       for (let tr = 0; tr < 200000 && made < want; tr++) {
         const i = (rng() * k) | 0;
         if (this.state[i] !== ST.CIV) continue;
-        this.setInfected(i, this.rollIncubation());
+        this.setInfected(i, this.incubationFor(i, 2), 2);
         this.panic[i] = 0.6;
         made++;
       }
@@ -731,7 +752,7 @@ export class Sim {
             this.pow[i] = asp.zombiePow || 1;
           } else {
             this.state[i] = ST.INFECTED;
-            this.incTot[i] = this.rollIncubation() * 0.6;
+            this.incTot[i] = this.incubationFor(i, 1) * 0.6;
             this.timer[i] = this.incTot[i];
           }
         }
@@ -739,6 +760,7 @@ export class Sim {
       }
     }
     this.n = k;
+    this.assignAttributes();
     this.countStats();
   }
 
@@ -767,7 +789,8 @@ export class Sim {
     const nav = this.nav;
     // 拒绝采样：目标必须落在可走格上，否则人会一直朝墙里走
     for (let t = 0; t < 8; t++) {
-      const a = rng() * 6.2832, d = 20 + rng() * 90;
+      // 先在近处试（楼里走动的人只能在楼内晃），不行再放大半径
+      const a = rng() * 6.2832, d = t < 5 ? (3 + rng() * 9) : (14 + rng() * 40);
       let x = this.px[i] + Math.cos(a) * d;
       let z = this.pz[i] + Math.sin(a) * d;
       if (x < -nav.halfW + 8) x = -nav.halfW + 8;
@@ -809,13 +832,36 @@ export class Sim {
     }
     // 一个 4×4 块至少 12/16 可走才算通 —— 否则"有一格能走"就算通，
     // 寻路会直接穿墙，人在墙间蹭（实测：中位速度只有 0.3 m/s）
-    for (let k = 0; k < g.length; k++) if (cnt[k] >= 12) g[k] = 1;
+    for (let k = 0; k < g.length; k++) if (cnt[k] >= 9) g[k] = 1;
     this.cgrid = g;
     this.came = new Int32Array(this.gw * this.gh);
     this.cseen = new Int32Array(this.gw * this.gh);
     this.cq = new Int32Array(this.gw * this.gh);
     this.cstamp = 0;
     this.pathBudget = 40;
+  }
+
+  /**
+   * 把一个粗格吸附到"最近的可通行粗格"（±4 格内）。
+   * 以前只给终点做吸附，起点不合格就直接放弃 —— 楼里的人几乎永远算不出路径。
+   */
+  snapCoarse(k) {
+    if (k < 0) return -1;
+    if (this.cgrid[k]) return k;
+    const gw = this.gw, gh = this.gh;
+    const c0 = k % gw, r0 = (k / gw) | 0;
+    let best = -1, bd = 1e9;
+    for (let dr = -4; dr <= 4; dr++) {
+      for (let dc = -4; dc <= 4; dc++) {
+        const r = r0 + dr, c = c0 + dc;
+        if (r < 0 || c < 0 || r >= gh || c >= gw) continue;
+        const k2 = r * gw + c;
+        if (!this.cgrid[k2]) continue;
+        const d = dr * dr + dc * dc;
+        if (d < bd) { bd = d; best = k2; }
+      }
+    }
+    return best;
   }
 
   ccell(x, z) {
@@ -826,11 +872,95 @@ export class Sim {
     return r * this.gw + c;
   }
 
+  /** 粗格 → 世界坐标（折线预览用） */
+  coarseWorld() {
+    const nav = this.nav, cs = this.cs;
+    const cellW = nav.cell * cs;
+    return (k) => {
+      const c = k % this.gw, r = (k / this.gw) | 0;
+      return [-nav.halfW + (c + 0.5) * cellW, nav.halfH - (r + 0.5) * cellW];
+    };
+  }
+
+  /**
+   * 只算不改：从个体当前位置到他目标的整条折线（世界坐标数组）。
+   * 面板/覆盖层用它画"行走路径"，不影响真实寻路状态。
+   */
+  previewPath(i, tx, tz) {
+    if (!this.cgrid) return null;
+    const nav = this.nav;
+    // 人在屋里：路线是"先走到门口，再从门口开始算"——这也是 AI 真正做的事
+    let fx = this.px[i], fz = this.pz[i];
+    const prefix = [];
+    if (nav.indoor && nav.indoor(fx, fz) && nav.doorPoint) {
+      const dp = nav.doorPoint(fx, fz);
+      if (dp) { prefix.push([fx, fz], [dp.x, dp.z]); fx = dp.x; fz = dp.z; }
+    }
+    // 太远的目标只算"头 400 米"：全城 BFS 要几十万格，根本跑不完 ——
+    // 显示的本来就是"下一步往哪走"，不是整段马拉松。
+    const dist0 = Math.hypot(tx - fx, tz - fz);
+    if (dist0 > 400) {
+      const k = 400 / dist0;
+      tx = fx + (tx - fx) * k;
+      tz = fz + (tz - fz) * k;
+    }
+    let s0 = this.snapCoarse(this.ccell(fx, fz));
+    let t0 = this.snapCoarse(this.ccell(tx, tz));
+    if (s0 < 0 || t0 < 0) return null;
+    // 目标格不可走：在附近找一格能走的
+    if (!this.cgrid[t0]) {
+      const gw = this.gw, tc = t0 % gw, tr = (t0 / gw) | 0;
+      let found = -1;
+      for (let dr = -2; dr <= 2 && found < 0; dr++) {
+        for (let dc = -2; dc <= 2; dc++) {
+          const r2 = tr + dr, c2 = tc + dc;
+          if (r2 < 0 || c2 < 0 || r2 >= this.gh || c2 >= gw) continue;
+          const k = r2 * gw + c2;
+          if (this.cgrid[k]) { found = k; break; }
+        }
+      }
+      if (found < 0) return null;
+      t0 = found;
+    }
+    const gw = this.gw, gh = this.gh, grid = this.cgrid;
+    const prev = new Int32Array(gw * gh).fill(-2);
+    const q = new Int32Array(gw * gh);
+    let head = 0, tail = 0;
+    prev[s0] = -1; q[tail++] = s0;
+    let hit = false;
+    while (head < tail && tail < 20000) {
+      const k = q[head++];
+      if (k === t0) { hit = true; break; }
+      const c = k % gw, r = (k / gw) | 0;
+      const nb = [c > 0 ? k - 1 : -1, c + 1 < gw ? k + 1 : -1,
+                  r > 0 ? k - gw : -1, r + 1 < gh ? k + gw : -1];
+      for (let z = 0; z < 4; z++) {
+        const k2 = nb[z];
+        if (k2 < 0 || !grid[k2] || prev[k2] !== -2) continue;
+        prev[k2] = k; q[tail++] = k2;
+      }
+    }
+    if (!hit) return null;
+    const W = this.coarseWorld();
+    const pts = [];
+    let k = t0;
+    while (k !== -1 && pts.length < 200) { pts.push(W(k)); k = prev[k]; }
+    pts.reverse();
+    return prefix.concat(pts);
+  }
+
   /** 从 (sx,sz) 到 (tx,tz) 出一条折线，最多 6 个路点；走不通返回 0 */
   planPath(i, tx, tz) {
     if (!this.cgrid || this.pathBudget <= 0) return 0;
-    const s = this.ccell(this.px[i], this.pz[i]);
-    const t = this.ccell(tx, tz);
+    // 起点也吸附：楼里的人原来在这里就被判"无路"，于是一直卡着
+    let fx = this.px[i], fz = this.pz[i];
+    const nav = this.nav;
+    if (nav.indoor && nav.indoor(fx, fz) && nav.doorPoint) {
+      const dp = nav.doorPoint(fx, fz);
+      if (dp) { fx = dp.x; fz = dp.z; }
+    }
+    const s = this.snapCoarse(this.ccell(fx, fz));
+    const t = this.snapCoarse(this.ccell(tx, tz));
     if (s < 0 || t < 0) return 0;
     if (!this.cgrid[t]) {
       // 目标在墙里/屋外：找它附近 3 格内最近的可行走粗格
@@ -932,7 +1062,9 @@ export class Sim {
   }
 
   setGoal(i, g, x, z) {
-    if (g === GOAL.ARM_HOME) { x = this.homeX[i]; z = this.homeZ[i]; }
+    if (g === GOAL.ARM_HOME) {
+      this.chainStep[i] = 3; x = this.homeX[i]; z = this.homeZ[i]; }
+    if (this.goal[i] !== g) this.arrGoal[i] = 0;
     this.goal[i] = g;
     if (x !== undefined) { this.goalX[i] = x; this.goalZ[i] = z; }
   }
@@ -1024,21 +1156,187 @@ export class Sim {
    * 分数不是玄学，每一项都对应规划里的 w1..w6：
    *   安全(离丧尸多远) / 信息(知不知道) / 距离 / 家庭 / 性格 / 从众
    */
-  decide(i) {
-    const st = this.state[i];
-    if (st !== ST.CIV && st !== ST.FLEE && st !== ST.FIGHT && st !== ST.INFECTED) return;
+  /** 四个属性 → 0..1（没赋值时按 50 兜底） */
+  attrOf(i) {
+    return {
+      trust: (this.trust[i] || 50) / 100,
+      family: (this.familyDuty[i] || 50) / 100,
+      will: (this.willpower[i] || 50) / 100,
+      courage: (this.courage[i] || 45) / 100,
+    };
+  }
+
+  /**
+   * 打分：所有候选目标 + 每一项的贡献。
+   * **decide() 和 explain() 都调这里** —— 保证面板显示的就是真跑的。
+   */
+  /** 给每个个体发四个属性（身份定基准 + 年龄修正 + 个人噪声） */
+  assignAttributes() {
+    for (let i = 0; i < this.n; i++) {
+      const st = this.state[i];
+      const k = this.kind[i];
+      let role = 'civilian';
+      if (st === ST.POLICE || st === ST.SOLDIER) role = k === SP.SOLDIER ? 'soldier' : 'police';
+      if (this.vip && this.vip[i]) role = 'vip';
+      const a = attrFor(i, role);
+      this.trust[i] = a.trust;
+      this.familyDuty[i] = a.family;
+      this.willpower[i] = a.will;
+      this.courage[i] = a.courage;
+    }
+  }
+
+  scoreGoals(i) {
+    const A = this.attrOf(i);
+    const awareNow = this.aware[i];
+    const chaosNow = this.chaos || 0;
+    const nearNow = this.zDanger(i);
+
+    // ---------- 日常层（P2.1 / 2.4）----------
+    // 一无所知 + 混乱度 < 15 + 附近没丧尸 → 过正常日子，不参与危机打分
+    if (awareNow === 0 && chaosNow < 15 && nearNow < 0.05) {
+      const m = this.clockMin;
+      const atWork = m >= 6 * 60 && m < 18 * 60;      // 06:00–18:00 在单位/学校
+      const sickNow = this.ill[i] && this.state[i] !== ST.INFECTED;
+      const candDaily = new Map();
+      const addD = (g, k, v) => {
+        let c = candDaily.get(g);
+        if (!c) { c = { goal: g, score: 0, parts: [] }; candDaily.set(g, c); }
+        c.score += v; c.parts.push({ k, v });
+      };
+      if (sickNow) {
+        addD(GOAL.HELP, '要看病（压过上班）', 2.2);
+        addD(atWork ? GOAL.WORK : GOAL.HOME, '日程', 0.6);
+      } else {
+        addD(atWork ? GOAL.WORK : GOAL.HOME, '日程（' + (atWork ? '上班/上学时段' : '回家/休息时段') + '）', 2.0);
+        addD(atWork ? GOAL.HOME : GOAL.WORK, '反向行程', 0.3);
+      }
+      addD(GOAL.NONE, '闲晃', 0.4);
+      const list = [...candDaily.values()].sort((a, b) => b.score - a.score);
+      return {
+        candidates: list, best: list[0].goal, bestScore: list[0].score,
+        excluded: [], daily: true,
+        ctx: { attr: A, near: nearNow, fam: this.familyAlive(i), homeD: 0,
+               gun: false, friend: 0, chaos: chaosNow, aware: awareNow, infected: false },
+      };
+    }
+
+    // ---------- 危机层 ----------
     const aware = this.aware[i];
-    const brave = braveOf(i);
-    const near = this.zDanger(i);          // 0..1，越近越危险（只看感知 + 附近的枪声）
+    const near = this.zDanger(i);            // 0..1，越近越危险
     const fam = this.familyAlive(i);
     const homeD = Math.hypot(this.homeX[i] - this.px[i], this.homeZ[i] - this.pz[i]);
     const gun = this.homeHasGun(i) && !this.armed[i];
-    const friend = this.nearFriends(i);    // 附近同类的人数（从众）
+    const friend = this.nearFriends(i);
+    const chaos = this.chaos || 0;
+    const infected = this.state[i] === ST.INFECTED;
 
-    let best = this.goal[i], bs = -1;
-    const consider = (g, sc) => { if (sc > bs) { bs = sc; best = g; } };
+    const cand = new Map();
+    const add = (g, k, v) => {
+      let c = cand.get(g);
+      if (!c) { c = { goal: g, score: 0, parts: [] }; cand.set(g, c); }
+      c.score += v;
+      c.parts.push({ k, v });
+    };
 
-    // 发病的人：不管知不知道外面出事了，都会往医院跑（这是零号病人的核心叙事）
+    // 恐慌系数：混乱度低的时候，人不会成群结队地逃或者跟人群走
+    const panic = Math.min(1, chaos / 40);
+
+    // ---- 基线（保证兜底，不会出现"全 0 发呆"）----
+    add(GOAL.FLEE, '基线', 0.35 * (0.35 + 0.65 * panic));
+    add(GOAL.HOME, '基线', 0.40);
+    add(GOAL.ARM_HOME, '基线', 0.25);
+    add(GOAL.SHELTER, '基线', 0.20);
+    add(GOAL.HOLD, '基线', 0.10);
+    add(GOAL.FOLLOW, '基线', 0.15 * (0.35 + 0.65 * panic));
+    add(GOAL.WORK, '基线', 0.30);
+    add(GOAL.NONE, '基线', 0.20);
+
+    // ---- 属性项 ----
+    add(GOAL.FLEE, '勇猛低（怕死）', (1 - A.courage) * 0.35 * panic);
+    add(GOAL.FLEE, '信任低（不信体制）', (1 - A.trust) * 0.20 * panic);
+    add(GOAL.FLEE, fam === 0 ? '没牵挂' : '有牵挂', (fam === 0 ? 0.15 : -A.family * 0.20) * panic);
+
+    add(GOAL.HOME, '家庭责任', A.family * 0.60);
+    add(GOAL.HOME, '家太远', -Math.min(0.35, homeD / 3000));
+
+    add(GOAL.ARM_HOME, '勇猛', A.courage * 0.50);
+    add(GOAL.ARM_HOME, '信任低', (1 - A.trust) * 0.20);
+
+    // 去警局避难需要"知道出事了"：一无所知的人不会主动去避难所
+    if (aware >= 1 || chaos >= 20) {
+      add(GOAL.SHELTER, '政府信任', A.trust * 0.70);
+      add(GOAL.SHELTER, '勇猛低', (1 - A.courage) * 0.15);
+    } else {
+      add(GOAL.SHELTER, '还没听说（不去避难）', -0.20);
+    }
+
+    add(GOAL.HOLD, '意志', A.will * 0.50);
+    add(GOAL.HOLD, homeD > 150 ? '不在家附近（守不住）' : '就在家附近', homeD > 150 ? -0.45 : 0.35);
+    add(GOAL.HOLD, '勇猛低', (1 - A.courage) * 0.20);
+
+    add(GOAL.FOLLOW, '意志低', (1 - A.will) * 0.40 * panic);
+    add(GOAL.FOLLOW, '附近人多', Math.min(1, friend / 12) * 0.30 * panic);
+
+    // ---- 处境项 ----
+    if (near > 0.25) {
+      add(GOAL.FLEE, '附近有丧尸', 0.55 + near * 0.4);
+      if (fam > 0) add(GOAL.HOME, '附近有丧尸（仍想回家）', 0.25 + (homeD < 500 ? 0.2 : 0));
+      if (gun) add(GOAL.ARM_HOME, '附近有丧尸 + 有枪', 0.30 + (homeD < 300 ? 0.2 : 0));
+      add(GOAL.HOLD, '附近有丧尸', 0.15);
+    }
+    if (chaos >= 50) {
+      const pp = this.nearestPoi('police', this.px[i], this.pz[i]);
+      if (pp) {
+        const d = Math.hypot(pp.x - this.px[i], pp.z - this.pz[i]);
+        add(GOAL.SHELTER, '混乱度 ≥ 50%', 0.95 - Math.min(0.45, d / 4000));
+      }
+    }
+    if (aware >= 1) {
+      add(GOAL.HOME, '听说了（回家看看）', 0.10);
+      add(GOAL.FLEE, '听说了 + 网络热度', this.heat * 0.25);
+    }
+    if (infected) add(GOAL.HELP, '已被感染（去医院）', this.sick[i] ? 1.6 : 0.5);
+
+    // ---- 三步行动链的约束（P2.3）：让链真的驱动行为，而不只是贴标签 ----
+    const atHome = homeD < 60;
+    if (this.chainStep[i] === 0 && fam > 0 && !atHome) {
+      // 家里还有人，却想直接跑 / 直接进避难所 → 扣分，先把人接上
+      add(GOAL.SHELTER, '还没接家人', -0.55);
+      add(GOAL.FLEE, '还没接家人', -0.45);
+    }
+    if (atHome && this.chainStep[i] <= 1 && this.homeHasGun(i) && !this.armed[i] && chaos >= 20) {
+      // 人在家、家里有枪、还没拿：先拿枪再走（第二步）
+      add(GOAL.ARM_HOME, '先取枪再走', 0.85);
+      add(GOAL.SHELTER, '先取枪再走', -0.45);
+      add(GOAL.FLEE, '先取枪再走', -0.35);
+    }
+
+    // ---- 前置条件不满足 → 直接从候选里移除（并记原因，供 explain 用）----
+    const excluded = [];
+    if (!gun) excluded.push({ goal: GOAL.ARM_HOME, why: '家里没有枪' });
+    if (infected) excluded.push({ goal: GOAL.WORK, why: '已感染，不会再上班' });
+
+    // ---- 排序 ----
+    let list = [...cand.values()];
+    const filtered = list.filter((c) => !excluded.some((e) => e.goal === c.goal));
+    filtered.sort((a, b) => b.score - a.score);
+    if (!filtered.length) filtered.push({ goal: GOAL.FLEE, score: 0.5, parts: [{ k: '兜底', v: 0.5 }] });
+
+    return {
+      candidates: filtered,
+      best: filtered[0].goal,
+      bestScore: filtered[0].score,
+      excluded,
+      ctx: { attr: A, near, fam, homeD, gun, friend, chaos, aware, infected },
+    };
+  }
+
+  decide(i) {
+    const st = this.state[i];
+    if (st !== ST.CIV && st !== ST.FLEE && st !== ST.FIGHT && st !== ST.INFECTED) return;
+
+    // 发病的人：不管知不知道外面出事了，都会往医院跑（零号病人的核心叙事）
     if (this.sick[i] && this.state[i] === ST.INFECTED) {
       const hp = this.nearestPoi('hospital', this.px[i], this.pz[i]);
       if (hp) {
@@ -1047,48 +1345,10 @@ export class Sim {
       }
     }
 
-    if (near > 0.25) {
-      // 附近有丧尸：先保命，再看牵挂
-      consider(GOAL.FLEE, 1.0 + (1 - brave) * 0.7 + near * 0.4);
-      if (fam > 0) consider(GOAL.HOME, 0.75 + (1 - brave) * 0.5 + (homeD < 500 ? 0.35 : 0) - homeD / 4000);
-      if (gun) consider(GOAL.ARM_HOME, 0.55 + brave * 0.8 + (homeD < 300 ? 0.3 : 0) - homeD / 5000);
-      // 混乱度 ≥ 50%：优先去警局避难（到了那儿、而且混乱度够了，才拿得到枪）
-      if (this.chaos >= 50) consider(GOAL.SHELTER, 0.9 + (1 - brave) * 0.4);
-      consider(GOAL.HOLD, 0.35 + (1 - brave) * 0.7);
-      if (this.state[i] === ST.INFECTED) consider(GOAL.HELP, 1.1);
-      consider(GOAL.FOLLOW, 0.25 + Math.min(1, friend / 12) * 0.5);
-    } else if (aware >= 1) {
-      // 只是听说：半信半疑 —— 有家人的往家走，没牵挂的往城外跑，
-      // 有枪的回家拿枪，胆小的固守，也有人压根不信
-      const famW = Math.min(1, fam / 2);
-      // 家越远越不想回（走 3 公里不如直接跑）
-      consider(GOAL.HOME, 0.30 + 0.45 * famW + (1 - brave) * 0.2 + (homeD < 400 ? 0.1 : 0)
-        - Math.min(0.35, homeD / 3000));
-      consider(GOAL.FLEE, 0.28 + this.heat * 0.35 + (fam === 0 ? 0.3 : 0) + brave * 0.15);
-      consider(GOAL.HOLD, 0.22 + (1 - brave) * 0.45 + (homeD < 80 ? 0.25 : 0));
-      if (gun) consider(GOAL.ARM_HOME, 0.30 + brave * 0.5 + (homeD < 500 ? 0.15 : 0));
-      if (this.chaos >= 50) consider(GOAL.SHELTER, 0.55 + (1 - brave) * 0.5);
-      if (this.state[i] === ST.INFECTED) consider(GOAL.HELP, 0.9);
-      consider(GOAL.NONE, 0.30);       // 有人就是不信/不动
-    } else {
-      // 什么都不知道：照常通勤
-      consider(GOAL.HOME, 0.5);
-      consider(GOAL.WORK, 0.5);
-      consider(GOAL.NONE, 0.3);
-    }
+    const r = this.scoreGoals(i);
+    let best = r.best, bs = r.bestScore;
 
-    // 惯性：已经选定的目标给一点加分，否则人会在两个目标之间每秒横跳
-    // 混乱度 ≥ 50%：全城的人都想往警局跑（不管他知不知道、看没看见）
-    if (this.chaos >= 50) {
-      const pp = this.nearestPoi('police', this.px[i], this.pz[i]);
-      if (pp) {
-        const d = Math.hypot(pp.x - this.px[i], pp.z - this.pz[i]);
-        consider(GOAL.SHELTER, 1.25 - Math.min(0.45, d / 4000));
-      }
-    }
-
-    // 惯性：当前目标加一点分。没有这个，人会在"回家"和"逃"之间每 1.5 秒横跳，
-    // 走 15 秒往家、再 15 秒往城外，30 秒净位移约等于 0（测试里表现为"卡住")
+    // 惯性：当前目标加一点分，避免每秒横跳
     const cur = this.goal[i];
     if (cur !== GOAL.NONE && best !== cur) {
       const momentum = cur === GOAL.FLEE ? 0.10 : 0.14;
@@ -1096,16 +1356,12 @@ export class Sim {
     }
     this.lastScore[i] = bs;
 
-    if (best === this.goal[i] && best !== GOAL.FLEE && best !== GOAL.NONE) {
-      // 目标没变就不用重复设点（尤其是逃跑点，别每帧重算）
-      return;
-    }
+    if (best === this.goal[i] && best !== GOAL.FLEE && best !== GOAL.NONE) return;
     let gx, gz;
     if (best === GOAL.FLEE) { const p = this.escapePoint(i); gx = p[0]; gz = p[1]; }
     else if (best === GOAL.HELP) {
       const h = this.nearestPoi('hospital', this.px[i], this.pz[i]);
-      if (h) { gx = h.x; gz = h.z; }
-      else { const p = this.fleePoint(i); gx = p[0]; gz = p[1]; }
+      if (h) { gx = h.x; gz = h.z; } else { const p = this.fleePoint(i); gx = p[0]; gz = p[1]; }
     } else if (best === GOAL.SHELTER) {
       const p = this.nearestPoi('police', this.px[i], this.pz[i]);
       if (p) { gx = p.x; gz = p.z; } else { const q = this.fleePoint(i); gx = q[0]; gz = q[1]; }
@@ -1113,10 +1369,25 @@ export class Sim {
     else if (best === GOAL.FOLLOW) { const q = this.escapePoint(i); gx = q[0]; gz = q[1]; }
     const changed = best !== this.goal[i];
     this.setGoal(i, best, gx, gz);
-    // 承诺：换了目标就 8~14 秒内不再改主意（逃的话更长）
-    this.decT[i] = this.time + (changed
-      ? (best === GOAL.FLEE ? 14 : 8 + this.rng() * 6)
-      : 1.0 + this.rng() * 1.2);
+    // 行动链步骤：1 接家人 / 2 取枪 / 3 避难或撤离
+    if (best === GOAL.HOME) this.chainStep[i] = this.chainStep[i] === 0 ? 1 : this.chainStep[i];
+    else if (best === GOAL.ARM_HOME) this.chainStep[i] = 2;
+    else if (best === GOAL.SHELTER || best === GOAL.FLEE) this.chainStep[i] = 3;
+    this.decT[i] = this.time + (changed ? (best === GOAL.FLEE ? 14 : 8 + this.rng() * 6) : 1.0 + this.rng() * 1.2);
+  }
+
+  /** 给面板用：为什么他现在在做这件事（和 decide 同一个打分函数） */
+  explain(i) {
+    const r = this.scoreGoals(i);
+    const NAMES = ['无', '回家', '上班', '逃', '回家取枪', '去警局', '去医院', '固守', '跟随', '被指挥'];
+    return {
+      goal: this.goal[i],
+      goalName: NAMES[this.goal[i]] || '—',
+      candidates: r.candidates.slice(0, 4).map((c) => ({ goal: c.goal, name: NAMES[c.goal], score: c.score, parts: c.parts })),
+      excluded: r.excluded.map((e) => ({ goal: e.goal, name: NAMES[e.goal], why: e.why })),
+      ctx: r.ctx,
+      attr: r.ctx.attr,
+    };
   }
 
   /** 到达目标点之后干什么 */
@@ -1139,10 +1410,11 @@ export class Sim {
       }
       this.setGoal(i, GOAL.HOLD, this.homeX[i], this.homeZ[i]);
       this.idle[i] = 1;
-      this.actT[i] = 8 + this.rng() * 10;
+      this.actT[i] = 5 + this.rng() * 8;
       return;
     }
     if (g === GOAL.SHELTER) {
+      this.chainStep[i] = 3;
       // 到警局避难：**混乱度 ≥ 50% 才拿得到枪**（低于 50% 时警察还在岗，军械库不给平民开）
       const poi = this.nearestPoi('police', this.px[i], this.pz[i]);
       if (!this.armed[i] && this.chaos >= 50 && poi && poi.store) {
@@ -1157,10 +1429,17 @@ export class Sim {
       }
       this.setGoal(i, GOAL.HOLD, this.px[i], this.pz[i]);
       this.idle[i] = 1;
-      this.actT[i] = 30 + this.rng() * 60;      // 就守在警局
+      this.actT[i] = 12 + this.rng() * 20;      // 就守在警局
       return;
     }
     if (g === GOAL.HOME) {
+      // 链式推进：到家之后先看家里有没有枪，再决定去避难还是固守
+      if (this.homeHasGun(i) && !this.armed[i] && this.chaos >= 20) {
+        this.setGoal(i, GOAL.ARM_HOME, this.homeX[i], this.homeZ[i]);
+        this.chainStep[i] = 2;
+        return;
+      }
+      this.chainStep[i] = 3;
       // 到家顺手把家里的枪拿上（如果他家本来就有枪）
       if (!this.armed[i] && this.homeHasGun(i)) {
         const stock = this.homeStocks.get(this.hh[i]);
@@ -1367,13 +1646,44 @@ export class Sim {
       }
     }
 
+    // ---- 接触传染（每秒一次）----
+    this.spreadContact();
+
+    // ---- 预算回款（P3.2）：每撤出一个人，返还 ¥200 ----
+    if (this.saved > (this.lastSaved || 0)) {
+      const d = this.saved - (this.lastSaved || 0);
+      this.lastSaved = this.saved;
+      this.budget = Math.min(this.budgetMax, this.budget + d * 200);
+      this.budgetBack = (this.budgetBack || 0) + d * 200;
+    }
+
     // ---- 感染率 / 戒严（每秒一次）----
     if (t >= this.rateT) {
       this.rateT = t + 1;
       const s = this.stats;
       this.infectRate = (s.zombie + s.infected) / Math.max(1, this.pop0 || this.n);
       this.awareRate = this.nAware / Math.max(1, this.n);
-      // 混乱度 = 知情值×1 + 感染值×2，上限 100
+      // 武力状态（0-100）：武装人数 × 40% + 警察存活 × 40% + 弹药存量 × 20%
+      let armedN = 0, polN = 0, ammoN = 0;
+      for (let i = 0; i < this.n; i++) {
+        const st2 = this.state[i];
+        if (st2 === ST.CORPSE || st2 === ST.ZOMBIE) continue;
+        if (this.armed[i]) { armedN++; ammoN += (this.mag[i] || 0) + (this.reserve[i] || 0); }
+        if (st2 === ST.POLICE || st2 === ST.SOLDIER) polN++;
+      }
+      const popAlive = Math.max(1, this.stats.civ + this.stats.police);
+      this.force = Math.min(100, Math.round(
+        Math.min(1, armedN / Math.max(1, popAlive * 0.15)) * 40 +
+        Math.min(1, polN / Math.max(1, (this.params && this.params.police) || 60)) * 40 +
+        Math.min(1, ammoN / Math.max(1, popAlive * 8)) * 20));
+
+      // 卫生状态（0-100）：尸体堆积和感染率会把城市拖垮
+      const corpses = this.stats.dead || 0;
+      const sanitRaw = 100 - Math.min(45, corpses / Math.max(1, this.pop0) * 300)
+                            - Math.min(45, this.infectRate * 100 * 4);
+      this.sanit = Math.max(0, Math.round(sanitRaw));
+
+      // 混乱度 = 知情值×0.5 + 感染值×2，上限 100
       const was = this.martialLaw;
       this.chaos = Math.min(CHAOS_W.cap,
         this.awareRate * 100 * CHAOS_W.aware + this.infectRate * 100 * CHAOS_W.infect);
@@ -1478,6 +1788,87 @@ export class Sim {
   // 策略：正前方 → 按固定一侧逐步加角度探测（Bug 算法，不会来回抖）
   //       全被堵 → 沿"门场"梯度朝最近的门走
   //       真动不了 → 换目标（连卡 0.6 秒就翻边/换点）
+  /**
+   * 找"最近的室外可走点"方向（门场失效时的兜底）。
+   * 24 个方向 × 4 个半径，只在室内且门场为空时调用。
+   */
+  exitProbe(i) {
+    const nav = this.nav;
+    if (!nav.indoor) return null;
+    if (!nav.indoor(this.px[i], this.pz[i])) return null;
+    let best = null, bd = 1e9;
+    for (let k = 0; k < 24; k++) {
+      const a = (k * Math.PI * 2) / 24;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      for (let q = 0; q < 4; q++) {
+        const d = 4 + q * 6;
+        const x = this.px[i] + ca * d, z = this.pz[i] + sa * d;
+        if (!this.walkable(x, z)) continue;
+        if (nav.indoor(x, z)) continue;
+        // 检查这条直线是不是真的通（每 1.5m 探一次），否则会一头撞在墙上
+        let clear = true;
+        for (let m = 1.5; m < d; m += 1.5) {
+          if (!this.walkable(this.px[i] + ca * m, this.pz[i] + sa * m)) { clear = false; break; }
+        }
+        if (!clear) continue;
+        if (d < bd) { bd = d; best = [ca, sa]; }
+        break;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * 统一"朝某方向走"：只要人在屋里，就先跟着门场出门；
+   * 门场给不出方向（这栋楼没有连通的门）就自己探一个最近的出口。
+   */
+  /**
+   * 把"站在不可通行格子上"的个体挪到最近的空地。
+   * 手绘墙之后必须调一次，否则被墙盖住的人会永远卡死在里面。
+   * 返回被挪动的人数。
+   */
+  evictFromWalls() {
+    let moved = 0;
+    const nav = this.nav;
+    const maxR = 40;                 // 最多找 40 米
+    for (let i = 0; i < this.n; i++) {
+      if (this.state[i] === ST.CORPSE) continue;
+      if (this.walkable(this.px[i], this.pz[i])) continue;
+      let ok = false;
+      for (let d = 1; d <= maxR && !ok; d += 1) {
+        for (let k = 0; k < 12; k++) {
+          const a = (k * Math.PI) / 6;
+          const x = this.px[i] + Math.cos(a) * d;
+          const z = this.pz[i] + Math.sin(a) * d;
+          if (this.walkable(x, z)) {
+            this.px[i] = x; this.pz[i] = z;
+            this.pathN[i] = 0; this.pathIdx[i] = 0;
+            this.stuckT[i] = 0; this.stuck[i] = 0;
+            ok = true; moved++;
+            break;
+          }
+        }
+      }
+      // 实在找不到（整片都被涂成墙）：挪到地图中心附近
+      if (!ok) { this.px[i] = 0; this.pz[i] = 0; moved++; }
+    }
+    return moved;
+  }
+
+  moveSmart(i, dx, dz, speed, dt) {
+    const nav = this.nav;
+    if (nav.indoor && nav.indoor(this.px[i], this.pz[i])) {
+      // 首选：直接朝"离我最近的那扇门"走（门的位置是烘焙好的，不用自己找）
+      const dp = nav.doorPoint ? nav.doorPoint(this.px[i], this.pz[i]) : null;
+      if (dp) { this.move(i, dp.x - this.px[i], dp.z - this.pz[i], speed, dt); return true; }
+      const g = nav.doorGradient ? nav.doorGradient(this.px[i], this.pz[i]) : null;
+      if (g) { this.move(i, g.x, g.z, speed, dt); return true; }
+      const e = this.exitProbe(i);
+      if (e) { this.move(i, e[0], e[1], speed, dt); return true; }
+    }
+    return this.move(i, dx, dz, speed, dt);
+  }
+
   move(i, dx, dz, speed, dt) {
     const d = Math.hypot(dx, dz);
     if (d < 1e-4) return;
@@ -1628,7 +2019,8 @@ export class Sim {
         } else if (st === ST.POLICE) {
           this.nearZ[i] = this.findNearest(i, 1, 46);
           // 警察有电台，默认知道；但零号病人模式下连他们也不知道（还没发生任何事）
-          if (!this.longInc && this.aware[i] < 3) this.setAware(i, 3);
+          // 警察有电台，但只有"城里真的还有丧尸"时他们才知道
+          if (!this.longInc && this.stats.zombie > 0 && this.aware[i] < 3) this.setAware(i, 3);
         } else if (st === ST.WILD) {
           const wsp = SPECIES[this.kind[i]] || SPECIES[SP.BEAR];
           this.nearC[i] = this.findNearest(i, 6, wsp.range || 90);
@@ -1712,33 +2104,65 @@ export class Sim {
                 // 逃命是跑，不是散步
                 const mul = this.goal[i] === GOAL.FLEE ? 1.6 : 0.92;
                 const ox = this.px[i], oz = this.pz[i];
-                this.move(i, adx, adz, this.spd[i] * mul, cdt);
+                this.moveSmart(i, adx, adz, this.spd[i] * mul, cdt);
                 // 卡住（被关在没门的屋里）：别一直原地跑，认命固守
                 if (Math.abs(this.px[i] - ox) < 1e-3 && Math.abs(this.pz[i] - oz) < 1e-3) {
                   this.stuckT[i] += cdt;
-                  if (this.stuckT[i] > 8) {
+                  if (this.stuckT[i] > 6) {
                     this.stuckT[i] = 0;
-                    this.setGoal(i, GOAL.HOLD, this.px[i], this.pz[i]);
-                    this.idle[i] = 1;
-                    this.actT[i] = 10 + this.rng() * 20;
+                    const hd = Math.hypot(this.homeX[i] - this.px[i], this.homeZ[i] - this.pz[i]);
+                    if (hd < 90) {
+                      // 真的就在自家附近：固守是合理的
+                      this.setGoal(i, GOAL.HOLD, this.px[i], this.pz[i]);
+                      this.idle[i] = 1;
+                      this.actT[i] = 6 + this.rng() * 10;
+                    } else if (this.nav.indoor && this.nav.indoor(this.px[i], this.pz[i])) {
+                      // 人在屋里出不去：直接探最近的出口，强行往外走
+                      const e = this.exitProbe(i);
+                      this.freeT[i] = 0;
+                      if (e) { this.move(i, e[0] * 4, e[1] * 4, this.spd[i], 0.6); }
+                      this.idle[i] = 0;
+                      this.actT[i] = 0.5;
+                    } else {
+                      // 只是被墙角别住了，不是"到家了"：换一侧、清掉门场记忆、重新找路，
+                      // 绝不就此认命（以前这里直接转固守，人就永久不动了）
+                      this.side[i] = -(this.side[i] || 1);
+                      this.freeT[i] = 0;
+                      this.pickWander(i);
+                      this.goal[i] = GOAL.NONE;
+                      this.arrGoal[i] = 0;
+                      this.idle[i] = 0;
+                      this.actT[i] = 0.5 + this.rng() * 1.5;
+                      this.nudgeT[i] = this.time + 3;
+                    }
                   }
                 } else this.stuckT[i] = 0;
                 break;
               }
-              this.arrive(i);
+              // 只在"刚到达"这一帧跑一次 arrive（以前每帧都跑，idle/actT 被反复重置，
+              // 表现就是所有人站在原地不动 —— 这是"AI 太蠢"的主因）
+              if (this.arrGoal[i] !== this.goal[i]) {
+                this.arrGoal[i] = this.goal[i];
+                this.arrive(i);
+              }
             }
           }
 
           // 到了 / 没目标：走 / 站 循环（原版节奏：站 25~60 秒 → 走 60~140 秒 → 再站）
           this.actT[i] -= cdt;
           if (this.actT[i] <= 0) {
-            if (this.idle[i]) { this.idle[i] = 0; this.actT[i] = 60 + rng() * 80; this.pickWander(i); }
-            else { this.idle[i] = 1; this.actT[i] = 25 + rng() * 35; }
+            if (this.idle[i]) { this.idle[i] = 0; this.actT[i] = 8 + rng() * 14; this.pickWander(i); }
+            else { this.idle[i] = 1; this.actT[i] = 2 + rng() * 4; }
           }
-          if (this.idle[i]) break;          // 站着不动 —— 丧尸能走到跟前咬他
+          if (this.idle[i]) {
+            // 站着也别完全冻住：朝自己的闲逛点慢慢挪（原版街上的人都在晃）
+            const ddx = this.tx[i] - this.px[i], ddz = this.tz[i] - this.pz[i];
+            if (ddx * ddx + ddz * ddz > 9) this.moveSmart(i, ddx, ddz, this.spd[i] * 0.5, cdt);
+            break;
+          }
           const tx = this.tx[i] - this.px[i], tz = this.tz[i] - this.pz[i];
-          if (tx * tx + tz * tz < 4) { this.idle[i] = 1; this.actT[i] = 15 + rng() * 25; break; }
-          this.move(i, tx, tz, this.spd[i], cdt);
+          if (tx * tx + tz * tz < 4) { this.idle[i] = 1; this.actT[i] = 2 + rng() * 5; break; }
+          this.moveSmart(i, tx, tz, this.spd[i], cdt);
           break;
         }
         // ---------------- 逃跑 ----------------
@@ -1799,7 +2223,7 @@ export class Sim {
         case ST.INFECTED: {
           this.timer[i] -= cdt;    // 潜伏倒计时按真实时间走（远处 5Hz 更新时步长已补偿）
           // ---- 发病阶段（M6）：潜伏期最后 40% 开始发烧 ----
-          if (!this.sick[i] && this.incTot[i] > 0 && this.timer[i] < this.incTot[i] * 0.4) {
+          if (!this.sick[i] && this.incTot[i] > 0 && this.timer[i] < this.incTot[i] * 0.25) {
             this.sick[i] = 1;
             this.panic[i] = 0.8;
             this.decT[i] = 0;      // 立刻重新决策 → 去医院
@@ -1908,16 +2332,17 @@ export class Sim {
 
                 if (this.hp[c] <= 0) {
                   // 咬死：先倒地（die01），死线照走 —— 到点从尸体上爬起来
-                  const wait = this.rollIncubation();
+                  const wait = this.incubationFor(c, 1);
                   this.killAgent(c, i);
                   this.riseAt[c] = this.time + wait;
                   this.infectBy[i] = (this.infectBy[i] || 0) + 1;
                 } else if (cs !== ST.INFECTED && vsp.infectable !== false &&
                            this.rng() < (vsp.infectChance == null ? 1 : vsp.infectChance)) {
                   // 只认第一次被咬：已经潜伏的人不重置死线（原版也是"首次被咬时刻 + 感染时长"）
-                  this.setInfected(c, this.rollIncubation());
+                  this.setInfected(c, this.incubationFor(c, 1), 1);
                   this.cool[c] = 0;
                   this.infectBy[i] = (this.infectBy[i] || 0) + 1;
+                  this.growFromKill(i);          // 每感染一个人，自己 +50 血
                 } else {
                   // 士兵/重装兵：不会感染，只是挨打
                   this.state[c] = ST.FLEE;
@@ -2448,7 +2873,7 @@ export class Sim {
       if (chaos >= 80 && this.vipStage[v] < 2) {
         const need = 8 - (this.vipStage[v] === 1 ? 4 : 0);
         if (this.sendEscort(v, need, 2)) this.vipStage[v] = 2;
-      } else if (chaos >= 20 && this.vipStage[v] === 0) {
+      } else if (chaos >= 20 && this.vipStage[v] === 0 && !this.vipStation[v]) {
         if (this.sendEscort(v, 4, 1)) this.vipStage[v] = 1;
       }
       if (!this.vipGoal[v]) continue;
@@ -2467,15 +2892,30 @@ export class Sim {
       }
 
       if (arrived) {
-        // 送到警局 / 逃出城：要员安全，小队解散归建
+        const slot2 = this.vips.indexOf(v) + 1;
+        if (this.vipGoal[v] === 1 && !this.vipStation[v]) {
+          // 第一阶段：送进警察局 —— 只是"安全了"，**还没撤离**。
+          // 之后混乱度冲到 80% 才会派八人小队把他送出城。
+          this.vipStation[v] = 1;
+          this.vipStage[v] = 0;       // 归零：80% 时重新派一支满编 8 人队
+          this.vipGoal[v] = 0;
+          this.goal[v] = GOAL.NONE;
+          this.decT[v] = 1e9;
+          for (let i = 0; i < this.n; i++) {
+            if (this.escortOf[i] === slot2) { this.escortOf[i] = 0; this.goal[i] = GOAL.NONE; }
+          }
+          this.pushEvent('要员已进入警察局待命（等撤离令）', 'start');
+          continue;
+        }
+        // 第二阶段：真的出城了（只有"目标是撤离"才算；送进警局那次不算）
+        if (this.vipGoal[v] !== 2) continue;
         this.state[v] = ST.SAVED;
         this.vipDone[v] = 1;
         this.savedVip = (this.savedVip || 0) + 1;
-        const slot2 = this.vips.indexOf(v) + 1;
         for (let i = 0; i < this.n; i++) {
           if (this.escortOf[i] === slot2) { this.escortOf[i] = 0; this.goal[i] = GOAL.NONE; }
         }
-        this.pushEvent(`要员已${this.vipGoal[v] === 1 ? '送抵警察局' : '撤离城区'}`, 'start');
+        this.pushEvent('要员已撤离城区', 'start');
         continue;
       }
 
@@ -2577,11 +3017,83 @@ export class Sim {
     return true;
   }
 
-  /** 抽一个潜伏时长：快速模式固定 8 段，零号病人模式 10–30 分钟 */
-  rollIncubation() {
-    if (!this.longInc) return INCFG.quick * (0.4 + this.rng() * 1.2);
-    const [a, b] = INCFG.long;
-    return a + this.rng() * (b - a);
+  /** 僵尸每感染一个人，自己变得更硬：+50 血（封顶 2000） */
+  growFromKill(by) {
+    if (by < 0) return;
+    const sp = SPECIES[this.kind[by]];
+    if (!sp || sp.team !== TEAM.ZOMBIE) return;
+    const add = 50;
+    this.hp[by] = Math.min(2000, this.hp[by] + add);
+  }
+
+  /**
+   * 潜伏时长（模拟秒；1 秒 = 1 游戏分钟）：
+   *   咬伤（route 1）：1–2 游戏小时   = 60–120 秒
+   *   接触（route 2）：6–24 游戏小时  = 360–1440 秒（均值 12 小时）
+   * 两条路线用**同一个评分函数**：0.6 × 体质 + 0.4 × 个人哈希。
+   */
+  /** 真正带个体年龄的版本（上面的占位由它替换） */
+  incubationFor(i, route) {
+    const r = route || 1;
+    const [lo, hi] = r === 2 ? INCFG.contact : INCFG.bite;
+    const age = ageOf(i);
+    const consti = age > 65 ? 0.25 : (age < 18 ? 0.6 : (age < 25 ? 0.75 : 0.5));
+    const score = 0.6 * consti + 0.4 * h(i, 77);
+    return lo + (hi - lo) * score;
+  }
+
+  /** 附近所有人（用空间哈希，半径 r 米） */
+  forEachNear(x, z, r, fn) {
+    const hc = this.hcols, hr = this.hrows, cell = this.hcell, nav = this.nav;
+    const cx = ((x + nav.halfW) / cell) | 0;
+    const cz = ((z + nav.halfH) / cell) | 0;
+    const rad = Math.max(1, Math.ceil(r / cell));
+    const r2 = r * r;
+    for (let rr = cz - rad; rr <= cz + rad; rr++) {
+      if (rr < 0 || rr >= hr) continue;
+      for (let cc = cx - rad; cc <= cx + rad; cc++) {
+        if (cc < 0 || cc >= hc) continue;
+        const k = rr * hc + cc;
+        const e = this.hStart[k + 1];
+        for (let p = this.hStart[k]; p < e; p++) {
+          const j = this.hOrder[p];
+          const dx = this.px[j] - x, dz = this.pz[j] - z;
+          if (dx * dx + dz * dz <= r2) fn(j);
+        }
+      }
+    }
+  }
+
+  /**
+   * 接触传染：传染类感染者 10m 内贴住某人**连续 10 秒** → 那人被感染（同样是接触路线）。
+   * 走开就重新计时（1.5 秒内没被刷新 = 断开了）。
+   */
+  spreadContact() {
+    const t = this.time, R = 10;
+    for (let i = 0; i < this.n; i++) {
+      if (this.state[i] !== ST.INFECTED || this.infRoute[i] !== 2) continue;
+      this.forEachNear(this.px[i], this.pz[i], R, (j) => {
+        if (j === i) return;
+        const st = this.state[j];
+        if (st !== ST.CIV && st !== ST.FLEE && st !== ST.FIGHT) return;
+        const sp = SPECIES[this.kind[j]];
+        if (!sp || sp.team !== TEAM.HUMAN || !sp.infectable) return;
+        const last = this.exposedAt[j];
+        if (last === 0 || t - last > 1.5) {
+          // 刚接触 / 中间断过：重新开始计时
+          this.exposedAt[j] = t;
+          this.expStart[j] = t;
+          return;
+        }
+        this.exposedAt[j] = t;
+        if (t - this.expStart[j] >= 10) {
+          this.exposedAt[j] = 0;
+          this.expStart[j] = 0;
+          this.setInfected(j, this.incubationFor(j, 2), 2);
+          this.panic[j] = 0.8;
+        }
+      });
+    }
   }
 
   /** 发一把枪（带初始熟练度） */
@@ -2664,8 +3176,9 @@ export class Sim {
    * 原版用的是"首次被咬时刻 + 感染时长"，不是倒计时 —— 因为人死了以后这条钟还得继续走，
    * 而倒地动画期间没有人会去减它。
    */
-  setInfected(i, seconds) {
+  setInfected(i, seconds, route) {
     this.state[i] = ST.INFECTED;
+    this.infRoute[i] = route || 1;
     this.incTot[i] = seconds;
     this.timer[i] = seconds;
     this.riseAt[i] = this.time + seconds;
@@ -2771,8 +3284,9 @@ export class Sim {
       if (!sp || sp.team !== TEAM.HUMAN || !sp.infectable) continue;
       const dx = this.px[j] - this.px[i], dz = this.pz[j] - this.pz[i];
       if (dx * dx + dz * dz < R * R) {
-        this.setInfected(j, this.params.infectTime);
+        this.setInfected(j, this.incubationFor(j, 1), 1);
         this.hp[j] = Math.max(1, this.hp[j] - 4);
+        this.growFromKill(i);
         this.panic[j] = 1.4;
       }
     }
@@ -2821,6 +3335,116 @@ export class Sim {
       else if (st === ST.CORPSE) s.vipLost++;
       else s.vipAlive++;
     }
+  }
+
+  /** 武力状态明细（给面板用） */
+  forceDetail() {
+    const armed = new Map();
+    let armedN = 0, ammoN = 0;
+    for (let i = 0; i < this.n; i++) {
+      const st = this.state[i];
+      if (st === ST.CORPSE || st === ST.ZOMBIE) continue;
+      if (!this.armed[i]) continue;
+      armedN++;
+      const id = this.wpn[i];
+      const a = armed.get(id) || { n: 0, ammo: 0 };
+      a.n++; a.ammo += (this.mag[i] || 0) + (this.reserve[i] || 0);
+      armed.set(id, a);
+      ammoN += (this.mag[i] || 0) + (this.reserve[i] || 0);
+    }
+    const weaponRows = [...armed.entries()]
+      .sort((a, b) => b[1].n - a[1].n)
+      .map(([id, a]) => ({ name: weaponOf(id).name, n: a.n, ammo: a.ammo }));
+
+    let police = 0, idle = 0, patrol = 0, onDuty = 0, escort = 0, policeDead = 0;
+    for (let i = 0; i < this.n; i++) {
+      const st = this.state[i];
+      const isP = st === ST.POLICE || st === ST.SOLDIER;
+      if (st === ST.CORPSE && this.stationOf[i]) { policeDead++; continue; }
+      if (!isP) continue;
+      police++;
+      if (this.escortOf[i]) escort++;
+      else if (this.patrol[i]) patrol++;
+      else if (this.goal[i] === GOAL.MOVE_TO) onDuty++;
+      else idle++;
+    }
+
+    const stations = [];
+    for (let k = 0; k < (this.poiByKind.police || []).length; k++) {
+      const p = this.poiByKind.police[k];
+      stations.push({
+        name: p.n || '警察局',
+        stock: p.store ? stockText(p.store) : '—',
+        idle: this.idleAt ? this.idleAt(k) : 0,
+      });
+    }
+
+    const alive = Math.max(1, this.stats.civ + this.stats.police);
+    const force = this.force || 0;
+    const level = force >= 75 ? '强大' : force >= 55 ? '充足' : force >= 35 ? '尚可' : force >= 15 ? '勉强' : '虚弱';
+    return {
+      force, level, armedN, ammoN,
+      armedRate: armedN / alive,
+      ammoPer: ammoN / Math.max(1, armedN),
+      weaponRows, police, idle, patrol, onDuty, escort, policeDead,
+      stations,
+      kills: this.kills || 0,
+      civKilled: this.civDeaths || 0,
+      accuracy: (this.params && this.params.policeAccuracy) || 0,
+    };
+  }
+
+  /** 卫生状态明细（给面板用） */
+  sanitDetail() {
+    const dead = this.stats.dead || 0;
+    const zombies = this.stats.zombie || 0;
+    const infected = this.stats.infected || 0;
+    let sick = 0;
+    for (let i = 0; i < this.n; i++) if (this.state[i] === ST.INFECTED && this.sick[i]) sick++;
+    const penaltyDead = Math.min(45, Math.round(dead / Math.max(1, this.pop0) * 300));
+    const penaltyInfect = Math.min(45, Math.round((this.infectRate || 0) * 100 * 4));
+    const hospitals = [];
+    for (const p of (this.poiByKind.hospital || [])) {
+      let near = 0;
+      for (let i = 0; i < this.n; i++) {
+        if (this.state[i] !== ST.CIV && this.state[i] !== ST.INFECTED) continue;
+        if (this.goal[i] !== GOAL.HELP) continue;
+        if (Math.hypot(this.px[i] - p.x, this.pz[i] - p.z) < 400) near++;
+      }
+      hospitals.push({ name: p.n || '医院', near });
+    }
+    const sanit = this.sanit || 0;
+    const level = sanit >= 85 ? '良好' : sanit >= 65 ? '尚可' : sanit >= 45 ? '恶化' : sanit >= 20 ? '糟糕' : '灾难';
+    const mainPressure = penaltyDead > penaltyInfect ? '尸体堆积' : penaltyInfect > 0 ? '感染扩散' : '暂无';
+    return {
+      sanit, level, dead, zombies, infected, sick,
+      infectRate: this.infectRate || 0,
+      penaltyDead, penaltyInfect, hospitals, mainPressure,
+    };
+  }
+
+  /** 结算数据（撤离评分卡用） */
+  scoreData() {
+    const st = this.stats || {};
+    const saved = this.saved || st.saved || 0;
+    const dead = st.dead || 0;
+    const infected = st.infected || 0;
+    const total = this.pop0 || 1;
+    const rate = saved / total;
+    let grade = 'D';
+    if (rate >= 0.5) grade = 'S';
+    else if (rate >= 0.35) grade = 'A';
+    else if (rate >= 0.2) grade = 'B';
+    else if (rate >= 0.08) grade = 'C';
+    return {
+      saved, dead, infected, total, budget: this.budget, budgetBack: this.budgetBack || 0,
+      saveRate: rate,
+      zombies: st.zombie || 0,
+      police: st.police || 0,
+      day: this.dayIndex,
+      time: this.clockMin,
+      grade,
+    };
   }
 
   outcome() {
