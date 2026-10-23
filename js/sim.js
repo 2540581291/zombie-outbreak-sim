@@ -1450,7 +1450,7 @@ export class Sim {
       // 三种目标各打一个分，取最高的（性格决定）
       const sHome = fam > 0 ? A.family * 1.10 + 0.15 : -1;
       const sPolice = A.trust * 1.60 + (1 - A.courage) * 0.50;
-      const sEscape = (1 - A.family) * 0.35 + (1 - A.trust) * 0.35 + A.courage * 0.20 + (fam === 0 ? 0.35 : 0);
+      const sEscape = (1 - A.family) * 0.28 + (1 - A.trust) * 0.30 + A.courage * 0.16 + (fam === 0 ? 0.30 : 0);
       let fg = 2;
       let bs = this.stationLost[i] ? -1 : sPolice;   // 确认过警局沦陷 → 警局项直接作废
       if (sHome > bs) { fg = 0; bs = sHome; }
@@ -1642,7 +1642,7 @@ export class Sim {
       if (poi) {
         const d = Math.hypot(poi.x - this.px[i], poi.z - this.pz[i]);
         // 到了警局门口：如果这里已经被丧尸占满，就标记"沦陷"，改道回家/出城
-        if (d < 18 && this.zombiesNear(poi.x, poi.z, 30) >= 3) {
+        if (d < 18 && this.policeNear(poi.x, poi.z, 50) === 0) {
           this.stationLost[i] = 1;
           this.fleeGoal[i] = this.familyAlive(i) > 0 ? 0 : 2;
           this.applyFleeGoal(i);
@@ -1661,6 +1661,19 @@ export class Sim {
     }
     const p = this.escapePoint(i);
     this.setGoal(i, GOAL.FLEE, p[0], p[1]);
+  }
+
+  /** 某点半径 r 内还有多少警察/士兵（警局"沦陷"的判据：50m 内一个警察都没有） */
+  policeNear(x, z, r) {
+    let n = 0;
+    const r2 = r * r;
+    for (let j = 0; j < this.n; j++) {
+      const st = this.state[j];
+      if (st !== ST.POLICE && st !== ST.SOLDIER) continue;
+      const dx = this.px[j] - x, dz = this.pz[j] - z;
+      if (dx * dx + dz * dz <= r2) n++;
+    }
+    return n;
   }
 
   /** 某点半径 r 内有多少丧尸（给"警局是否沦陷"用，调用很少） */
