@@ -842,7 +842,9 @@ export class Sim {
     const dx = x1 - x0, dz = z1 - z0;
     const d = Math.hypot(dx, dz);
     if (d < 0.001) return true;
-    const n = Math.min(64, Math.max(1, Math.ceil(d / 2)));
+    // 采样间隔 2m → 0.6m：格子是 1m，2m 采样会"穿透"1m 厚的薄墙，
+    // 于是人以为直线可达、从不寻路，直接顶着墙走（实测卡在墙前 40 秒）。
+    const n = Math.min(256, Math.max(1, Math.ceil(d / 0.6)));
     for (let k = 1; k <= n; k++) {
       const t = k / n;
       if (!this.walkable(x0 + dx * t, z0 + dz * t)) return false;
@@ -2300,7 +2302,9 @@ export class Sim {
       const nx = ox + ux * stepLen;
       const nz = oz + uz * stepLen;
       if (!this.walkable(nx, nz)) continue;
-      if (!meIn && nav.indoor && nav.indoor(nx, nz)) continue;   // 不进屋
+      // 进屋规则放宽：只要这一步不是"从街上直接跨进楼里"就允许；
+      // 原来卡死过很多贴着楼角的人（四周全是室内格 → 一个方向都走不了）
+      if (!meIn && nav.indoor && nav.indoor(nx, nz) && this.pathN[i] === 0) continue;
       this.px[i] = nx; this.pz[i] = nz;
       // 落地校验：Float32 存储会把探测点舍入，极少数会跨过格子边界落进墙里
       if (!this.walkable(this.px[i], this.pz[i])) {
@@ -2314,6 +2318,25 @@ export class Sim {
       this.phase[i] = (this.phase[i] + (speed / stride) * dt) % 1;
       this.stuck[i] = 0;
       return true;
+    }
+
+    // 第二遍：允许踏进"室内格"当逃生口。
+    //   站在楼角/门口那种凹位时，四周每一步都是室内格 → 第一遍全部被拒，
+    //   人就永久钉死在那儿（实测 40 秒纹丝不动）。这里允许一步进屋，只为脱困。
+    if (!meIn) {
+      for (let k = 0; k < PROBE.length; k++) {
+        const a = base + PROBE[k] * side * DEG;
+        const nx = ox + Math.cos(a) * stepLen;
+        const nz = oz + Math.sin(a) * stepLen;
+        if (!this.walkable(nx, nz)) continue;
+        this.px[i] = nx; this.pz[i] = nz;
+        if (!this.walkable(this.px[i], this.pz[i])) { this.px[i] = ox; this.pz[i] = oz; continue; }
+        this.heading[i] = a;
+        const sp2 = SPECIES[this.kind[i]] || SPECIES[SP.CIV1];
+        this.phase[i] = (this.phase[i] + (speed / (1.45 * (sp2.scale || 1))) * dt) % 1;
+        this.stuck[i] = 0;
+        return true;
+      }
     }
 
     // 被墙围住了：朝最近的门走
@@ -2497,13 +2520,13 @@ export class Sim {
             if (gp) {
               // 有粗网格路径 → 沿路点走（这是唯一能绕过楼群堵截的办法）
               if (this.pathN[i] > 0) {
-                const wmul0 = this.goal[i] === GOAL.FLEE ? 1.6 : 0.92;
+                const wmul0 = this.goal[i] === GOAL.FLEE ? 1.6 : 1.0;
                 let k = this.pathIdx[i];
                 const wx = this.pathX[i * 16 + k], wz = this.pathZ[i * 16 + k];
                 const wdx = wx - this.px[i], wdz = wz - this.pz[i];
                 const wd2 = wdx * wdx + wdz * wdz;
                 // 到了（1.5m 内）：推进到下一个路点
-                if (wd2 < 2.25) {
+                if (wd2 < 6.25) {
                   this.pathIdx[i]++;
                   if (this.pathIdx[i] >= this.pathN[i]) this.pathN[i] = 0;
                   break;
@@ -2522,8 +2545,10 @@ export class Sim {
                   this.move(i, wdx, wdz, this.spd[i] * wmul0, cdt);
                   break;
                 }
-                // 看不见 → 说明这条路径过不去：清掉，下一帧重算（不要贴墙蹭）
-                this.pathN[i] = 0;
+                // 看不见：不再清路径（那会导致"算路→清路"死循环，实测 40 秒只挪 13m），
+                // 而是照常朝路点走，让 move() 的探测扇形处理小障碍
+                this.move(i, wdx, wdz, this.spd[i] * wmul0, cdt);
+                break;
               }
               let ax = gp[0], az = gp[1];
               // 有绕路点就先走绕路点

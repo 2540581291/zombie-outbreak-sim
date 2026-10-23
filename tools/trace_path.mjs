@@ -20,6 +20,9 @@ const i = 0;
 const sx = cx - hw - 12, sz = cz, gx = cx + hw + 12, gz = cz;
 console.log(`楼 ${(hw * 2).toFixed(0)}×${(hh * 2).toFixed(0)}m  起点(${sx.toFixed(0)},${sz.toFixed(0)}) 终点(${gx.toFixed(0)},${gz.toFixed(0)})`);
 sim.px[i] = sx; sim.pz[i] = sz; sim.state[i] = 0;
+// 关键：population=1 时 0 号会被"政府要员"逻辑抓走（actT=1e9），永远不动
+sim.vip[i] = 0; sim.actT[i] = 0; sim.idle[i] = 0; sim.actT[i] = 0;
+sim.armHome[i] = 0;
 sim.setGoal(i, GOAL.MOVE_TO, gx, gz);
 sim.pathBudget = 20;
 
@@ -31,7 +34,7 @@ for (let k = 0; k < 20 * 40; k++) {
   if (k % 10 === 0 || n !== lastN || idx !== lastIdx) {
     let wp = '-';
     if (n > 0 && idx < n) wp = `${sim.pathX[i * 16 + idx].toFixed(0)},${sim.pathZ[i * 16 + idx].toFixed(0)}`;
-    console.log(`t=${sim.time.toFixed(1)} pos=${sim.px[i].toFixed(1)},${sim.pz[i].toFixed(1)} 剩${d.toFixed(0)}m path=${n}@${idx} wp=${wp}`);
+    console.log(`t=${sim.time.toFixed(1)} pos=${sim.px[i].toFixed(1)},${sim.pz[i].toFixed(1)} 剩${d.toFixed(0)}m path=${n}@${idx} wp=${wp} goal=${sim.goal[i]} idle=${sim.idle[i]} actT=${sim.actT[i].toFixed(1)} spd=${sim.spd[i].toFixed(2)} st=${sim.state[i]}`);
     lastN = n; lastIdx = idx;
   }
   if (d < 10) { console.log(`✅ 到达 ${sim.time.toFixed(1)}s`); break; }
