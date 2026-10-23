@@ -871,15 +871,56 @@ export class Sim {
     this.gh = Math.ceil(nav.rows / cs);
     const g = new Uint8Array(this.gw * this.gh);
     const cnt = new Uint8Array(this.gw * this.gh);
+    // 关键：建筑内部虽然是"可走"（有地板、有门），但对**寻路**来说必须当成障碍 ——
+    // 否则 A* 会直接穿楼算出一条路径，而移动层又不许进屋（进屋规则），
+    // 两边规则打架，人就在楼外反复清路重算（实测：120 秒走不到 100m 外的目标）。
+    const cellW = nav.cell;
+    const halfW = nav.halfW, halfH = nav.halfH;
+    const useIndoor = typeof nav.indoor === 'function';
     for (let r = 0; r < nav.rows; r++) {
       const base = ((r / cs) | 0) * this.gw;
+      const wz = halfH - (r + 0.5) * cellW;
       for (let c = 0; c < nav.cols; c++) {
-        if (nav.grid[r * nav.cols + c] & 1) cnt[base + ((c / cs) | 0)]++;
+        if (!(nav.grid[r * nav.cols + c] & 1)) continue;
+        if (useIndoor) {
+          const wx = (c + 0.5) * cellW - halfW;
+          if (nav.indoor(wx, wz)) continue;      // 室内 = 不走
+        }
+        cnt[base + ((c / cs) | 0)]++;
       }
     }
     // 一个 4×4 块至少 12/16 可走才算通 —— 否则"有一格能走"就算通，
     // 寻路会直接穿墙，人在墙间蹭（实测：中位速度只有 0.3 m/s）
     for (let k = 0; k < g.length; k++) if (cnt[k] >= 9) g[k] = 1;
+    // 连通性过滤：从地图四边泛洪，走不到的粗格一律封掉。
+    // 这样"四面围死的内院 / 没门的楼内空间"不会被 A* 当成通路
+    // （之前 A* 会算出一条穿院子的小路，而移动层根本进不去 → 人绕着楼转圈）。
+    {
+      const gw = this.gw, gh = this.gh;
+      const seen = new Uint8Array(g.length);
+      const st = [];
+      for (let c = 0; c < gw; c++) {
+        const a = c, b2 = (gh - 1) * gw + c;
+        if (g[a]) { seen[a] = 1; st.push(a); }
+        if (g[b2]) { seen[b2] = 1; st.push(b2); }
+      }
+      for (let r = 0; r < gh; r++) {
+        const a = r * gw, b2 = r * gw + gw - 1;
+        if (g[a] && !seen[a]) { seen[a] = 1; st.push(a); }
+        if (g[b2] && !seen[b2]) { seen[b2] = 1; st.push(b2); }
+      }
+      while (st.length) {
+        const k = st.pop();
+        const c = k % gw, r = (k / gw) | 0;
+        if (c > 0) { const k2 = k - 1; if (g[k2] && !seen[k2]) { seen[k2] = 1; st.push(k2); } }
+        if (c + 1 < gw) { const k2 = k + 1; if (g[k2] && !seen[k2]) { seen[k2] = 1; st.push(k2); } }
+        if (r > 0) { const k2 = k - gw; if (g[k2] && !seen[k2]) { seen[k2] = 1; st.push(k2); } }
+        if (r + 1 < gh) { const k2 = k + gw; if (g[k2] && !seen[k2]) { seen[k2] = 1; st.push(k2); } }
+      }
+      let cut = 0;
+      for (let k = 0; k < g.length; k++) if (g[k] && !seen[k]) { g[k] = 0; cut++; }
+      this.cgridCut = cut;
+    }
     this.cgrid = g;
     this.came = new Int32Array(this.gw * this.gh);
     this.cseen = new Int32Array(this.gw * this.gh);
