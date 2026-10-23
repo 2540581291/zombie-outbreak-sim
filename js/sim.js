@@ -2296,11 +2296,34 @@ export class Sim {
     // 然后目标在楼对面，卡死在里面。
     const meIn = nav.indoor ? nav.indoor(ox, oz) : false;
 
+    // 先试"正前方"的三种步长：能直着走过去就别偏转
+    //   （窄缝、门口这类地方，缩短步长就能过，比转 20° 划算得多）
+    for (let sm = 0; sm < 2; sm++) {
+      const mul = sm === 0 ? 1 : 0.55;
+      const nx = ox + Math.cos(base) * stepLen * mul;
+      const nz = oz + Math.sin(base) * stepLen * mul;
+      if (!this.walkable(nx, nz)) continue;
+      if (!meIn && nav.indoor && nav.indoor(nx, nz) && this.pathN[i] === 0) continue;
+      this.px[i] = nx; this.pz[i] = nz;
+      if (!this.walkable(this.px[i], this.pz[i])) { this.px[i] = ox; this.pz[i] = oz; continue; }
+      this.heading[i] = base;
+      const spB = SPECIES[this.kind[i]] || SPECIES[SP.CIV1];
+      this.phase[i] = (this.phase[i] + (speed / (1.45 * (spB.scale || 1))) * dt) % 1;
+      this.stuck[i] = 0;
+      return true;
+    }
+
     for (let k = 0; k < PROBE.length; k++) {
-      const a = base + PROBE[k] * side * DEG;
+      const dev = PROBE[k] * side * DEG;
+      const a = base + dev;
       const ux = Math.cos(a), uz = Math.sin(a);
-      const nx = ox + ux * stepLen;
-      const nz = oz + uz * stepLen;
+      // 贴墙走时方向被偏转，沿目标方向的位移只剩 cos(dev) 倍。
+      // 这里把步长按 1/cos(dev) 放大（上限 2.2 倍、且不超格宽 0.9），
+      // 让"沿期望方向的有效速度"尽量维持住。
+      const cd = Math.max(0.45, Math.cos(dev));
+      const st = Math.min(stepLen / cd, nav.cell * 0.9);
+      const nx = ox + ux * st;
+      const nz = oz + uz * st;
       if (!this.walkable(nx, nz)) continue;
       // 进屋规则放宽：只要这一步不是"从街上直接跨进楼里"就允许；
       // 原来卡死过很多贴着楼角的人（四周全是室内格 → 一个方向都走不了）
