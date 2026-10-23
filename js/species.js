@@ -38,19 +38,19 @@ export const TEAM = { HUMAN: 0, ZOMBIE: 1, VEHICLE: 2, WILD: 3 };
  */
 export const SPECIES = {
   [SP.CIV1]: {
-    name: '平民', team: TEAM.HUMAN, scale: 1.0, hp: 100, speed: 1.30,
+    name: '平民', team: TEAM.HUMAN, scale: 1.0, hp: 100, speed: 2.00,
     dmg: 0, rate: 3, range: 26, acc: 0.08, biteR: 1.8,
     color: [0.30, 0.80, 0.44], infectedColor: [0.97, 0.72, 0.26],
     infectable: true,
   },
   [SP.CIV2]: {
-    name: '平民', team: TEAM.HUMAN, scale: 0.94, hp: 100, speed: 1.42,
+    name: '平民', team: TEAM.HUMAN, scale: 0.94, hp: 100, speed: 2.00,
     dmg: 0, rate: 3, range: 26, acc: 0.08, biteR: 1.8,
     color: [0.36, 0.78, 0.52], infectedColor: [0.97, 0.72, 0.26],
     infectable: true,
   },
   [SP.CIV3]: {
-    name: '胖子', team: TEAM.HUMAN, scale: 1.22, hp: 100, speed: 0.95,
+    name: '胖子', team: TEAM.HUMAN, scale: 1.22, hp: 100, speed: 2.00,
     dmg: 0, rate: 3, range: 26, acc: 0.08, biteR: 1.8,
     color: [0.42, 0.72, 0.56], infectedColor: [0.97, 0.72, 0.26],
     infectable: true,
@@ -74,7 +74,7 @@ export const SPECIES = {
     infectable: false,
   },
   [SP.ZOMBIE]: {
-    name: '丧尸', team: TEAM.ZOMBIE, scale: 1.0, hp: 200, speed: 2.0,
+    name: '丧尸', team: TEAM.ZOMBIE, scale: 1.0, hp: 200, speed: 3.0,
     dmg: 20, rate: 2.0, range: 60, acc: 0, biteR: 1.8,
     color: [0.94, 0.28, 0.18], infectedColor: [0.94, 0.28, 0.18],
     infectable: false,

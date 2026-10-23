@@ -7,7 +7,7 @@
 //    A. 感染时长 6 s（人还没被咬死就先发作）→ 必须走 TURN，且转身期间一步不动
 //    B. 感染时长 30 s（先被咬死）→ 必须走 DIE → 躺尸 → RISE，最后才变丧尸
 // ============================================================
-import { buildNav, Sim } from '../js/sim.js';
+import { buildNav, Sim, INCFG } from '../js/sim.js';
 import { STAGE, DUR, BODIES } from '../js/bodymap.js';
 
 function makeCity(size = 700, blockSize = 40, street = 22) {
@@ -28,7 +28,9 @@ const STEP = 1 / 20;
 let pass = 0, fail = 0;
 const check = (name, ok, extra = '') => { ok ? pass++ : fail++; console.log(`${ok ? '  ✓' : '  ✗'} ${name} ${extra}`); };
 
-function scenario(label, infectTime, seconds) {
+function scenario(label, infectTime, seconds, biteRange) {
+  const savedBite = INCFG.bite;
+  if (biteRange) INCFG.bite = biteRange;   // 临时改咬伤潜伏（默认是 60-120 s）
   sim.reset({
     seed: 777, population: 2500, initialZombies: 30, zombieSpeed: 2.0,
     infectTime, armedRate: 0.03, police: 10, policeAccuracy: 0.4,
@@ -65,7 +67,7 @@ function scenario(label, infectTime, seconds) {
 }
 
 // A：发作快，人还活着 → 站着转身
-const A = scenario('A 站着变', 6, 60);
+const A = scenario('A 站着变', 6, 60, [2, 3]);   // 潜伏压到 2~3 s：人还活着就发作
 check('A 有人走 turn01', A.turns > 0, `turns=${A.turns}`);
 check('A 转身期间位置不动', A.watchMoved < 1e-6, `最大位移 ${A.watchMoved.toFixed(4)} m`);
 {
@@ -74,10 +76,11 @@ check('A 转身期间位置不动', A.watchMoved < 1e-6, `最大位移 ${A.watch
 }
 
 // B：发作慢，先被咬死 → 倒地 → 爬起
-const B = scenario('B 先死再爬', 30, 90);
+const B = scenario('B 先死再爬', 30, 120);
 check('B 有人走 die01', B.dies > 0, `dies=${B.dies}`);
 check('B 有尸体爬起 zrise01', B.rises > 0, `rises=${B.rises}`);
 
 console.log(`\n结果：${pass} 通过 / ${fail} 失败`);
 process.exit(fail ? 1 : 0);
+
 

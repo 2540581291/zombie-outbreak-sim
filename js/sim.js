@@ -1763,7 +1763,7 @@ export class Sim {
           const st = this.state[j];
           const ok = want === 1 ? (st === ST.ZOMBIE)
             : want === 2 ? (st === ST.CIV || st === ST.FLEE || st === ST.FIGHT || st === ST.INFECTED)
-              : want === 4 ? (st === ST.CIV || st === ST.FLEE || st === ST.FIGHT)
+              : want === 4 ? (st === ST.CIV || st === ST.FLEE || st === ST.FIGHT || st === ST.INFECTED)
                 : want === 5 ? (st === ST.CIV || st === ST.FLEE || st === ST.FIGHT ||
                                 st === ST.INFECTED || st === ST.WILD)          // 丧尸的猎物：人和野兽
                   : want === 6 ? (st === ST.CIV || st === ST.FLEE || st === ST.FIGHT ||
@@ -2277,11 +2277,12 @@ export class Sim {
             }
           }
           const isWild = st === ST.WILD;
+          if (this.cool[i] > 0) this.cool[i] -= dt;   // 咬合冷却（原版是 2 s；我们 1 s）
           // 目标记忆：一旦盯上就追到 90m 或目标不再是健康人
           let c = this.tgt[i];
           if (c >= 0) {
             const cs = this.state[c];
-            if (!(cs === ST.CIV || cs === ST.FLEE || cs === ST.FIGHT ||
+            if (!(cs === ST.CIV || cs === ST.FLEE || cs === ST.FIGHT || cs === ST.INFECTED ||
                   (isWild && (cs === ST.ZOMBIE || cs === ST.POLICE || cs === ST.SOLDIER)))) c = -1;
             else {
               const ddx = this.px[c] - this.px[i], ddz = this.pz[c] - this.pz[i];
@@ -2296,7 +2297,8 @@ export class Sim {
             const d2 = dx * dx + dz * dz;
             const sp = SPECIES[this.kind[i]] || SPECIES[SP.ZOMBIE];
             const biteR2 = (sp.biteR || 1.8) * (sp.biteR || 1.8);
-            if (d2 < biteR2) {
+            if (d2 < biteR2 && this.cool[i] <= 0) {
+              this.cool[i] = 1.0;                     // 两口之间隔 1 秒
               const cs = this.state[c];
               // 野兽咬人/咬尸：只掉血，不传播感染
               if (isWild) {
