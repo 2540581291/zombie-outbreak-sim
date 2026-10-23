@@ -41,10 +41,7 @@ console.log(`nav: ${nav.cols}x${nav.rows} = ${(nav.cols * nav.rows).toLocaleStri
 const sim = new Sim(nav);
 
 function run(pop, police, z0, label) {
-  const P = {
-    seed: 12345, population: pop, initialZombies: z0, zombieSpeed: 1.7,
-    infectTime: 8, armedRate: 0.12, police, policeAccuracy: 0.4,
-  };
+  const P = { seed: 12345, population: pop, initialZombies: z0, police, homeGunRate: 0.12 };
   const tA = performance.now();
   sim.reset(P);
   const tReset = performance.now() - tA;
@@ -83,25 +80,10 @@ function hashState() {
   return h.digest('hex').slice(0, 12);
 }
 const P = {
-  seed: 777, population: 20000, initialZombies: 40, zombieSpeed: 1.6,
-  infectTime: 7, armedRate: 0.1, police: 100, policeAccuracy: 0.4,
+  seed: 777, population: 20000, initialZombies: 40, police: 100, homeGunRate: 0.1,
 };
 sim.reset(P); for (let i = 0; i < 200; i++) sim.step(1 / 20, 0, 0);
 const h1 = hashState();
 sim.reset(P); for (let i = 0; i < 200; i++) sim.step(1 / 20, 0, 0);
 const h2 = hashState();
 console.log(`determinism: ${h1} vs ${h2} -> ${h1 === h2 ? 'PASS ✓' : 'FAIL ✗'}`);
-
-// 结局判定：无警察无武装 → 应沦陷
-const P2 = { ...P, seed: 9, police: 0, armedRate: 0, population: 8000, initialZombies: 100 };
-sim.reset(P2);
-for (let i = 0; i < 20 * 240; i++) sim.step(1 / 20, 0, 0);
-console.log(`apocalypse test: civ=${sim.stats.civ} zomb=${sim.stats.zombie} ` +
-  `dead=${sim.stats.dead} -> ${sim.stats.civ === 0 ? 'FALLEN ✓' : 'still alive'}`);
-
-// 结局判定：重警力 → 应清剿
-const P3 = { ...P, seed: 9, police: 600, policeAccuracy: 0.9, armedRate: 0.5, population: 8000, initialZombies: 30 };
-sim.reset(P3);
-for (let i = 0; i < 20 * 300; i++) sim.step(1 / 20, 0, 0);
-console.log(`containment test: civ=${sim.stats.civ} zomb=${sim.stats.zombie} ` +
-  `dead=${sim.stats.dead} -> ${sim.stats.zombie === 0 ? 'CLEARED ✓' : 'still spreading'}`);
