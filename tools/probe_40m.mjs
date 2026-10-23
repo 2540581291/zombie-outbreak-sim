@@ -16,9 +16,11 @@ const hw = (Math.max(...xs) - Math.min(...xs)) / 2, hh = (Math.max(...zs) - Math
 const sim = new Sim(nav, city);
 sim.reset({ seed: 1, population: 1, initialZombies: 0, police: 0, homeGunRate: 0 });
 const i = 0;
-let sx = cx - hw - 12, sz = cz, gx = cx + hw + 12, gz = cz;
-for (let k = 0; k < 25 && !(sim.walkable(sx, sz) && !nav.indoor(sx, sz)); k++) sx -= 2;
-for (let k = 0; k < 25 && !(sim.walkable(gx, gz) && !nav.indoor(gx, gz)); k++) gx += 2;
+const NS = process.argv[2] === 'ns';
+let sx = NS ? cx : cx - hw - 12, sz = NS ? cz - hh - 12 : cz;
+let gx = NS ? cx : cx + hw + 12, gz = NS ? cz + hh + 12 : cz;
+for (let k = 0; k < 25 && !(sim.walkable(sx, sz) && !nav.indoor(sx, sz)); k++) { if (NS) sz -= 2; else sx -= 2; }
+for (let k = 0; k < 25 && !(sim.walkable(gx, gz) && !nav.indoor(gx, gz)); k++) { if (NS) gz += 2; else gx += 2; }
 sim.px[i] = sx; sim.pz[i] = sz; sim.state[i] = 0;
 sim.vip[i] = 0; sim.actT[i] = 0; sim.idle[i] = 0;
 sim.setGoal(i, GOAL.MOVE_TO, gx, gz);

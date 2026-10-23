@@ -1102,14 +1102,47 @@ export class Sim {
       const dp = nav.doorPoint(fx, fz);
       if (dp) { fx = dp.x; fz = dp.z; }
     }
-    const s = this.snapCoarse(this.ccell(fx, fz));
+    let s = this.snapCoarse(this.ccell(fx, fz));
     const t = this.snapCoarse(this.ccell(tx, tz));
+    // 起点兜底：站在"被判不可走"的粗格里（街角、楼边）时，snapCoarse 不一定能吸附到
+    // 合法格 → 这里自己向外螺旋搜一个最近的合法粗格（半径 6 格 = 24m）。
+    // 否则整条链路就是"planPath 返回 0 → 没路径 → 直线撞楼 → 卡死"。
+    if (s < 0 || !this.cgrid[s]) {
+      const gw0 = this.gw, gh0 = this.gh, c0 = this.ccell(fx, fz);
+      const cc = c0 % gw0, rr = (c0 / gw0) | 0;
+      let found = -1;
+      for (let rad = 1; rad <= 8 && found < 0; rad++) {
+        for (let dr = -rad; dr <= rad && found < 0; dr++) {
+          for (let dc = -rad; dc <= rad; dc++) {
+            if (Math.abs(dr) !== rad && Math.abs(dc) !== rad) continue;
+            const r2 = rr + dr, c2 = cc + dc;
+            if (r2 < 0 || c2 < 0 || r2 >= gh0 || c2 >= gw0) continue;
+            const k = r2 * gw0 + c2;
+            if (this.cgrid[k]) { found = k; break; }
+          }
+        }
+      }
+      if (found >= 0) s = found;
+    }
     if (s < 0 || t < 0) return 0;
     if (!this.cgrid[t]) {
       // 目标在墙里/屋外：找它附近 3 格内最近的可行走粗格
       const gw = this.gw, tc = t % gw, tr = (t / gw) | 0;
       let best = -1;
-      for (let dr = -3; dr <= 3 && best < 0; dr++) {
+      // 半径 3 格（12m）找不到就扩到 8 格（32m）：城市里 12m 外经常还是别人的楼
+      for (let rad = 3; rad <= 8 && best < 0; rad++) {
+        for (let dr = -rad; dr <= rad && best < 0; dr++) {
+          for (let dc = -rad; dc <= rad; dc++) {
+            if (Math.abs(dr) !== rad && Math.abs(dc) !== rad) continue;
+            const r2 = tr + dr, c2 = tc + dc;
+            if (r2 < 0 || c2 < 0 || r2 >= this.gh || c2 >= gw) continue;
+            const k = r2 * gw + c2;
+            if (this.cgrid[k]) { best = k; break; }
+          }
+        }
+      }
+      for (let dr = -0; dr <= 0 && best >= 0; dr++) { /* no-op(占位) */ }
+      for (let dr = -3; dr <= 3 && false; dr++) {
         for (let dc = -3; dc <= 3; dc++) {
           const r2 = tr + dr, c2 = tc + dc;
           if (r2 < 0 || c2 < 0 || r2 >= this.gh || c2 >= gw) continue;
