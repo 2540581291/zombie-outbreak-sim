@@ -766,11 +766,17 @@ function renderAgentCard() {
     .join('');
   const kinHtml = kinRows || (p.family ? `<div class="ac-row"><span>家庭</span><em>${p.family}</em></div>` : '<div class="ac-row"><span>家庭</span><em>—</em></div>');
 
+  const sp = sim.speciesOf ? sim.speciesOf(selected) : null;
+  const spTxt = sp
+    ? `<b class="ac-spec ${sp.cls}">${sp.label}</b>${sp.from ? ` <span style="color:#8a98a6">· ${sp.from}</span>` : ''}${sp.pet !== undefined ? ` <span style="color:#8a98a6">· ${sp.pet ? '家养' : '野生'}</span>` : ''}`
+    : '';
+  const sec0 = sp ? `
+    <div class="ac-spec-row"><span>种族</span><em>${spTxt}</em></div>` : '';
+
   const sec1 = `
     <div class="ac-sec">身份</div>
     ${isAnimal
-      ? `<div class="ac-row"><span>种类</span><em>${kindName}（动物）</em></div>
-         <div class="ac-row"><span>来历</span><em>街上的${kindName}，没有家和工作地</em></div>`
+      ? `<div class="ac-row"><span>来历</span><em>${sim.pet && sim.pet[selected] ? '有主人的' : '街头的'}${kindName}，没有职业</em></div>`
       : `<div class="ac-row"><span>职业</span><em>${p.job}</em></div>
          ${kinHtml}`}`;
 
@@ -804,7 +810,7 @@ function renderAgentCard() {
     <div class="ac-row"><span>离家</span><em>${Math.hypot(sim.homeX[selected] - px, sim.homeZ[selected] - pz).toFixed(0)} m</em></div>
     <div class="ac-row"><span>位置</span><em>${(sim.nav && sim.nav.indoor && sim.nav.indoor(px, pz)) ? '楼里' : '街上'} · ${px.toFixed(0)}, ${pz.toFixed(0)}</em></div>`;
 
-  const bodyHtml = sec1 + sec2 + fleeBlock(selected) + statBlock(selected) + sec3 + sec4 +
+  const bodyHtml = sec0 + sec1 + sec2 + fleeBlock(selected) + statBlock(selected) + sec3 + sec4 +
     `<div class="ac-sec">当前状态</div>` + stateChips(selected, p) +
     attrBlock(selected) + explainBlock(selected);
   const bodyEl = document.getElementById('ac-body');

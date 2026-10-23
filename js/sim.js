@@ -1317,6 +1317,30 @@ export class Sim {
   }
 
   /**
+   * 种族/身份：卡片顶部最显眼的那一行。
+   * 人类 / 丧尸 / 已感染的活人 / 狗 / 丧尸狗 / 猫 / 丧尸猫 / 尸体
+   */
+  speciesOf(i) {
+    const st = this.state[i];
+    const kind = this.kind[i] || 0;
+    const dog = kind === 12, cat = kind === 13;
+    const dead = st === ST.CORPSE;
+    const zomb = st === ST.ZOMBIE;
+    const inf = st === ST.INFECTED;
+    if (dog) return { label: zomb ? '丧尸狗' : '狗', cls: zomb ? 'zomb' : 'civ', pet: this.pet[i] ? 1 : 0 };
+    if (cat) return { label: zomb ? '丧尸猫' : '猫', cls: zomb ? 'zomb' : 'civ', pet: this.pet[i] ? 1 : 0 };
+    if (zomb) return { label: '丧尸', cls: 'zomb', from: '人类尸变' };
+    if (dead) return { label: '尸体', cls: 'dead', from: '已死亡' };
+    if (inf) return { label: '已感染的活人', cls: 'inf', from: '未尸变' };
+    if (kind === 3 || kind === 4 || kind === 5 || kind === 11) {
+      const t = kind === 4 ? '士兵' : kind === 5 ? '重装兵' : kind === 11 ? '装甲车组' : '警察';
+      return { label: '人类', cls: 'civ', from: t };
+    }
+    if (st === ST.WILD) return { label: '野兽', cls: 'warn' };
+    return { label: '人类', cls: 'civ' };
+  }
+
+  /**
    * 这个人此刻具体在干什么（卡片用）。返回 { tag, name, detail }。
    * 之前卡片只显示"平民/丧尸/警察"这种大类，警察的巡逻/执勤/护送全混在一起，
    * 这里按分支实际条件拆开。

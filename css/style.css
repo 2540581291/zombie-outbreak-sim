@@ -356,3 +356,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
   .tb-stat em{font-size:9px}
   .tb-stat b{font-size:11.5px}
 }
+
+/* 种族行：卡片最顶部的身份标识（人类 / 丧尸 / 丧尸狗 …） */
+.ac-spec-row{display:flex;align-items:center;gap:10px;padding:6px 0 8px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:4px}
+.ac-spec-row>span{flex:0 0 72px;color:#8a98a6;font-size:11.5px}
+.ac-spec{font-size:14px;font-weight:800;letter-spacing:.04em;padding:1px 8px;border-radius:4px}
+.ac-spec.civ{color:#cfe6ff;background:rgba(120,180,255,.14)}
+.ac-spec.zomb{color:#ff8a72;background:rgba(255,80,60,.18)}
+.ac-spec.inf{color:#ffd27a;background:rgba(255,200,80,.16)}
+.ac-spec.dead{color:#9aa2a8;background:rgba(160,170,180,.14)}
+.ac-spec.warn{color:#ffc07a;background:rgba(255,170,80,.16)}
