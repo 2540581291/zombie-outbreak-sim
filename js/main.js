@@ -293,6 +293,7 @@ let escapeMark = null;      // 逃离线的绿色光带
 // 选中角色的行走路径（虚线折线）
 let pathLine = null;
 let pathRing = null;
+let selRing = null;         // 选中的人脚下的圈
 let pathKey = '';
 
 function ensurePathGfx() {
@@ -317,7 +318,7 @@ function ensurePathGfx() {
   scene.add(pathRing);
 
   // 选中的人脚下的圈（2D/3D 都显示，跟着人走 —— 找得到人）
-  const selRing = new THREE.Mesh(
+  selRing = new THREE.Mesh(
     new THREE.RingGeometry(1.15, 1.55, 32),
     new THREE.MeshBasicMaterial({ color: 0x7fe0ff, transparent: true, opacity: 0.85, depthWrite: false, depthTest: false, side: THREE.DoubleSide })
   );
@@ -1770,9 +1771,10 @@ async function boot() {
     orthoCam.lookAt(rig.target.x, 0, rig.target.z);
     if (followSelected && selected >= 0) rig.target.set(sim.px[selected], 0, sim.pz[selected]);
     if (sim && selected >= 0) {
+      ensurePathGfx();                       // 圈在里面创建
       selRing.position.set(sim.px[selected], 2.0, sim.pz[selected]);
       selRing.visible = true;
-    } else selRing.visible = false;
+    } else if (selRing) selRing.visible = false;
     retro.update(sim, { cx: rig.target.x, cz: rig.target.z, halfW, halfH,
       pxPerM: (renderer.domElement.clientHeight || window.innerHeight) / Math.max(1e-4, 2 * halfH) });
     if (++fc % 20 === 0) document.title = 'RETRO n=' + retro.count + ' ready=' + retro.ready +
