@@ -2047,6 +2047,17 @@ export class Sim {
             this.panic[i] = 1;
             break;
           }
+          // 看见丧尸（15 m 内）就跑：腿软期（fleeCd）内不重复触发
+          if (!this.armed[i] && this.nearZ[i] >= 0 && this.fleeCd[i] <= 0) {
+            const z = this.nearZ[i];
+            const fdx = this.px[z] - this.px[i], fdz = this.pz[z] - this.pz[i];
+            if (fdx * fdx + fdz * fdz < 15 * 15) {
+              this.state[i] = ST.FLEE;
+              this.fleeT[i] = 3 + this.rng() * 2;
+              this.panic[i] = 1;
+              break;
+            }
+          }
           // 什么都不知道 / 没目标 → 照常通勤
           if (this.goal[i] === GOAL.NONE && this.time >= this.commuteAt[i]) {
             this.commuteAt[i] = this.time + 70 + this.rng() * 110;
@@ -2178,10 +2189,10 @@ export class Sim {
             const ax = this.px[i] - this.px[z], az = this.pz[i] - this.pz[z];
             // 逃离 + 侧向扰动（避免所有人一条直线）
             const s = this.pz[i] > this.pz[z] ? 1 : -1;
-            // 体力：狂奔会累
-            this.stam[i] = Math.max(0.45, this.stam[i] - dt * 0.09);
-            const sp = this.spd[i] * (1.0 + 0.55 * this.panic[i]) * this.stam[i];
-            this.move(i, ax - az * 0.55 * s, az + ax * 0.55 * s, sp, dt);
+            // 体力：狂奔会累（约 6 秒后被丧尸追上）
+            this.stam[i] = Math.max(0.65, this.stam[i] - dt * 0.055);
+            const sp = this.spd[i] * (1.0 + 0.90 * this.panic[i]) * this.stam[i];
+            this.move(i, ax - az * 0.25 * s, az + ax * 0.25 * s, sp, dt);
             this.panic[i] = Math.min(1.4, this.panic[i] + dt * 0.6);
           } else {
             this.stam[i] = Math.min(1, this.stam[i] + dt * 0.12);
@@ -2202,13 +2213,13 @@ export class Sim {
           }
           const dx = this.px[z] - this.px[i], dz = this.pz[z] - this.pz[i];
           const d2 = dx * dx + dz * dz;
-          if (d2 > 30 * 30) { this.state[i] = ST.FLEE; break; }
+          if (d2 > 30 * 30) { this.state[i] = ST.FLEE; this.fleeT[i] = 3; break; }
           this.heading[i] = Math.atan2(dz, dx);
           this.cool[i] -= dt;
           if (this.cool[i] <= 0) {
             const w = weaponOf(this.wpn[i]);
             if (!this.armed[i] || (this.mag[i] <= 0 && this.reserve[i] <= 0)) {
-              this.state[i] = ST.FLEE; this.panic[i] = 1.4; break;
+              this.state[i] = ST.FLEE; this.fleeT[i] = 3 + rng() * 2; this.panic[i] = 1.4; break;
             }
             this.cool[i] = (w.rate || 0.5) * (1 + rng() * 0.25);
             this.fireWeapon(i, z);
@@ -2343,10 +2354,12 @@ export class Sim {
                   this.cool[c] = 0;
                   this.infectBy[i] = (this.infectBy[i] || 0) + 1;
                   this.growFromKill(i);          // 每感染一个人，自己 +50 血
-                } else {
-                  // 士兵/重装兵：不会感染，只是挨打
+                } else if (cs !== ST.INFECTED) {
+                  // 真的不会感染的人（士兵/重装）或抵抗成功：挨一口然后跑
+                  // 注意：已经潜伏的人**不能**改状态，否则感染计时会被踢掉
                   this.state[c] = ST.FLEE;
                   this.fleeT[c] = 2;
+                  this.panic[c] = 1.4;
                 }
               }
             } else if (sp.special === 'spit' && d2 < 26 * 26) {
