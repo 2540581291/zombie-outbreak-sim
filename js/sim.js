@@ -377,6 +377,7 @@ export class Sim {
     this.goal.fill(0); this.goalX.fill(0); this.goalZ.fill(0); this.decT.fill(0); this.lastScore.fill(0); this.stuckT.fill(0);
     this.lastX.fill(0); this.lastZ.fill(0); this.stuckT2 = 0; this.wpT.fill(0); this.freeT.fill(0);
     this.pathN.fill(0); this.pathIdx.fill(0); this.pathBudget = 8; this.stuckSlice = 0;
+    this.preyBudget = 8;       // 锁敌扫描预算也要重置，否则第二次 reset 起手值不同 → 非确定性
     this.infectRate = 0; this.awareRate = 0; this.chaos = 0;
     this.martialLaw = false; this.rateT = 0;
     this.homeGunRate = P.homeGunRate == null ? 0.12 : +P.homeGunRate;
@@ -413,6 +414,7 @@ export class Sim {
     this.vip.fill(0);
     this.vips.length = 0;
     this.vipTotal = 0;
+    this.vips.length = 0; this.vipGov = null;   // 要员列表也要清，否则第二次 reset 就没要员了（非确定性）
     this.cd = {};
     this.effects.length = 0;
     this.helis.length = 0;
@@ -2419,7 +2421,12 @@ export class Sim {
                 else this.wpT[i] = 0;
               }
               const adx = ax - this.px[i], adz = az - this.pz[i];
-              if (adx * adx + adz * adz > 30) {     // 还没到 → 往目标走
+              // "到了"的判定看**真正的目标点**（gp），不看绕行用的小路点：
+              // 目标多半是门口，门口再往里是墙、进不去，人会绕着楼转圈找那 5 米，
+              // 所以 12m 内就算到，停下来说话/发呆，不再绕圈。
+              const gdx = gp[0] - this.px[i], gdz = gp[1] - this.pz[i];
+              const atGoal = (gdx * gdx + gdz * gdz) < 144;
+              if (!atGoal && adx * adx + adz * adz > 30) {     // 还没到 → 往目标走
                 this.idle[i] = 0;
                 // 自己在屋里、目标又还远 → 先沿"门场"找门出去。
                 //  注意：不能要求"目标在屋外"，回家时目标也在（另一栋）屋里，
