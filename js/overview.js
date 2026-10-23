@@ -179,7 +179,7 @@ export function openOverview(sim) {
   close();
   S = sim;
   if (!names.length) {
-    names = new Array(Math.min(sim.n + 400, 62000));
+    names = new Array(Math.min(sim.n + 400, 160000));
   }
   el = document.createElement('div');
   el.id = 'overview';

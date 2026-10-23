@@ -54,9 +54,10 @@ function roleList(size, u) {
 export function buildFamilies(sim, civs, hash01) {
   const n = civs.length;
   sim.civAt = civs;
-  sim.hhStart = new Uint16Array(Math.min(62000, n + 2));
-  sim.hhEnd = new Uint16Array(Math.min(62000, n + 2));
-  sim.age = new Uint8Array(Math.min(62000, n + 2));
+  const cap = Math.min(160000, n + 2);
+  sim.hhStart = new Uint32Array(cap);   // 位置可能 > 65535（10 万平民），不能用 Uint16
+  sim.hhEnd = new Uint32Array(cap);
+  sim.age = new Uint8Array(cap);
   let pos = 0, hid = 0;
   while (pos < n) {
     const tourist = hash01(pos, 42) < HH_TOURIST_RATE;

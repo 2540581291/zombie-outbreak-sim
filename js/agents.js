@@ -51,7 +51,7 @@ void main(){
 `;
 
 export class AgentRenderer {
-  constructor(scene, max = 62000) {
+  constructor(scene, max = 160000) {
     this.max = max;
     this.count = 0;
 
@@ -86,7 +86,7 @@ export class AgentRenderer {
     const NEAR = 4000;
     this.nearCap = NEAR;
     this.unitsVisible = true;
-    this.nearFlag = new Uint8Array(62000);   // 滞回：已经显示为模型的个体不会在边界抖动
+    this.nearFlag = new Uint8Array(160000);   // 滞回：已经显示为模型的个体不会在边界抖动
     this.mat = new THREE.MeshLambertMaterial({ vertexColors: true });
     this.kindMeshes = new Map();      // kind -> { mesh, n }
     this.nearRadius = 430;

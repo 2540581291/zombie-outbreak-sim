@@ -1680,7 +1680,7 @@ async function boot() {
   sim.reset(readParams());
   buildEscapeMarker();
 
-  agents = new AgentRenderer(scene, 62000);
+  agents = new AgentRenderer(scene, 160000);
 
 // ---------- 2009 复古模式（图集 + 正交相机） ----------
   // 精灵块 v2（src/sprite/）：图集来自 assets/atlas/，见 assets/atlas/README.md

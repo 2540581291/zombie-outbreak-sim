@@ -23,7 +23,7 @@ export const ST = {
   WILD: 9,     // 野生动物：人尸双杀
 };
 
-const NMAX = 62000;
+const NMAX = 160000;
 
 // 潜伏期两套常量（决策 3）：默认 8 秒；零号病人模式 10–30 分钟
 // 潜伏时长区间（秒）。实际值 = 区间 × (面板「咬伤潜伏」/ 90)，再按年龄体质加权。
@@ -432,7 +432,7 @@ export class Sim {
     const nav = this.nav;
     const total = nav.cols * nav.rows;
     const pop = Math.min(P.population, NMAX - 2000 - P.police);
-    const nPol = Math.min(P.police, 800);
+    const nPol = Math.min(P.police, 10000);   // 警察上限跟着滑杆走
 
     // 收集可走格（用于均匀布点）
     let walk = 0;
