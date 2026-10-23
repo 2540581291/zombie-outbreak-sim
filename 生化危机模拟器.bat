@@ -42,7 +42,7 @@ for /f "tokens=5" %%P in ('netstat -ano ^| findstr ":%PORT% " ^| findstr "LISTEN
         set KILLED=1
     )
 )
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*http.server %PORT%*' } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {} }" >nul 2>&1
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { ($_.CommandLine -like '*http.server %PORT%*' -or $_.CommandLine -like '*serve.py %PORT%*') } | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop } catch {} }" >nul 2>&1
 
 if "!KILLED!"=="1" (
     echo   [1/4] 已停止旧服务，端口 %PORT% 已释放
@@ -52,7 +52,11 @@ if "!KILLED!"=="1" (
 
 ping -n 2 -w 300 127.0.0.1 >nul
 
-start "%TITLE%" /min %PY% -m http.server %PORT% --bind 127.0.0.1
+if exist "tools\serve.py" (
+    start "%TITLE%" /min %PY% "tools\serve.py" %PORT%
+) else (
+    start "%TITLE%" /min %PY% -m http.server %PORT% --bind 127.0.0.1
+)
 echo   [2/4] 新服务已启动，等待端口就绪...
 
 set OK=0
