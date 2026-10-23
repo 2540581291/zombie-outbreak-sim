@@ -2230,6 +2230,9 @@ export class Sim {
         }
         // ---------------- 潜伏 ----------------
         case ST.INFECTED: {
+          // 死线优先：到点就地转身。必须放在最前面 —— 下面"去医院"那条分支会 break，
+          // 放在末尾的话发烧的人一路走向医院，永远轮不到变身。
+          if (this.time >= this.riseAt[i]) { this.beginTurn(i); break; }
           this.timer[i] -= cdt;    // 潜伏倒计时按真实时间走（远处 5Hz 更新时步长已补偿）
           // ---- 发病阶段（M6）：潜伏期最后 40% 开始发烧 ----
           if (!this.sick[i] && this.incTot[i] > 0 && this.timer[i] < this.incTot[i] * 0.25) {
@@ -2263,8 +2266,7 @@ export class Sim {
             if (tx * tx + tz * tz < 4) this.pickWander(i);
             this.move(i, tx, tz, this.spd[i] * 0.55, dt);
           }
-          // 到点：活着就站着转（turn01），转身期间不能动；播完在 tickStage 里变丧尸
-          if (this.time >= this.riseAt[i]) this.beginTurn(i);
+          // 到点的情况在上面已经处理过了（转身期间不能动；播完在 tickStage 里变丧尸）
           break;
         }
         // ---------------- 丧尸 / 野兽 ----------------

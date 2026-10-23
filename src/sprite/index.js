@@ -64,6 +64,8 @@ export class SpriteView {
     this.zDie = new Uint8Array(CAP);
 
     this.trace = null;   // 开发用：设成数组就把每帧画了什么记进去
+    this.watchSel = -1;  // 开发用：盯住某个 index，记录这一帧有没有被画出来
+    this.selDrawn = false;
     // 剪影累计计数（按阵营）：看统计就知道这一局出现过红/蓝剪影没有
     this.silTot = { civ: 0, police: 0, zombie: 0 };
     this.dummy = new THREE.Object3D();
@@ -182,6 +184,7 @@ export class SpriteView {
     const sA = this.shadow ? this.shadow.alpha.array : null;
     const dotCol = dots.col.array;
 
+    this.selDrawn = false;
     let k = 0, dk = 0, sk = 0, pk = 0;
     let nSil = 0, nTurn = 0, nDie = 0, nRise = 0;
     let nSilCiv = 0, nSilPol = 0, nSilZom = 0;
@@ -235,6 +238,7 @@ export class SpriteView {
         fi = Math.floor(fpos * clip.n) % clip.n;
         if (fi < 0) fi += clip.n;
       }
+      if (i === this.watchSel) this.selDrawn = true;
       const r = clip.frames[fi];
       if (!r) continue;
 

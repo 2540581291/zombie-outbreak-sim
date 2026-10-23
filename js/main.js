@@ -10,6 +10,8 @@ import { applyLayerPatch } from './layerpatch.js';
 import { AgentRenderer } from './agents.js';
 import { TOOLS, TOOL_BY_ID, HOTKEYS, fmtWan, fmtMoney } from './tools.js';
 import { profileFor } from './people.js';
+import { SPECIES, SP } from './species.js';
+import { weaponOf } from './weapons.js';
 import { stockText } from './storage.js';
 import { AudioEngine } from './audio.js';
 import { openReport, closeReport, isReportOpen } from './report.js';
@@ -313,6 +315,16 @@ function ensurePathGfx() {
   pathRing.renderOrder = 6;
   pathRing.visible = false;
   scene.add(pathRing);
+
+  // 选中的人脚下的圈（2D/3D 都显示，跟着人走 —— 找得到人）
+  const selRing = new THREE.Mesh(
+    new THREE.RingGeometry(1.15, 1.55, 32),
+    new THREE.MeshBasicMaterial({ color: 0x7fe0ff, transparent: true, opacity: 0.85, depthWrite: false, depthTest: false, side: THREE.DoubleSide })
+  );
+  selRing.rotation.x = -Math.PI / 2;
+  selRing.renderOrder = 8;
+  selRing.visible = false;
+  scene.add(selRing);
 }
 
 /** 每帧刷新：选中谁就画谁的行走路径 */
@@ -518,6 +530,32 @@ function agentRules(i, p) {
     return `<div class="ac-bar ${cls || ''}"><i style="width:${pct.toFixed(0)}%"></i></div>`;
   }
 
+  /** 数值属性（移速 / 命中率 / 攻击 / 咬合 / 感知） */
+  function statBlock(i) {
+    const st = sim.state[i];
+    const sp = SPECIES[sim.kind[i]] || SPECIES[SP.CIV1];
+    const isZ = st === ST.ZOMBIE || st === ST.WILD;
+    const rows = [];
+    rows.push(['移动速度', sim.spd[i].toFixed(2) + ' m/s']);
+    if (isZ) {
+      rows.push(['命中率', '—（撕咬必中）']);
+      rows.push(['咬击伤害', (sp.dmg || 0) + ' / 口']);
+      rows.push(['咬合间隔', '1.0 s']);
+      rows.push(['追击半径', (sp.range || 0) + ' m']);
+    } else {
+      const armed = !!sim.armed[i];
+      rows.push(['命中率', armed ? (sim.shotAccuracy(i) * 100).toFixed(0) + '%' : '—（徒手）']);
+      const w = armed ? weaponOf(sim.wpn[i]) : null;
+      rows.push(['攻击', w ? (w.dmg + ' / 发 · ' + w.range + ' m') : (sp.dmg ? sp.dmg + ' / 下' : '无')]);
+      if (armed) rows.push(['武器', w.name + ' · ' + sim.mag[i] + (sim.reserve[i] ? '/' + sim.reserve[i] : '')]);
+      rows.push(['感知半径', (st === ST.POLICE ? 46 : st === ST.SOLDIER ? 60 : 26) + ' m']);
+    }
+    if (st === ST.INFECTED) rows.push(['尸变倒计时', Math.max(0, sim.timer[i]).toFixed(1) + ' s']);
+    if (st === ST.FLEE) rows.push(['体力', (sim.stam[i] * 100).toFixed(0) + '% · 恐慌 ' + sim.panic[i].toFixed(2)]);
+    return '<div class="ac-sec">属性</div>' +
+      rows.map(([k, v]) => `<div class="ac-row"><span>${k}</span><em>${v}</em></div>`).join('');
+  }
+
   function attrBlock(i) {
     const rows = [
       ['政府信任', sim.trust[i]],
@@ -612,7 +650,7 @@ function renderAgentCard() {
     <div class="ac-row"><span>位置</span><em>${(sim.nav && sim.nav.indoor && sim.nav.indoor(px, pz)) ? '楼里' : '街上'} · ${px.toFixed(0)}, ${pz.toFixed(0)}</em></div>`;
 
   document.getElementById('ac-body').innerHTML =
-    sec1 + sec2 + sec3 + sec4 +
+    sec1 + sec2 + statBlock(selected) + sec3 + sec4 +
     `<div class="ac-sec">当前状态</div>` + stateChips(selected, p) +
     attrBlock(selected) + explainBlock(selected);
 }
@@ -925,6 +963,9 @@ if (new URLSearchParams(location.search).has('pick')) {
     }
   }, 900);
 }
+window.addEventListener('error', (e) => {
+  window.__err = (e.message || 'err') + ' @' + String(e.filename || '').split('/').pop() + ':' + e.lineno;
+});
 window.__zosRestart = () => { sim.reset(readParams()); buildEscapeMarker(); hideBanner(); };
 $('btn-seed').onclick = () => { seed = (Math.random() * 1e9) | 0; sim.reset(readParams()); buildEscapeMarker(); hideBanner(); };
 $('p-toggle').onclick = () => {
@@ -1088,7 +1129,7 @@ function updateToolbar() {
   if (bf) bf.style.width = Math.min(100, (sim.budget / sim.budgetMax) * 100) + '%';
   // 卡片跟随刷新
   if (selected >= 0 && !document.getElementById('agentcard').classList.contains('hidden')) {
-    renderAgentCard();
+    try { renderAgentCard(); } catch (e) { window.__cardErr = String((e && e.message) || e); }
     if (followSelected) {
       rig.target.set(sim.px[selected], 0, sim.pz[selected]);
     }
@@ -1558,6 +1599,18 @@ async function boot() {
   }
   if (Q.get('report')) setTimeout(() => openReport(sim), 500);
   if (Q.get('ov')) setTimeout(() => { if (sim) toggleOverview(sim); }, 600);
+  // 调试：?zombify=N 让第 N 个个体被咬 → 快进 → 选中跟随（复现"变丧尸后图标消失"）
+  if (Q.get('zombify') != null) {
+    setTimeout(() => {
+      const i = Math.max(0, +Q.get('zombify') || 0);
+      if (!sim || !sim.setInfected) return;
+      sim.setInfected(i, 0.2);
+      const secs = Math.min(120, +Q.get('zsec') || 12);
+      for (let k = 0; k < secs * 20; k++) sim.step(1 / 20, sim.px[i], sim.pz[i]);
+      selectAgent(i);
+      followSelected = true;
+    }, 800);
+  }
   // 调试：?follow=N 选中并跟随第 N 个个体（截图/排查用）
   if (Q.get('follow') != null) {
     setTimeout(() => {
@@ -1576,6 +1629,14 @@ async function boot() {
     setInterval(() => {
       if (!retro || !retro.stats) { pre.textContent = 'sprite: 未就绪'; return; }
       const s = retro.stats;
+      retro.watchSel = selected;
+      const selTxt = selected >= 0
+        ? ('sel #' + selected + '  state=' + sim.state[selected] +
+           '  stage=' + (sim.aStage ? sim.aStage[selected] : '-') +
+           '  kind=' + sim.kind[selected] +
+           '  body=' + (retro.bodyStr && retro.bodyStr[selected]) +
+           '  本帧画出=' + (retro.selDrawn ? 'YES' : 'NO'))
+        : 'sel -';
       // 全城有多少人正处在"有顶盖"的格子上（僵尸/警察会不会进屋，看这一行）
       let ic = 0, ip = 0, iz = 0;
       if (sim && sim.nav && sim.nav.indoor) {
@@ -1593,7 +1654,7 @@ async function boot() {
         'silhouette ' + s.sil + '  (civ ' + s.silCiv + ' / police ' + s.silPolice + ' / zombie ' + s.silZombie + ')\n' +
         '累计剪影 civ ' + s.silTot.civ + '  police ' + s.silTot.police + '  zombie ' + s.silTot.zombie + '\n' +
         'turn01 ' + s.turn + '  die01 ' + s.die + '  zrise01 ' + s.rise + '\n' +
-        '全城室内：平民 ' + ic + '  警察/士兵 ' + ip + '  丧尸 ' + iz;
+        '全城室内：平民 ' + ic + '  警察/士兵 ' + ip + '  丧尸 ' + iz + '\n' + selTxt + '\n' + selTxt + (window.__err ? '\nERR ' + window.__err : '');
     }, 250);
   }
   if (Q.get('sel')) setTimeout(() => {
@@ -1711,6 +1772,11 @@ async function boot() {
     orthoCam.position.set(rig.target.x, 900, rig.target.z);
     orthoCam.up.set(0, 0, -1);                                  // 2D 强制正北朝上
     orthoCam.lookAt(rig.target.x, 0, rig.target.z);
+    if (followSelected && selected >= 0) rig.target.set(sim.px[selected], 0, sim.pz[selected]);
+    if (sim && selected >= 0) {
+      selRing.position.set(sim.px[selected], 2.0, sim.pz[selected]);
+      selRing.visible = true;
+    } else selRing.visible = false;
     retro.update(sim, { cx: rig.target.x, cz: rig.target.z, halfW, halfH,
       pxPerM: (renderer.domElement.clientHeight || window.innerHeight) / Math.max(1e-4, 2 * halfH) });
     if (++fc % 20 === 0) document.title = 'RETRO n=' + retro.count + ' ready=' + retro.ready +
