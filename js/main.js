@@ -685,7 +685,9 @@ function renderAgentCard() {
   const kindName = (SPECIES[sim.kind[selected]] || SPECIES[SP.CIV1]).name;
   // 家属：每个都做成可点的 chip（点了选中他，镜头跳过去）
   const ROLE_TXT = { spouse: '配偶', child: '子女', parent: '父母', grandparent: '祖辈', sibling: '同住' };
-  const kins = isAnimal ? []
+  const knd = sim.kind[selected];
+  const forceKind = (knd === 3 || knd === 4 || knd === 5);   // 警察 / 士兵 / 重装兵：住宿舍
+  const kins = (isAnimal || forceKind) ? []
     : kinList(sim, selected, (j) => (sim.age && sim.age[j]) || ageOfAgent(sim, j, () => 0), (j) => shortName(j, sim));
   const kinChip = (k) => {
     const dead = sim.state[k.j] === ST.CORPSE;
@@ -747,7 +749,7 @@ function renderAgentCard() {
 }
 
 // ---------- 地点名牌：投影到屏幕，公共建筑加发光 ----------
-const PUB_KINDS = new Set(['police', 'hospital', 'fire', 'gov', 'transit']);
+const PUB_KINDS = new Set(['police', 'hospital', 'fire', 'gov', 'transit', 'school']);
 let poiLabelEls = [];       // [{ el, x, z, kind }]
 let poiLabelSim = null;
 
@@ -775,7 +777,7 @@ function updatePoiLabels() {
   }
   const cam = activeCamera();
   const W = window.innerWidth, H = window.innerHeight;
-  const show = !overviewIsOpen();
+  const show = overlayOn && !overviewIsOpen();   // 只有在地形模式下才显示地点名牌
   // 2D：视高 = 2 × rig.dist × 0.0475；3D：dist 约等于相机到目标的距离
   const viewHalfH = retroMode ? rig.dist * 0.0475 : rig.dist * 0.5;
   for (const it of poiLabelEls) {

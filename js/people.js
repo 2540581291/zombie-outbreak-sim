@@ -110,7 +110,11 @@ export function profileFor(sim, i) {
 
   // 家庭：真的按 household 算（配偶 / 子女 / 父母 / 独居 / 旅客）
   const kinAge = (j) => ageOfAgent(sim, j, ageOf);
-  const family = kinText(sim, i, kinAge, (j) => shortName(j, sim));
+  let family = kinText(sim, i, kinAge, (j) => shortName(j, sim));
+  // 家属文本也按身份：动物没有家属；警察/军人住宿舍，家属不随行
+  if (kind === 12 || kind === 13) family = '—（动物没有家庭）';
+  else if (kind === 3) family = '住警队宿舍，家属不随行';
+  else if (kind === 4 || kind === 5) family = '住部队营房，家属不随行';
 
   const state = sim.state[i];
   const [stateTxt, stateColor] = STATE_TXT[state] || ['—', 'grey'];
