@@ -294,7 +294,9 @@ let escapeMark = null;      // 逃离线的绿色光带
 // 选中角色的行走路径（虚线折线）
 let pathLine = null;
 let pathRing = null;
-let selRing = null;         // 选中的人脚下的圈
+let selRingA = null, selRingB = null;   // 选中标记：亮白细环 + 外圈光晕（实例化）
+const MARK_CAP = 24;
+let marked = [];                        // 选中过的个体（新的在前，最多 MARK_CAP 个）
 let pathKey = '';
 
 function ensurePathGfx() {
@@ -318,15 +320,25 @@ function ensurePathGfx() {
   pathRing.visible = false;
   scene.add(pathRing);
 
-  // 选中的人脚下的圈（2D/3D 都显示，跟着人走 —— 找得到人）
-  selRing = new THREE.Mesh(
-    new THREE.RingGeometry(1.15, 1.55, 32),
-    new THREE.MeshBasicMaterial({ color: 0x7fe0ff, transparent: true, opacity: 0.85, depthWrite: false, depthTest: false, side: THREE.DoubleSide })
+  // 选中标记：白色荧光圈（加法混合，两层 —— 亮白细环 + 外圈光晕）
+  const mkRing = (r0, r1, op) => new THREE.InstancedMesh(
+    new THREE.RingGeometry(r0, r1, 40),
+    new THREE.MeshBasicMaterial({
+      color: 0xffffff, transparent: true, opacity: op, side: THREE.DoubleSide,
+      depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,
+    }),
+    MARK_CAP
   );
-  selRing.rotation.x = -Math.PI / 2;
-  selRing.renderOrder = 8;
-  selRing.visible = false;
-  scene.add(selRing);
+  selRingA = mkRing(1.05, 1.32, 0.95);      // 芯
+  selRingB = mkRing(1.32, 1.95, 0.28);      // 光晕
+  for (const m of [selRingA, selRingB]) {
+    m.frustumCulled = false;
+    m.renderOrder = 8;
+    m.visible = false;
+    m.count = 0;
+    m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    scene.add(m);
+  }
 }
 
 /** 每帧刷新：选中谁就画谁的行走路径 */
@@ -396,8 +408,6 @@ function buildEscapeMarker() {
   escapeMark = m;
 }
 
-let selHist = [];            // 最近看过的人（点家属/来路跳转用）
-
 function selectAgent(i) {
   if (i === selected) {
     // 同一个人的情况下也要能"从地点视图回到他本人"
@@ -405,11 +415,7 @@ function selectAgent(i) {
     renderAgentCard();
     return;
   }
-  if (selected >= 0) {
-    selHist = selHist.filter((x) => x !== selected);
-    selHist.unshift(selected);
-    if (selHist.length > 6) selHist.length = 6;
-  }
+  markAgent(i);               // 选中即留下一个荧光圈（之前选中的人不动）
   selected = i;
   placeView = null;           // 换人时回到"角色视图"
   const el = document.getElementById('agentcard');
@@ -425,13 +431,48 @@ function visit(i) {
   rig.target.set(sim.px[i], 0, sim.pz[i]);
 }
 
+/** 选中即留下一个荧光圈（集合：之前选中的人不清，点空白才清） */
+function markAgent(i) {
+  if (!sim || i < 0 || i >= sim.n) return;
+  marked = marked.filter((x) => x !== i);
+  marked.unshift(i);
+  if (marked.length > MARK_CAP) marked.length = MARK_CAP;
+}
+
+function clearMarks() { marked.length = 0; }
+
+const _mkM = new THREE.Matrix4();
+const _mkQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
+const _mkP = new THREE.Vector3();
+const _mkS = new THREE.Vector3(1, 1, 1);
+
+/** 每帧把 marked 里的人全部画成白色荧光圈（带一点呼吸） */
+function updateMarks(t) {
+  if (!selRingA) return;
+  const pulse = 1 + Math.sin((t || 0) / 700) * 0.07;
+  // 圈是世界尺寸，拉远会看不见 —— 按当前视距放大，上限 6 倍
+  const zoomK = Math.min(6, Math.max(1, (rig.dist || 0) / 260));
+  const sc = pulse * zoomK;
+  let n = 0;
+  for (const i of marked) {
+    if (!sim || i < 0 || i >= sim.n) continue;
+    _mkP.set(sim.px[i], 2.0, sim.pz[i]);
+    _mkS.set(sc, sc, sc);
+    _mkM.compose(_mkP, _mkQ, _mkS);
+    selRingA.setMatrixAt(n, _mkM);
+    selRingB.setMatrixAt(n, _mkM);
+    if (++n >= MARK_CAP) break;
+  }
+  selRingA.count = n; selRingB.count = n;
+  selRingA.visible = n > 0; selRingB.visible = n > 0;
+  if (n) {
+    selRingA.instanceMatrix.needsUpdate = true;
+    selRingB.instanceMatrix.needsUpdate = true;
+  }
+}
+
 function setFollow(on) {
   followSelected = !!on;
-  const trEl = document.getElementById('ac-trace');
-  if (trEl) trEl.onclick = (ev) => {
-    const c = ev.target.closest('[data-i]');
-    if (c) visit(+c.dataset.i);
-  };
   const f = document.getElementById('ac-follow');
   if (f) {
     f.textContent = followSelected ? '停止跟随' : '跟随镜头';
@@ -441,6 +482,7 @@ function setFollow(on) {
 
 function deselectAgent() {
   selected = -1;
+  clearMarks();               // 点空白：选中概念整组消失
   followSelected = false;
   const el = document.getElementById('agentcard');
   if (el) el.classList.add('hidden');
@@ -636,7 +678,6 @@ function renderAgentCard() {
   if (!sim || selected < 0) return;
   const el = document.getElementById('agentcard');
   if (!el) return;
-  renderTrace();                     // 来路：地点视图里也要在
   if (placeView) { renderPlace(); return; }
 
   const p = profileFor(sim, selected);
@@ -716,16 +757,6 @@ function renderAgentCard() {
     sec1 + sec2 + statBlock(selected) + sec3 + sec4 +
     `<div class="ac-sec">当前状态</div>` + stateChips(selected, p) +
     attrBlock(selected) + explainBlock(selected);
-}
-
-/** 卡片顶部的"来路"：最近看过的人，点一下跳回去 */
-function renderTrace() {
-  const tr = document.getElementById('ac-trace');
-  if (!tr) return;
-  const list = selHist.filter((j) => j >= 0 && j < (sim ? sim.n : 0)).slice(0, 5);
-  tr.innerHTML = list
-    .map((j) => `<b class="chip" data-i="${j}" title="回到 ${shortName(j, sim)}">← ${shortName(j, sim)}</b>`)
-    .join('');
 }
 
 function hoverAt(e) {
@@ -994,6 +1025,7 @@ if ($('sel-mode')) {
 syncLabels();
 
 $('btn-restart').onclick = () => {
+  clearMarks();
   closeReport();
   closeOverview();
   deselectAgent();
@@ -1030,8 +1062,8 @@ if (new URLSearchParams(location.search).has('pick')) {
 window.addEventListener('error', (e) => {
   window.__err = (e.message || 'err') + ' @' + String(e.filename || '').split('/').pop() + ':' + e.lineno;
 });
-window.__zosRestart = () => { sim.reset(readParams()); buildEscapeMarker(); hideBanner(); };
-$('btn-seed').onclick = () => { seed = (Math.random() * 1e9) | 0; sim.reset(readParams()); buildEscapeMarker(); hideBanner(); };
+window.__zosRestart = () => { clearMarks(); sim.reset(readParams()); buildEscapeMarker(); hideBanner(); };
+$('btn-seed').onclick = () => { clearMarks(); seed = (Math.random() * 1e9) | 0; sim.reset(readParams()); buildEscapeMarker(); hideBanner(); };
 $('p-toggle').onclick = () => {
   const b = $('p-body');
   b.classList.toggle('hide');
@@ -1847,12 +1879,6 @@ async function boot() {
     orthoCam.position.set(rig.target.x, 900, rig.target.z);
     orthoCam.up.set(0, 0, -1);                                  // 2D 强制正北朝上
     orthoCam.lookAt(rig.target.x, 0, rig.target.z);
-    if (followSelected && selected >= 0) rig.target.set(sim.px[selected], 0, sim.pz[selected]);
-    if (sim && selected >= 0) {
-      ensurePathGfx();                       // 圈在里面创建
-      selRing.position.set(sim.px[selected], 2.0, sim.pz[selected]);
-      selRing.visible = true;
-    } else if (selRing) selRing.visible = false;
     retro.update(sim, { cx: rig.target.x, cz: rig.target.z, halfW, halfH,
       pxPerM: (renderer.domElement.clientHeight || window.innerHeight) / Math.max(1e-4, 2 * halfH) });
     if (++fc % 20 === 0) document.title = 'RETRO n=' + retro.count + ' ready=' + retro.ready +
@@ -1948,6 +1974,12 @@ function loop(t) {
     cityRef.mat.uniforms.uNight.value = 0.42;
     cityRef.mat.uniforms.uFogNear.value = scene.fog ? scene.fog.near : 900;
     cityRef.mat.uniforms.uFogFar.value = scene.fog ? scene.fog.far : 5200;
+  }
+
+  // 跟随 + 选中圈：每帧更新，2D/3D 都生效
+  if (sim) {
+    if (followSelected && selected >= 0) rig.target.set(sim.px[selected], 0, sim.pz[selected]);
+    updateMarks(t);
   }
 
   if (retroMode && retro && retro.ready) {

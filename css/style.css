@@ -306,24 +306,14 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
 .ac-row .link.gone { opacity: .45; text-decoration: line-through; }
 
 
-/* ---- 可点元素：统一看起来就能点（地址 / 工作地 / 家属 / 来路） ---- */
-.ac-row .link, .ac-trace .chip {
+/* ---- 可点元素：统一看起来就能点（地址 / 工作地 / 家属） ---- */
+.ac-row .link {
   color:#7fe0ff; cursor:pointer;
   border-bottom:1px dashed rgba(127,224,255,.5);
   transition:color .12s, background .12s;
 }
-.ac-row .link:hover, .ac-trace .chip:hover {
+.ac-row .link:hover {
   color:#eafcff; background:rgba(127,224,255,.16); border-radius:3px;
 }
-.ac-row .link.gone { opacity:.45; text-decoration:line-through; border-bottom-color:rgba(127,224,255,.2); }
-
-/* 来路（最近看过的人） */
-.ac-trace{
-  padding:5px 12px 7px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;
-  font-size:10.5px; border-bottom:1px solid rgba(255,255,255,.07);
-}
-.ac-trace:empty{ display:none; }
-.ac-trace::before{ content:'来路'; color:#4e5a66; letter-spacing:.08em; }
-.ac-trace .chip{
   padding:1px 6px; border-radius:999px; background:rgba(127,224,255,.08); font-weight:600;
 }
