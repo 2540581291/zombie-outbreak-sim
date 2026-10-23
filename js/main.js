@@ -257,9 +257,13 @@ el.addEventListener('pointerup', (e) => {
     if (rc.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit)) {
       const t = TOOL_BY_ID[activeTool];
       if (!t || t.kind === 'select') {
-        const i = pickAgent(e.clientX, e.clientY);
-        if (i >= 0) selectAgent(i);
-        else deselectAgent();
+        const cand = pickAgents(e.clientX, e.clientY);
+        if (cand.length) {
+          // 人群中几个个体可能重叠在同一个像素上：优先切到"不是当前选中"的那个，
+          // 否则点旁边的人会一直返回到原来那位（这就是"点了没反应"的原因）
+          const pick = cand.find((c) => c.i !== selected) || cand[0];
+          selectAgent(pick.i);
+        } else deselectAgent();
       } else {
         useToolAt(hit.x, hit.z);
       }
@@ -270,6 +274,28 @@ el.addEventListener('pointerup', (e) => {
 // ---------- 个体选择 ----------
 let selected = -1;
 let followSelected = false;
+
+function pickAgents(clientX, clientY, radius = 22) {
+  if (!sim) return [];
+  const cam = activeCamera();
+  const v = new THREE.Vector3();
+  const out = [];
+  const n = sim.n;
+  const r2 = radius * radius;
+  for (let i = 0; i < n; i++) {
+    const st = sim.state[i];
+    if (st === ST.CORPSE || st === ST.SAVED) continue;
+    v.set(sim.px[i], 0.9, sim.pz[i]).project(cam);
+    if (v.z > 1) continue;
+    const sx = (v.x * 0.5 + 0.5) * window.innerWidth;
+    const sy = (-v.y * 0.5 + 0.5) * window.innerHeight;
+    if (sx < -40 || sy < -40 || sx > window.innerWidth + 40 || sy > window.innerHeight + 40) continue;
+    const d = (sx - clientX) * (sx - clientX) + (sy - clientY) * (sy - clientY);
+    if (d < r2) out.push({ i, d });
+  }
+  out.sort((a, b) => a.d - b.d);
+  return out.slice(0, 8);
+}
 
 function pickAgent(clientX, clientY) {
   if (!sim) return -1;
