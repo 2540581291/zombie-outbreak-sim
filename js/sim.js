@@ -2070,7 +2070,7 @@ export class Sim {
           this.nearC[i] = this.findNearest(i, 4, 60);
         } else if (st === ST.POLICE || st === ST.SOLDIER) {
           // 士兵看得更远（步枪 + 训练），警察 46m、士兵 60m
-          this.nearZ[i] = this.findNearest(i, 1, st === ST.SOLDIER ? 60 : 46);
+          this.nearZ[i] = this.findNearest(i, 1, st === ST.SOLDIER ? 80 : 50);
           // 警察有电台，默认知道；但零号病人模式下连他们也不知道（还没发生任何事）
           // 警察有电台，但只有"城里真的还有丧尸"时他们才知道
           if (!this.longInc && this.stats.zombie > 0 && this.aware[i] < 3) this.setAware(i, 3);
@@ -2078,7 +2078,7 @@ export class Sim {
           const wsp = SPECIES[this.kind[i]] || SPECIES[SP.CIV1];
           this.nearC[i] = this.findNearest(i, 6, wsp.range || 90);
         } else if (st === ST.CIV || st === ST.FLEE || st === ST.FIGHT || st === ST.INFECTED) {
-          this.nearZ[i] = this.findNearest(i, 1, 26);
+          this.nearZ[i] = this.findNearest(i, 1, 40);
           // 目击：真的看见了 → 知晓度 2（之后才开始打电话 / 上网）
           if (this.nearZ[i] >= 0 && this.aware[i] < 2) this.setAware(i, 2);
           // 85% 的人有手机：看到丧尸会打 110（同一片 60 秒内只报一次）

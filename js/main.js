@@ -599,7 +599,7 @@ function agentRules(i, p) {
       const w = armed ? weaponOf(sim.wpn[i]) : null;
       rows.push(['攻击', w ? (w.dmg + ' / 发 · ' + w.range + ' m') : (sp.dmg ? sp.dmg + ' / 下' : '无')]);
       if (armed) rows.push(['武器', w.name + ' · ' + sim.mag[i] + (sim.reserve[i] ? '/' + sim.reserve[i] : '')]);
-      rows.push(['感知半径', (st === ST.POLICE ? 46 : st === ST.SOLDIER ? 60 : 26) + ' m']);
+      rows.push(['感知半径', (st === ST.POLICE ? 50 : st === ST.SOLDIER ? 80 : 40) + ' m']);
     }
     if (st === ST.INFECTED) {
       rows.push(['尸变倒计时', Math.max(0, sim.timer[i]).toFixed(1) + ' s']);
