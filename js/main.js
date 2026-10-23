@@ -559,6 +559,14 @@ function agentRules(i, p) {
 }
 
 /** 当前状态：一排小标签（不再是长条） */
+  function behaviorBlock(i) {
+    if (!sim.statusOf) return '';
+    const b = sim.statusOf(i);
+    const cls = b.tag === 'pol' ? 'pol' : b.tag === 'zomb' ? 'bad' : b.tag === 'flee' ? 'hot' : b.tag === 'inf' ? 'bad' : '';
+    return `
+      <div class="ac-row"><span>当前行为</span><em><b class="ac-chip ${cls}" style="font-size:11.5px">${b.name}</b>${b.detail ? ' <span style="color:#8a98a6">· ' + b.detail + '</span>' : ''}</em></div>`;
+  }
+
   function stateChips(i, p) {
     const chips = [];
     const add = (t, cls) => chips.push('<span class="ac-chip ' + (cls || '') + '">' + t + '</span>');
@@ -768,8 +776,12 @@ function renderAgentCard() {
 
   const sec2 = `
     <div class="ac-sec">状态</div>
-    <div class="ac-row"><span>状态</span><em><b class="st-${p.stateColor}">${p.stateTxt}</b></em></div>
-    ${p.social ? `<div class="ac-row"><span>行程</span><em>${p.social}</em></div>` : ''}
+    <div class="ac-row"><span>状态</span><em>${(() => {
+        const b = sim.statusOf ? sim.statusOf(selected) : null;
+        if (!b) return `<b class="st-${p.stateColor}">${p.stateTxt}</b>`;
+        return `<b class="st-${p.stateColor}">${p.stateTxt}</b> <span style="color:#8ff0d6">→ ${b.name}</span>${b.detail ? ` <span style="color:#8a98a6">· ${b.detail}</span>` : ''}`;
+      })()}</em></div>
+    <div class="ac-row"><span>行程</span><em>${sim.itineraryOf ? sim.itineraryOf(selected) : (p.social || '—')}</em></div>
     <div class="ac-row"><span>知情</span><em>${p.awareText || '一无所知'}</em></div>
     ${p.vipEscort ? `<div class="ac-row"><span>护送</span><em>${p.vipEscort}</em></div>` : ''}
     ${linkTo ? `<div class="ac-row"><span>连线</span><em><b class="link" data-act="unlink">→ ${linkTo.label}</b>（再点一次断开）</em></div>` : ''}
@@ -1818,6 +1830,23 @@ async function boot() {
       const i = Math.max(0, +Q.get('follow') || 0);
       selectAgent(i);
       followSelected = true;
+    }, 900);
+  }
+  // 调试：?pickrole=police|zombie|vip|dog|flee 直接选中第一个该角色（看行为文案用）
+  if (Q.get('pickrole')) {
+    setTimeout(() => {
+      if (!sim) return;
+      const want = Q.get('pickrole');
+      let hit = -1;
+      for (let i = 0; i < sim.n; i++) {
+        const st = sim.state[i], k = sim.kind[i];
+        if (want === 'police' && (st === ST.POLICE || st === ST.SOLDIER)) { hit = i; break; }
+        if (want === 'zombie' && st === ST.ZOMBIE) { hit = i; break; }
+        if (want === 'flee' && st === ST.FLEE) { hit = i; break; }
+        if (want === 'vip' && sim.vip && sim.vip[i]) { hit = i; break; }
+        if (want === 'dog' && (k === 12 || k === 13)) { hit = i; break; }
+      }
+      if (hit >= 0) { selectAgent(hit); followSelected = true; }
     }, 900);
   }
   // 调试：?spritedbg=1 显示 2D 精灵各层实例数

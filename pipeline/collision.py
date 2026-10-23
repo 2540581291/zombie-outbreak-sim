@@ -135,7 +135,7 @@ def faces_out(grid, c, r, nx, ny, depth=2):
         cc = int(c + nx * d)
         rr = int(r + ny * d)
         v = grid.get(cc, rr)
-        if v in (OPEN, COVER):
+        if v in (OPEN, GRASS):
             return True
         if v in (WALL, INSIDE, WINDOW):
             return False
@@ -355,7 +355,7 @@ def build(city, cell=0.4, verbose=True, sat_path=None):   # 默认 0.4m/格（�
             g.fill_poly([tuple(p) for p in hole], OPEN)
     for z in city.get("parks") or []:
         kind = z.get("k")
-        g.fill_poly([tuple(p) for p in z["p"]], COVER if kind in ("forest", "wood") else OPEN)
+        g.fill_poly([tuple(p) for p in z["p"]], GRASS if kind in ("forest", "wood") else OPEN)
 
     # 河流中心线：逐个采样点从卫星亮度量左右岸，贴住河岸盖水面
     # （比依赖 multipolygon 闭合稳；宽度不再用固定估算值）
@@ -553,7 +553,7 @@ def build(city, cell=0.4, verbose=True, sat_path=None):   # 默认 0.4m/格（�
             hist[v] = hist.get(v, 0) + 1
         total = len(g.g)
         print(f"      碰撞层 {g.cols}×{g.rows} = {total:,} 格 @ {cell}m", flush=True)
-        for v, name in [(OPEN, "空地/路"), (COVER, "林地"), (INSIDE, "室内"),
+        for v, name in [(OPEN, "空地/路"), (GRASS, "林地"), (INSIDE, "室内"),
                         (WALL, "墙"), (DOOR, "门"), (WINDOW, "窗"),
                         (FENCE, "围栏"), (WATER, "水")]:
             if v in hist:

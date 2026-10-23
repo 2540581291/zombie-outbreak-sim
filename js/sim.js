@@ -1316,6 +1316,125 @@ export class Sim {
     return dp ? [dp.x, dp.z] : null;
   }
 
+  /**
+   * 这个人此刻具体在干什么（卡片用）。返回 { tag, name, detail }。
+   * 之前卡片只显示"平民/丧尸/警察"这种大类，警察的巡逻/执勤/护送全混在一起，
+   * 这里按分支实际条件拆开。
+   */
+  statusOf(i) {
+    const st = this.state[i];
+    const kind = this.kind[i] || 0;
+    const D = (x, z) => Math.hypot(x - this.px[i], z - this.pz[i]);
+    const sp = SPECIES[kind] || {};
+    // ---- 丧尸 / 野兽 ----
+    if (st === ST.ZOMBIE || st === ST.WILD) {
+      const t = this.tgt[i];
+      const wild = st === ST.WILD;
+      if (t >= 0) {
+        const d = D(this.px[t], this.pz[t]);
+        const biteR = sp.biteR || 1.8;
+        if (d <= biteR) return { tag: 'zomb', name: wild ? '撕咬' : '撕咬猎物', detail: `${d.toFixed(1)}m 内` };
+        if (this.lockOn[i]) return { tag: 'zomb', name: '锁敌追猎', detail: `锁定 ${Math.round(d)}m 外，跨越全城也不放弃` };
+        return { tag: 'zomb', name: wild ? '扑向目标' : '追击猎物', detail: `${Math.round(d)}m` };
+      }
+      const wait = Math.max(0, Math.ceil((this.lockT[i] || 0) - this.time));
+      return { tag: 'zomb', name: '游荡寻食', detail: wait > 0 ? `${wait}s 后再次搜敌` : '正在搜敌' };
+    }
+    // ---- 潜伏期 ----
+    if (st === ST.INFECTED) {
+      const left = Math.max(0, Math.ceil((this.riseAt[i] || 0) - this.time));
+      return { tag: 'inf', name: '潜伏（未尸变）', detail: `约 ${left}s 后尸变` };
+    }
+    // ---- 警 / 军 ----
+    if (st === ST.POLICE || st === ST.SOLDIER) {
+      const force = st === ST.SOLDIER ? '部队' : '警队';
+      const si = (this.stationOf[i] || 0) - 1;
+      const stn = si >= 0 ? (this.poiByKind.police || [])[si] : null;
+      const dHome = stn ? D(stn.x, stn.z) : 0;
+      if (this.escortOf && this.escortOf[i]) {
+        const v = this.vips ? this.vips[this.escortOf[i] - 1] : -1;
+        const dv = (v >= 0) ? D(this.px[v], this.pz[v]) : 0;
+        return { tag: 'pol', name: '护送要员', detail: dv > 12 ? `距要员 ${Math.round(dv)}m，正在贴身` : '在要员身边' };
+      }
+      if (this.ammo[i] <= 0 && this.mag[i] <= 0 && this.reserve[i] <= 0) {
+        return { tag: 'pol', name: '回局补弹', detail: stn ? `距${force}驻地 ${Math.round(dHome)}m` : '没有归属驻地' };
+      }
+      if (this.goal[i] === GOAL.MOVE_TO) {
+        const gp = this.goalPoint(i, GOAL.MOVE_TO);
+        if (gp) {
+          const d = D(gp[0], gp[1]);
+          if (d > 6) return { tag: 'pol', name: '出警途中', detail: `距现场 ${Math.round(d)}m` };
+        }
+      }
+      const mustReturn = this.chaos >= 50 || (this.chaos >= 20 && this.patrol[i]);
+      if (mustReturn && dHome > 18) return { tag: 'pol', name: '奉命撤回', detail: `距驻地 ${Math.round(dHome)}m` };
+      if (mustReturn && dHome <= 18) return { tag: 'pol', name: '驻防戒备', detail: '在驻地附近待命' };
+      if (this.nearZ[i] >= 0) {
+        const d = D(this.px[this.nearZ[i]], this.pz[this.nearZ[i]]);
+        if (d < 30) return { tag: 'pol', name: '现场交火', detail: `${Math.round(d)}m 外有目标` };
+      }
+      if (this.patrol[i]) return { tag: 'pol', name: '街面巡逻', detail: `距驻地 ${Math.round(dHome)}m` };
+      if (dHome > 45) return { tag: 'pol', name: '离开驻地', detail: `距驻地 ${Math.round(dHome)}m，正在归位` };
+      return { tag: 'pol', name: '驻地待命', detail: `距驻地 ${Math.round(dHome)}m` };
+    }
+    // ---- 平民 / 逃跑 / 交战 ----
+    if (this.fleeMode && this.fleeMode[i] === 2) {
+      const fg = this.fleeGoal[i];
+      const txt = fg === 0 ? '回家躲避' : fg === 1 ? '去警局避难' : '逃离城区';
+      if (this.stationLost && this.stationLost[i]) return { tag: 'flee', name: '有目标逃跑', detail: '警局已沦陷，改道' };
+      return { tag: 'flee', name: '有目标逃跑', detail: txt };
+    }
+    if (st === ST.FLEE) {
+      const fg = this.fleeGoal ? this.fleeGoal[i] : 0;
+      const txt = fg === 0 ? '回家' : fg === 1 ? '去警局' : fg === 2 ? '出城' : '离开这里';
+      return { tag: 'flee', name: '惊慌逃跑', detail: `方向：${txt}` };
+    }
+    if (this.armHome && this.armHome[i]) {
+      const d = D(this.homeX[i], this.homeZ[i]);
+      return { tag: 'civ', name: '回家补弹', detail: `距家 ${Math.round(d)}m` };
+    }
+    if (this.goal[i] === GOAL.SHELTER) {
+      const gp = this.goalPoint(i, GOAL.SHELTER);
+      return { tag: 'civ', name: '去警局避难', detail: gp ? `还有 ${Math.round(D(gp[0], gp[1]))}m` : '' };
+    }
+    if (this.goal[i] === GOAL.ARM_HOME) return { tag: 'civ', name: '回家取枪', detail: `距家 ${Math.round(D(this.homeX[i], this.homeZ[i]))}m` };
+    if (this.goal[i] === GOAL.HOME) return { tag: 'civ', name: '回家', detail: `还有 ${Math.round(D(this.homeX[i], this.homeZ[i]))}m` };
+    if (this.goal[i] === GOAL.WORK) return { tag: 'civ', name: '去单位', detail: `还有 ${Math.round(D(this.workX[i], this.workZ[i]))}m` };
+    if (this.goal[i] === GOAL.HOLD) return { tag: 'civ', name: '待在原地', detail: '' };
+    if (this.idle[i]) return { tag: 'civ', name: '驻足', detail: `还剩 ${Math.max(0, Math.ceil(this.actT[i]))}s` };
+    if (kind === 12 || kind === 13) return { tag: 'animal', name: this.pet[i] ? '在住处附近活动' : '四处觅食', detail: '' };
+    return { tag: 'civ', name: '闲逛', detail: '' };
+  }
+
+  /** 行程一行：任何情况下都给一句话（卡片里"行程"永远有内容） */
+  itineraryOf(i) {
+    const st = this.state[i];
+    if (st === ST.CORPSE) return '—（已死亡）';
+    if (st === ST.SAVED) return '已从撤离口离开城区';
+    if (st === ST.ZOMBIE || st === ST.WILD) {
+      const t = this.tgt[i];
+      if (t >= 0) return `追向 (${this.px[t].toFixed(0)}, ${this.pz[t].toFixed(0)})`;
+      return '无目标，正在游荡';
+    }
+    if (st === ST.POLICE || st === ST.SOLDIER) {
+      const si = (this.stationOf[i] || 0) - 1;
+      const stn = si >= 0 ? (this.poiByKind.police || [])[si] : null;
+      const bits = [];
+      if (stn) bits.push(`驻地 ${stn.n || '警局'}（${Math.round(Math.hypot(stn.x - this.px[i], stn.z - this.pz[i]))}m）`);
+      if (this.goal[i] === GOAL.MOVE_TO) {
+        const gp = this.goalPoint(i, GOAL.MOVE_TO);
+        if (gp) bits.push(`前往 (${gp[0].toFixed(0)}, ${gp[1].toFixed(0)})`);
+      }
+      bits.push(`${this.pathN[i]} 个路点`);
+      return bits.join(' · ');
+    }
+    const g = this.goal[i];
+    const gp = g !== GOAL.NONE ? this.goalPoint(i, g) : null;
+    if (!gp) return this.idle[i] ? '原地停留' : '无固定行程';
+    const d = Math.hypot(gp[0] - this.px[i], gp[1] - this.pz[i]);
+    return `(${gp[0].toFixed(0)}, ${gp[1].toFixed(0)}) · 还有 ${Math.round(d)}m · ${this.pathN[i]} 个路点`;
+  }
+
   goalPoint(i, g) {
     if (g === GOAL.HOME) return this.doorOf(this.homeX[i], this.homeZ[i]) || [this.homeX[i], this.homeZ[i]];
     if (g === GOAL.WORK) return this.doorOf(this.workX[i], this.workZ[i]) || [this.workX[i], this.workZ[i]];
