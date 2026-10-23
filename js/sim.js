@@ -2386,7 +2386,8 @@ export class Sim {
     if (this.stuck[i] > 0.6) {
       this.side[i] = -side;       // 先翻边，下个 tick 往另一侧绕
       this.stuck[i] = 0;
-      this.pathN[i] = 0;          // 卡住了：清路径，下一帧重算（别乱换目的地）
+      this.pathN[i] = 0;          // 卡住了：清路径
+      this.decT[i] = 0;           // 并**立刻**重新决策/重算路径（原来要等 1~2 秒节流）
     }
     return false;
   }
