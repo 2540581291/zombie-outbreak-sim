@@ -350,29 +350,21 @@ function updatePathLine() {
   if (!tp && g === GOAL.FLEE) tp = sim.escapePoint(selected);
   if (!tp) { pathLine.visible = false; pathRing.visible = false; return; }
 
-  const key = selected + ':' + Math.round(tp[0]) + ':' + Math.round(tp[1]) + ':' + g;
-  if (key !== pathKey) {
-    pathKey = key;
-    const pts = sim.previewPath(selected, tp[0], tp[1]);
+  // 画他**正在走**的路线：自己 → 门 → 剩余路点 → 目标（不做寻路计算，每帧重建）
+  {
+    const pts = sim.routeOf ? sim.routeOf(selected) : null;
     const arr = pathLine.geometry.attributes.position.array;
-    const n = Math.min(259, (pts ? pts.length : 0));
-    arr[0] = sim.px[selected]; arr[1] = 2.2; arr[2] = sim.pz[selected];
+    const n = Math.min(259, pts ? pts.length : 0);
     for (let k = 0; k < n; k++) {
-      arr[(k + 1) * 3] = pts[k][0];
-      arr[(k + 1) * 3 + 1] = 2.2;
-      arr[(k + 1) * 3 + 2] = pts[k][1];
+      arr[k * 3] = pts[k][0];
+      arr[k * 3 + 1] = 2.2;
+      arr[k * 3 + 2] = pts[k][1];
     }
-    if (!pts) {
-      arr[3] = tp[0]; arr[4] = 2.2; arr[5] = tp[1];
-    }
-    pathLine.geometry.setDrawRange(0, (pts ? n : 1) + 1);
+    if (!n) { arr[0] = sim.px[selected]; arr[1] = 2.2; arr[2] = sim.pz[selected]; arr[3] = tp[0]; arr[4] = 2.2; arr[5] = tp[1]; }
+    pathLine.geometry.setDrawRange(0, Math.max(2, n));
     pathLine.geometry.attributes.position.needsUpdate = true;
     pathLine.computeLineDistances();
   }
-  // 起点跟人走
-  const pa = pathLine.geometry.attributes.position.array;
-  pa[0] = sim.px[selected]; pa[1] = 2.2; pa[2] = sim.pz[selected];
-  pathLine.geometry.attributes.position.needsUpdate = true;
   pathLine.visible = true;
   pathRing.position.set(tp[0], 2.2, tp[1]);
   pathRing.visible = true;

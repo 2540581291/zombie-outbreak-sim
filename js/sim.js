@@ -262,8 +262,8 @@ export class Sim {
     this.wpZ = new Float32Array(NMAX);
     this.wpT = new Float32Array(NMAX);           // 绕路点有效期（绝对时刻）
     this.freeT = new Float32Array(NMAX);         // 刚出门的"别再找门"保护期
-    this.pathX = new Float32Array(NMAX * 6);     // 粗网格寻路的路点（最多 6 个）
-    this.pathZ = new Float32Array(NMAX * 6);
+    this.pathX = new Float32Array(NMAX * 16);    // 粗网格寻路的路点（最多 16 个）
+    this.pathZ = new Float32Array(NMAX * 16);
     this.pathN = new Uint8Array(NMAX);
     this.pathIdx = new Uint8Array(NMAX);
     this.infectRate = 0;                         // 感染率（尸 + 潜伏）/ 总人口
@@ -766,10 +766,26 @@ export class Sim {
       if (x > nav.halfW - 8) x = nav.halfW - 8;
       if (z < -nav.halfH + 8) z = -nav.halfH + 8;
       if (z > nav.halfH - 8) z = nav.halfH - 8;
-      if (this.walkable(x, z)) { this.tx[i] = x; this.tz[i] = z; return; }
+      // 目标必须走得到（能看见），否则人会一直朝墙里走
+      if (this.walkable(x, z) && this.losClear(this.px[i], this.pz[i], x, z)) {
+        this.tx[i] = x; this.tz[i] = z; return;
+      }
     }
     this.tx[i] = this.px[i];
     this.tz[i] = this.pz[i];
+  }
+
+  /** 两点之间是否全程可走（每 ~2m 采样）。用于视线拉直 / 闲逛选点 / 判断要不要寻路 */
+  losClear(x0, z0, x1, z1) {
+    const dx = x1 - x0, dz = z1 - z0;
+    const d = Math.hypot(dx, dz);
+    if (d < 0.001) return true;
+    const n = Math.min(64, Math.max(1, Math.ceil(d / 2)));
+    for (let k = 1; k <= n; k++) {
+      const t = k / n;
+      if (!this.walkable(x0 + dx * t, z0 + dz * t)) return false;
+    }
+    return true;
   }
 
   // ---------- 栅格工具 ----------
@@ -918,6 +934,33 @@ export class Sim {
     return prefix.concat(pts);
   }
 
+  /**
+   * 这个人**当前真正在走的路线**（世界坐标数组）：
+   *   自己 → （在屋里就先到门口）→ 剩余路点 → 目标点
+   * UI 用它画折线；不做任何寻路计算。
+   */
+  routeOf(i) {
+    const out = [];
+    if (!this || i < 0 || i >= this.n) return out;
+    const nav = this.nav;
+    const sx = this.px[i], sz = this.pz[i];
+    out.push([sx, sz]);
+    if (nav && nav.indoor && nav.doorPoint && nav.indoor(sx, sz)) {
+      const dp = nav.doorPoint(sx, sz);
+      if (dp) out.push([dp.x, dp.z]);
+    }
+    const n = this.pathN[i] | 0;
+    for (let k = this.pathIdx[i] | 0; k < n && out.length < 18; k++) {
+      out.push([this.pathX[i * 16 + k], this.pathZ[i * 16 + k]]);
+    }
+    const gp = this.goalPoint(i, this.goal[i]);
+    if (gp) {
+      const last = out[out.length - 1];
+      if (Math.hypot(gp[0] - last[0], gp[1] - last[1]) > 1.5) out.push(gp);
+    }
+    return out;
+  }
+
   /** 从 (sx,sz) 到 (tx,tz) 出一条折线，最多 6 个路点；走不通返回 0 */
   planPath(i, tx, tz) {
     if (!this.cgrid || this.pathBudget <= 0) return 0;
@@ -974,19 +1017,33 @@ export class Sim {
     }
     if (!found) return 0;
     this.pathBudget--;
-    // 回溯 → 每隔 4 个粗格（16m）取一个路点
-    let cur = s, n = 0;
-    const step = 4;
-    let hop = 0;
-    while (cur >= 0 && n < 6) {
-      if (hop % step === 0) {
-        const cr = (cur / gw) | 0, cc = cur - cr * gw;
-        this.pathX[i * 6 + n] = (cc + 0.5) * this.nav.cell * this.cs - this.nav.halfW;
-        this.pathZ[i * 6 + n] = this.nav.halfH - (cr + 0.5) * this.nav.cell * this.cs;
-        n++;
-      }
+    // 回溯出完整格子链（起点侧 → 目标侧）
+    const raw = [];
+    let cur = s;
+    while (cur >= 0 && raw.length < 60) {
+      const cr = (cur / gw) | 0, cc = cur - cr * gw;
+      raw.push([(cc + 0.5) * this.nav.cell * this.cs - this.nav.halfW,
+                this.nav.halfH - (cr + 0.5) * this.nav.cell * this.cs]);
       cur = this.came[cur];
-      hop++;
+    }
+    // 视线拉直（string pulling）：能直接看到更远的点就跳过中间路点，别走锯齿
+    const pts = [];
+    let cx = this.px[i], cz = this.pz[i];
+    let i0 = 0;
+    while (i0 < raw.length && pts.length < 15) {
+      let far = i0;
+      const lim = Math.min(raw.length - 1, i0 + 10);
+      for (let k = lim; k > i0; k--) {
+        if (this.losClear(cx, cz, raw[k][0], raw[k][1])) { far = k; break; }
+      }
+      pts.push(raw[far]);
+      cx = raw[far][0]; cz = raw[far][1];
+      i0 = far + 1;
+    }
+    const n = Math.min(16, pts.length);
+    for (let k = 0; k < n; k++) {
+      this.pathX[i * 16 + k] = pts[k][0];
+      this.pathZ[i * 16 + k] = pts[k][1];
     }
     this.pathN[i] = n;
     this.pathIdx[i] = 0;
@@ -1022,9 +1079,19 @@ export class Sim {
   }
 
   /** 目标 → 世界坐标（没有目标点就返回 null，表示"原地/按通勤逻辑"） */
+  /** 室内点 → 它最近的门（门口空地）。室内目标一律"走到门口就算到"，
+   *  这样人不会为了穿到楼对面而贴墙、也不会钻进去出不来。 */
+  doorOf(x, z) {
+    const nav = this.nav;
+    if (!nav || !nav.indoor || !nav.doorPoint) return null;
+    if (!nav.indoor(x, z)) return null;          // 本来就在户外，不用找门
+    const dp = nav.doorPoint(x, z);
+    return dp ? [dp.x, dp.z] : null;
+  }
+
   goalPoint(i, g) {
-    if (g === GOAL.HOME) return [this.homeX[i], this.homeZ[i]];
-    if (g === GOAL.WORK) return [this.workX[i], this.workZ[i]];
+    if (g === GOAL.HOME) return this.doorOf(this.homeX[i], this.homeZ[i]) || [this.homeX[i], this.homeZ[i]];
+    if (g === GOAL.WORK) return this.doorOf(this.workX[i], this.workZ[i]) || [this.workX[i], this.workZ[i]];
     if (g === GOAL.FLEE || g === GOAL.HELP || g === GOAL.SHELTER || g === GOAL.MOVE_TO
         || g === GOAL.ARM_HOME) return [this.goalX[i], this.goalZ[i]];
     return null;
@@ -1562,7 +1629,8 @@ export class Sim {
             // 第 2 秒：先换一侧沿墙走，同时规划一条粗网格路径（两者都试）
             this.side[i] = -(this.side[i] || 1);
             const gp3 = this.goalPoint(i, this.goal[i]);
-            if (gp3) this.planPath(i, gp3[0], gp3[1]);
+            // 只有到目标的直线走不通时才值得花预算寻路（开阔街上直接走就行）
+      if (gp3 && !this.losClear(this.px[i], this.pz[i], gp3[0], gp3[1])) this.planPath(i, gp3[0], gp3[1]);
           }
           // 第 5 秒：还不行就随机抖一下方向，打破对称
           else if (this.stuckT[i] === 5) { this.side[i] = -(this.side[i] || 1); }
@@ -1846,6 +1914,9 @@ export class Sim {
     const base = Math.atan2(dz, dx);
     const side = this.side[i] || 1;
     const ox = this.px[i], oz = this.pz[i];
+    // 已经在屋外的人不许一步跨进建筑里 —— 以前就是这么"贴着墙蹭进屋"，
+    // 然后目标在楼对面，卡死在里面。
+    const meIn = nav.indoor ? nav.indoor(ox, oz) : false;
 
     for (let k = 0; k < PROBE.length; k++) {
       const a = base + PROBE[k] * side * DEG;
@@ -1853,6 +1924,7 @@ export class Sim {
       const nx = ox + ux * stepLen;
       const nz = oz + uz * stepLen;
       if (!this.walkable(nx, nz)) continue;
+      if (!meIn && nav.indoor && nav.indoor(nx, nz)) continue;   // 不进屋
       this.px[i] = nx; this.pz[i] = nz;
       // 落地校验：Float32 存储会把探测点舍入，极少数会跨过格子边界落进墙里
       if (!this.walkable(this.px[i], this.pz[i])) {
@@ -1892,7 +1964,7 @@ export class Sim {
     if (this.stuck[i] > 0.6) {
       this.side[i] = -side;       // 先翻边，下个 tick 往另一侧绕
       this.stuck[i] = 0;
-      this.pickWander(i);
+      this.pathN[i] = 0;          // 卡住了：清路径，下一帧重算（别乱换目的地）
     }
     return false;
   }
@@ -1944,7 +2016,7 @@ export class Sim {
       }
     }
 
-    this.pathBudget = 8;       // 每帧恢复寻路预算（BFS 很贵，宁少勿多）
+    this.pathBudget = 40;      // 每帧恢复寻路预算（只给看不见目标的人用）
     this.stepInfo(dt);
     this.rebuildHash();
 
@@ -2042,7 +2114,7 @@ export class Sim {
               // 有粗网格路径 → 沿路点走（这是唯一能绕过楼群堵截的办法）
               if (this.pathN[i] > 0) {
                 const k = this.pathIdx[i];
-                const wx = this.pathX[i * 6 + k], wz = this.pathZ[i * 6 + k];
+                const wx = this.pathX[i * 16 + k], wz = this.pathZ[i * 16 + k];
                 const wdx = wx - this.px[i], wdz = wz - this.pz[i];
                 if (wdx * wdx + wdz * wdz < 25) {
                   this.pathIdx[i]++;
