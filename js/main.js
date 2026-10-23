@@ -745,6 +745,61 @@ function renderAgentCard() {
     attrBlock(selected) + explainBlock(selected);
 }
 
+// ---------- 地点名牌：投影到屏幕，公共建筑加发光 ----------
+const PUB_KINDS = new Set(['police', 'hospital', 'fire', 'gov', 'transit']);
+let poiLabelEls = [];       // [{ el, x, z, kind }]
+let poiLabelSim = null;
+
+function buildPoiLabels() {
+  const box = document.getElementById('poilabels');
+  if (!box || !sim) return;
+  box.innerHTML = '';
+  poiLabelEls = [];
+  poiLabelSim = sim;
+  for (const p of (sim.pois || [])) {
+    const el = document.createElement('div');
+    el.className = 'poilabel' + (PUB_KINDS.has(p.k) ? ' pub ' + p.k : '');
+    el.textContent = p.n || KIND_NAME[p.k] || '地点';
+    box.appendChild(el);
+    poiLabelEls.push({ el, x: p.x, z: p.z, poi: p });
+  }
+}
+
+const _pv = new THREE.Vector3();
+function updatePoiLabels() {
+  if (!sim) return;
+  if (poiLabelSim !== sim || !poiLabelEls.length) {
+    buildPoiLabels();
+    if (!poiLabelEls.length) return;
+  }
+  const cam = activeCamera();
+  const W = window.innerWidth, H = window.innerHeight;
+  const show = !overviewIsOpen();
+  for (const it of poiLabelEls) {
+    if (!show) { it.el.style.display = 'none'; continue; }
+    _pv.set(it.x, 24, it.z).project(cam);
+    const inView = _pv.z < 1 && _pv.x > -1.15 && _pv.x < 1.15 && _pv.y > -1.15 && _pv.y < 1.15;
+    if (!inView) { it.el.style.display = 'none'; continue; }
+    // 缩得太远只留公共建筑，避免糊成一片
+    if (rig.dist > (PUB_KINDS.has(it.poi.k) ? 5200 : 1500)) { it.el.style.display = 'none'; continue; }
+    it.el.style.display = '';
+    it.el.style.left = ((_pv.x * 0.5 + 0.5) * W).toFixed(1) + 'px';
+    it.el.style.top = ((-_pv.y * 0.5 + 0.5) * H).toFixed(1) + 'px';
+  }
+}
+
+/** 点某个地点时，把它的名牌高亮 2 秒 */
+function flashPoiAt(x, z) {
+  let best = null, bd = 160 * 160;
+  for (const it of poiLabelEls) {
+    const d = (it.x - x) ** 2 + (it.z - z) ** 2;
+    if (d < bd) { bd = d; best = it; }
+  }
+  if (!best) return;
+  best.el.classList.add('on');
+  setTimeout(() => best.el.classList.remove('on'), 2000);
+}
+
 function hoverAt(e) {
   if (!sim) return;
   const ndc = new THREE.Vector2(
@@ -1048,8 +1103,8 @@ if (new URLSearchParams(location.search).has('pick')) {
 window.addEventListener('error', (e) => {
   window.__err = (e.message || 'err') + ' @' + String(e.filename || '').split('/').pop() + ':' + e.lineno;
 });
-window.__zosRestart = () => { clearLink(); sim.reset(readParams()); buildEscapeMarker(); hideBanner(); };
-$('btn-seed').onclick = () => { clearLink(); seed = (Math.random() * 1e9) | 0; sim.reset(readParams()); buildEscapeMarker(); hideBanner(); };
+window.__zosRestart = () => { clearLink(); sim.reset(readParams()); buildEscapeMarker(); buildPoiLabels(); hideBanner(); };
+$('btn-seed').onclick = () => { clearLink(); seed = (Math.random() * 1e9) | 0; sim.reset(readParams()); buildEscapeMarker(); buildPoiLabels(); hideBanner(); };
 $('p-toggle').onclick = () => {
   const b = $('p-body');
   b.classList.toggle('hide');
@@ -1376,6 +1431,7 @@ selectTool('select');
     const poi = placeNear(x, z, 220);
     const label = poi ? ((KIND_NAME[poi.k] || '地点') + (poi.n ? ' · ' + poi.n : '')) : a.textContent || '地点';
     setLink('place', [x, z], label);
+    flashPoiAt(x, z);
     renderAgentCard();
   };
   const f = document.getElementById('ac-follow');
@@ -1989,6 +2045,7 @@ function loop(t) {
   } else {
     renderer.render(scene, camera);
   }
+  updatePoiLabels();   // 相机矩阵这一帧已更新，投影才不会 NaN
   if (++fc === 1) {
     document.title = 'R tris=' + renderer.info.render.triangles +
       ' calls=' + renderer.info.render.calls +

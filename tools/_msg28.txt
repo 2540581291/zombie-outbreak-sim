@@ -1,0 +1,25 @@
+地点名牌（未完成）：投影到屏幕 + 公共建筑发光
+
+已做的部分：
+· index.html 加 #poilabels 容器；css 加 .poilabel 样式：
+    - 普通地点：10.5px 灰白，半透明底
+    - 公共建筑（police/hospital/fire/gov/transit）：12px 加粗 + 文字发光
+      警察局蓝、医院红、消防橙、政府紫、车站青
+· main.js 新增 buildPoiLabels / updatePoiLabels / flashPoiAt：
+    - 每个 POI 一个 div，按世界坐标 (x,24,z) 投影到屏幕
+    - 太远自动隐藏（公共建筑 5200m、普通地点 1500m 之外）
+    - 点地点链接时 flashPoiAt() 把对应名牌高亮 2 秒（.on 类）
+    - 放在主循环渲染之后调用（相机矩阵已更新）
+
+现状：**标签还没有真正显示出来**。已验证：
+  · #poilabels 容器存在但为空 → 说明 buildPoiLabels() 没有被执行
+  · 修了"空数组早退"那个死循环（原来 if(!poiLabelEls.length) return 挡在 build 前面）
+  · 又把调用从"渲染前"挪到"渲染后"，仍未见效
+
+下一步要查的就三件事（有 spritedbg 就很快）：
+  1. 浏览器里 sim.pois.length 是多少（如果 0，说明 generatePois 在浏览器端失败，
+     毕竟 Node 里同样的调用能生成 32 个）
+  2. poiLabelEls.length 是多少
+  3. 投影后的 px/py 是否落在屏幕内（打印一两个看看）
+
+其余部分（POI 生成、逃跑大类、逃跑统计）未受影响，test_chain 5/5。

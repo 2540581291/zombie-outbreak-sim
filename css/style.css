@@ -317,3 +317,24 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
 }
   padding:1px 6px; border-radius:999px; background:rgba(127,224,255,.08); font-weight:600;
 }
+
+/* ---- 地点名牌（投影到屏幕，跟着建筑走） ---- */
+#poilabels{position:fixed;inset:0;pointer-events:none;z-index:5;overflow:hidden}
+.poilabel{
+  position:absolute;transform:translate(-50%,-100%);
+  font-size:10.5px;line-height:1.15;white-space:nowrap;color:#c9d3dc;
+  padding:1px 4px;border-radius:3px;background:rgba(0,0,0,.36);
+  text-shadow:0 1px 2px rgba(0,0,0,.9);
+  opacity:.85;transition:opacity .15s;
+}
+/* 公共建筑：更大更亮 + 发光 */
+.poilabel.pub{
+  font-size:12px;font-weight:800;letter-spacing:.03em;
+  background:rgba(0,0,0,.5);opacity:1;
+}
+.poilabel.police{color:#8fc2ff;text-shadow:0 0 6px rgba(120,180,255,.95),0 0 14px rgba(80,140,255,.6)}
+.poilabel.hospital{color:#ff9a9a;text-shadow:0 0 6px rgba(255,120,120,.95),0 0 14px rgba(255,80,80,.6)}
+.poilabel.fire{color:#ffc07a;text-shadow:0 0 6px rgba(255,180,110,.95),0 0 12px rgba(255,140,60,.55)}
+.poilabel.gov{color:#c8a8ff;text-shadow:0 0 6px rgba(190,150,255,.95),0 0 12px rgba(160,110,255,.55)}
+.poilabel.transit{color:#9fe4ff;text-shadow:0 0 5px rgba(140,220,255,.85)}
+.poilabel.on{opacity:1;outline:1px solid rgba(255,255,255,.7);transform:translate(-50%,-100%) scale(1.12)}
