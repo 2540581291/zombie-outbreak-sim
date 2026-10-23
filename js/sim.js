@@ -1697,22 +1697,30 @@ export class Sim {
     };
     for (const kind in DENS) {
       const [dens, minN] = DENS[kind];
-      const want = Math.max(minN, Math.round(km2 * dens));
+      const want = Math.max(1, minN, Math.round(km2 * dens));   // 每种至少 1 个（防 bug）
       // 大楼优先（只在前 40% 里挑），但别把候选池压得太小
       const pool = BIG.has(kind) ? cand.slice(0, Math.max(40, Math.round(cand.length * 0.4))) : cand;
       let made = 0;
-      for (let attempt = 0; attempt < pool.length * 2 && made < want; attempt++) {
-        const c = pool[(rnd() * pool.length) | 0];
-        if (c.a < MIN_A[kind]) continue;
-        const minD = MIN_D[kind];
-        let clash = false;
-        for (const t of taken) {
-          if (Math.hypot(t.x - c.x, t.z - c.z) < minD) { clash = true; break; }
+      // 三档松弛：先按正常规则，凑不够就放宽间距，再不够就放宽面积，
+      // 最后兜底"最大的一栋楼"—— 保证每种至少 1 个，绝不出现"政府 0 个"。
+      for (let pass = 0; pass < 3 && made < want; pass++) {
+        const relaxD = pass >= 1 ? 0 : MIN_D[kind];
+        const relaxA = pass >= 2 ? 0 : MIN_A[kind];
+        for (let attempt = 0; attempt < pool.length * 3 && made < want; attempt++) {
+          const c = pool[(rnd() * pool.length) | 0];
+          if (c.a < relaxA) continue;
+          if (taken.indexOf(c) >= 0) continue;
+          let clash = false;
+          if (relaxD > 0) {
+            for (const t of taken) {
+              if (Math.hypot(t.x - c.x, t.z - c.z) < relaxD) { clash = true; break; }
+            }
+          }
+          if (clash) continue;
+          taken.push(c);
+          out.push({ k: kind, x: c.x, z: c.z, n: KIND_NAME[kind] + ' ' + (made + 1) + ' 号', a: c.a });
+          made++;
         }
-        if (clash) continue;
-        taken.push(c);
-        out.push({ k: kind, x: c.x, z: c.z, n: KIND_NAME[kind] + ' ' + (made + 1) + ' 号', a: c.a });
-        made++;
       }
     }
     return out;
