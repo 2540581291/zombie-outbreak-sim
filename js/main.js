@@ -23,6 +23,8 @@ import { TerrainOverlay } from './overlay.js';
 import { LayerEditor } from './editmode.js';
 
 const $ = (id) => document.getElementById(id);
+// 构建戳：控制台输入 window.__BUILD 就能确认跑的是不是最新一版
+window.__BUILD = '2026-03-24-label1';
 const MAX_DIST = 9000;        // 3D 上限：视高 ≈ 0.975×dist ≈ 8.8 km
 // 2D 的 dist 语义完全不同（视高 = 2×0.0475×dist），9000 只相当于 855 m 视高，
 // 根本缩不出城区。所以 2D 单独设上限，而且按城市大小算：正好把整座城装进画面
