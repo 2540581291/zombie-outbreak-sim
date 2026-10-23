@@ -1495,8 +1495,15 @@ export class Sim {
     // 玩家/系统下达的移动命令（右键点地、出警）优先：没走到之前不被社会决策覆盖
     if (this.goal[i] === GOAL.MOVE_TO) {
       const gp = this.goalPoint(i, GOAL.MOVE_TO);
-      if (gp && Math.hypot(gp[0] - this.px[i], gp[1] - this.pz[i]) < 6) this.setGoal(i, GOAL.NONE);
-      else return;
+      if (gp && Math.hypot(gp[0] - this.px[i], gp[1] - this.pz[i]) < 6) {
+        this.setGoal(i, GOAL.NONE);
+      } else {
+        // 命令目标看不见时才寻路（以前这里直接 return，导致"右键点地"永远没有路径）
+        if (gp && this.pathN[i] === 0 && !this.losClear(this.px[i], this.pz[i], gp[0], gp[1])) {
+          this.planPath(i, gp[0], gp[1]);
+        }
+        return;
+      }
     }
 
     // ---- 逃跑（有目标）大类：一旦进入就粘住，直到到达或主动放弃 ----
@@ -2449,17 +2456,33 @@ export class Sim {
             if (gp) {
               // 有粗网格路径 → 沿路点走（这是唯一能绕过楼群堵截的办法）
               if (this.pathN[i] > 0) {
-                const k = this.pathIdx[i];
+                const wmul0 = this.goal[i] === GOAL.FLEE ? 1.6 : 0.92;
+                let k = this.pathIdx[i];
                 const wx = this.pathX[i * 16 + k], wz = this.pathZ[i * 16 + k];
                 const wdx = wx - this.px[i], wdz = wz - this.pz[i];
-                if (wdx * wdx + wdz * wdz < 25) {
+                const wd2 = wdx * wdx + wdz * wdz;
+                // 到了（1.5m 内）：推进到下一个路点
+                if (wd2 < 2.25) {
                   this.pathIdx[i]++;
                   if (this.pathIdx[i] >= this.pathN[i]) this.pathN[i] = 0;
-                } else {
-                  const wmul = this.goal[i] === GOAL.FLEE ? 1.6 : 0.92;
-                  this.move(i, wdx, wdz, this.spd[i] * wmul, cdt);
                   break;
                 }
+                // 下一个路点"看得见" → 直接跳过当前这个（少走一次拐弯）
+                if (k + 1 < this.pathN[i]) {
+                  const nx2 = this.pathX[i * 16 + k + 1], nz2 = this.pathZ[i * 16 + k + 1];
+                  if (this.losClear(this.px[i], this.pz[i], nx2, nz2)) {
+                    this.pathIdx[i] = k + 1;
+                    this.move(i, nx2 - this.px[i], nz2 - this.pz[i], this.spd[i] * wmul0, cdt);
+                    break;
+                  }
+                }
+                // 当前路点看得见 → 直走（不走扇形探测，避免沿墙磨）
+                if (this.losClear(this.px[i], this.pz[i], wx, wz)) {
+                  this.move(i, wdx, wdz, this.spd[i] * wmul0, cdt);
+                  break;
+                }
+                // 看不见 → 说明这条路径过不去：清掉，下一帧重算（不要贴墙蹭）
+                this.pathN[i] = 0;
               }
               let ax = gp[0], az = gp[1];
               // 有绕路点就先走绕路点
