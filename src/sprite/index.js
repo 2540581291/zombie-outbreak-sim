@@ -40,6 +40,8 @@ export class SpriteView {
     this.group.visible = false;
     scene.add(this.group);
 
+    // 调试：?silforce=1 让所有人都画成剪影（验证绿/蓝/红三色用）
+    this.forceSil = (typeof location !== 'undefined' && /[?&]silforce=1/.test(location.search));
     this.atlas = null;
     this.tex = null;
     this.ready = false;
@@ -58,6 +60,8 @@ export class SpriteView {
     this.zDie = new Uint8Array(CAP);
 
     this.trace = null;   // 开发用：设成数组就把每帧画了什么记进去
+    // 剪影累计计数（按阵营）：看统计就知道这一局出现过红/蓝剪影没有
+    this.silTot = { civ: 0, police: 0, zombie: 0 };
     this.dummy = new THREE.Object3D();
     // 每体稳定随机：同一帧内不变，个体之间不同（衣服色相 / 圆点抖动）
     this.seed2 = new Float32Array(CAP);
@@ -175,6 +179,8 @@ export class SpriteView {
     const dotCol = dots.col.array;
 
     let k = 0, dk = 0, sk = 0, pk = 0;
+    let nSil = 0, nTurn = 0, nDie = 0, nRise = 0;
+    let nSilCiv = 0, nSilPol = 0, nSilZom = 0;
     const dotStride = Math.max(1, Math.ceil(n / CAP));
 
     for (let i = 0; i < n; i++) {
@@ -207,7 +213,7 @@ export class SpriteView {
 
       const nominal = 15 * M_PER_PX * (sp.scale || 1);
       const naturalPx = nominal * pxPerM;
-      const sil = naturalPx >= DOT_BELOW_PX && occl(i, x, z);
+      const sil = this.forceSil || (naturalPx >= DOT_BELOW_PX && occl(i, x, z));
 
       const clip = A.clipFast(body, anim, sil);
       if (!clip) continue;
@@ -254,6 +260,17 @@ export class SpriteView {
         const kk = minWorld / big;
         scaleX *= kk; scaleZ *= kk;
       }
+
+      if (sil) {
+        nSil++;
+        const cc = colorClassOf(kind, st);
+        if (cc === 'ZOMBIE' || cc === 'SPECIAL') { nSilZom++; this.silTot.zombie++; }
+        else if (cc === 'POLICE' || cc === 'ARMY') { nSilPol++; this.silTot.police++; }
+        else { nSilCiv++; this.silTot.civ++; }
+      }
+      if (stage === STAGE.TURN) nTurn++;
+      else if (stage === STAGE.DIE) nDie++;
+      else if (stage === STAGE.RISE) nRise++;
 
       const corpse = (st === ST.CORPSE && stage === STAGE.NONE);
       const buf = corpse ? { R: dR, T: dT, H: dH, idx: dk } : { R: aR, T: aT, H: aH, idx: k };
@@ -317,6 +334,13 @@ export class SpriteView {
     if (sMesh) sMesh.count = sk;
     dots.mesh.count = pk;
     this.count = k + dk;
+    this.stats = {
+      w: A.w, h: A.h, clips: Object.keys(A.clips).length,
+      actor: k, decal: dk, shadow: sk, dots: pk,
+      sil: nSil, turn: nTurn, die: nDie, rise: nRise,
+      silCiv: nSilCiv, silPolice: nSilPol, silZombie: nSilZom,
+      silTot: this.silTot,
+    };
     actor.mesh.instanceMatrix.needsUpdate = true;
     decal.mesh.instanceMatrix.needsUpdate = true;
     dots.mesh.instanceMatrix.needsUpdate = true;

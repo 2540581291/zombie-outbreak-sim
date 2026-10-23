@@ -1370,6 +1370,44 @@ async function boot() {
   }
   if (Q.get('report')) setTimeout(() => openReport(sim), 500);
   if (Q.get('ov')) setTimeout(() => { if (sim) toggleOverview(sim); }, 600);
+  // 调试：?follow=N 选中并跟随第 N 个个体（截图/排查用）
+  if (Q.get('follow') != null) {
+    setTimeout(() => {
+      const i = Math.max(0, +Q.get('follow') || 0);
+      selectAgent(i);
+      followSelected = true;
+    }, 900);
+  }
+  // 调试：?spritedbg=1 显示 2D 精灵各层实例数
+  if (Q.get('spritedbg')) {
+    const pre = document.createElement('pre');
+    pre.id = 'spritedbg';
+    pre.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:99;background:rgba(0,0,0,.72);' +
+      'color:#9fe;padding:6px 9px;font:11px/1.35 ui-monospace,monospace;border-radius:6px;white-space:pre';
+    document.body.appendChild(pre);
+    setInterval(() => {
+      if (!retro || !retro.stats) { pre.textContent = 'sprite: 未就绪'; return; }
+      const s = retro.stats;
+      // 全城有多少人正处在"有顶盖"的格子上（僵尸/警察会不会进屋，看这一行）
+      let ic = 0, ip = 0, iz = 0;
+      if (sim && sim.nav && sim.nav.indoor) {
+        for (let k = 0; k < sim.n; k++) {
+          if (!sim.nav.indoor(sim.px[k], sim.pz[k])) continue;
+          const st = sim.state[k];
+          if (st === ST.ZOMBIE) iz++;
+          else if (st === ST.POLICE || st === ST.SOLDIER) ip++;
+          else if (st === ST.CIV || st === ST.INFECTED) ic++;
+        }
+      }
+      pre.textContent =
+        'sprite v2  atlas ' + s.w + 'x' + s.h + '  clips ' + s.clips + '\n' +
+        'actor ' + s.actor + '  decal ' + s.decal + '  shadow ' + s.shadow + '  dots ' + s.dots + '\n' +
+        'silhouette ' + s.sil + '  (civ ' + s.silCiv + ' / police ' + s.silPolice + ' / zombie ' + s.silZombie + ')\n' +
+        '累计剪影 civ ' + s.silTot.civ + '  police ' + s.silTot.police + '  zombie ' + s.silTot.zombie + '\n' +
+        'turn01 ' + s.turn + '  die01 ' + s.die + '  zrise01 ' + s.rise + '\n' +
+        '全城室内：平民 ' + ic + '  警察/士兵 ' + ip + '  丧尸 ' + iz;
+    }, 250);
+  }
   if (Q.get('sel')) setTimeout(() => {
     const i = (sim.vips && sim.vips.length) ? sim.vips[0] : 0;
     selectAgent(i);
@@ -1664,6 +1702,7 @@ addEventListener('resize', () => {
 });
 
 boot().catch(e => fail('启动失败：' + (e?.message || e)));
+
 
 
 

@@ -231,6 +231,9 @@ apocalypse: still alive   containment: CLEARED
 | `?fixcam=1` | 固定相机（隔离相机问题） |
 | `?nopoints=1` / `?nohumans=1` / `?nocity=1` / `?nosky=1` | 分别关掉点云/人形/城市/天空 |
 | `?mat=normal` / `?mat=basic` | 换建筑材质（隔离 shader 问题） |
+| `?spritedbg=1` | 左下角显示 2D 精灵统计：图集尺寸 / 活体·尸体·阴影·圆点实例数 / 剪影数（按阵营）/ 正在播的 turn01·die01·zrise01 / 全城室内人数 |
+| `?silforce=1` | 把所有单位都画成剪影（绿=平民 / 蓝=警察 / 红=丧尸），用来验证三色剪影 |
+| `?follow=N` | 选中第 N 个个体并跟随镜头（截图、看某个人的动作） |
 
 ---
 
