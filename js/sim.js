@@ -128,7 +128,8 @@ export class Sim {
     const inBld = (x, z) => (nav.indoor ? nav.indoor(x, z) : (nav.walkable ? nav.walkable(x, z) : true));
     let snapped = 0, dropped = 0;
     // city.json 现在直接是世界坐标（z 南为正），不再需要任何翻转
-    this.pois = (this.city?.pois || []).map((p) => ({ ...p }));
+    // ---- POI 不再读 OSM 标签，改为按"城市面积 × 密度"从建筑里生成 ----
+    this.pois = this.generatePois();
     for (const p of this.pois) {
       if (!inBld(p.x, p.z)) {
         let done = false;
@@ -1632,6 +1633,89 @@ export class Sim {
     const st = this.state[j];
     if (st === ST.ZOMBIE) return true;
     return this.chaos > 80 && st === ST.INFECTED;
+  }
+
+  /**
+   * 按面积密度生成 POI（不看任何 OSM 标签）：
+   *   目标数量 = max(最少数量, 城市面积 km² × 密度)
+   *   从建筑面积 >= 门槛 的楼里挑，警察局/医院优先挑大楼，
+   *   彼此还要满足最小间距，避免挤在一起。
+   * 随机种子 = 城市尺寸的哈希 → 同一张地图每次结果一致。
+   */
+  generatePois() {
+    const nav = this.nav;
+    const city = this.city || {};
+    const W = nav.W || nav.halfW * 2, H = nav.H || nav.halfH * 2;
+    const km2 = (W * H) / 1e6;
+    // 每 km² 数量 + 最少数量
+    const DENS = {
+      police: [0.55, 2], hospital: [0.40, 2], fire: [0.25, 1],
+      school: [0.80, 3], market: [1.20, 4], transit: [0.40, 2],
+      pharmacy: [0.60, 2], gov: [0.20, 1],
+    };
+    // 最小间距（米）与最小建筑面积（m²）
+    const MIN_D = { police: 700, hospital: 800, fire: 700, school: 450, market: 250, transit: 600, pharmacy: 200, gov: 700 };
+    const MIN_A = { police: 250, hospital: 400, fire: 150, school: 300, market: 120, transit: 250, pharmacy: 80, gov: 300 };
+    const BIG = new Set(['police', 'hospital', 'gov', 'transit', 'fire']);
+
+    // 候选：楼 → 面积 + 内部点（用多边形质心，凹形会被后面的吸附兜住）
+    const cand = [];
+    for (const b of (city.buildings || [])) {
+      const pts = b.p || [];
+      if (pts.length < 3) continue;
+      let a2 = 0, cx = 0, cz = 0;
+      for (let k = 0; k < pts.length; k++) {
+        const [x0, z0] = pts[k], [x1, z1] = pts[(k + 1) % pts.length];
+        const cr = x0 * z1 - x1 * z0;
+        a2 += cr; cx += (x0 + x1) * cr; cz += (z0 + z1) * cr;
+      }
+      const area = Math.abs(a2) / 2;
+      if (area < 80) continue;
+      if (Math.abs(a2) < 1e-6) continue;
+      cand.push({ a: area, x: cx / (3 * a2), z: cz / (3 * a2) });
+    }
+    if (!cand.length) return [];
+    cand.sort((p, q) => q.a - p.a);
+
+    // 确定性随机（城市尺寸的哈希）
+    let seed = 2166136261;
+    const key = `${Math.round(W)}x${Math.round(H)}`;
+    for (let i = 0; i < key.length; i++) { seed ^= key.charCodeAt(i); seed = (seed * 16777619) >>> 0; }
+    const rnd = () => {
+      seed = (seed + 0x6D2B79F5) >>> 0;
+      let t = seed;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+
+    const out = [];
+    const taken = [];
+    const KIND_NAME = {
+      police: '警察局', hospital: '医院', fire: '消防站', school: '学校',
+      market: '超市', transit: '车站', pharmacy: '药店', gov: '政府',
+    };
+    for (const kind in DENS) {
+      const [dens, minN] = DENS[kind];
+      const want = Math.max(minN, Math.round(km2 * dens));
+      // 大楼优先（只在前 40% 里挑），但别把候选池压得太小
+      const pool = BIG.has(kind) ? cand.slice(0, Math.max(40, Math.round(cand.length * 0.4))) : cand;
+      let made = 0;
+      for (let attempt = 0; attempt < pool.length * 2 && made < want; attempt++) {
+        const c = pool[(rnd() * pool.length) | 0];
+        if (c.a < MIN_A[kind]) continue;
+        const minD = MIN_D[kind];
+        let clash = false;
+        for (const t of taken) {
+          if (Math.hypot(t.x - c.x, t.z - c.z) < minD) { clash = true; break; }
+        }
+        if (clash) continue;
+        taken.push(c);
+        out.push({ k: kind, x: c.x, z: c.z, n: KIND_NAME[kind] + ' ' + (made + 1) + ' 号', a: c.a });
+        made++;
+      }
+    }
+    return out;
   }
 
   /** 把"有目标逃跑"落到具体目标上；到警局发现沦陷就改道 */
