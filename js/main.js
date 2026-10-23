@@ -775,13 +775,15 @@ function updatePoiLabels() {
   const cam = activeCamera();
   const W = window.innerWidth, H = window.innerHeight;
   const show = !overviewIsOpen();
+  // 2D：视高 = 2 × rig.dist × 0.0475；3D：dist 约等于相机到目标的距离
+  const viewHalfH = retroMode ? rig.dist * 0.0475 : rig.dist * 0.5;
   for (const it of poiLabelEls) {
     if (!show) { it.el.style.display = 'none'; continue; }
     _pv.set(it.x, 24, it.z).project(cam);
     const inView = _pv.z < 1 && _pv.x > -1.15 && _pv.x < 1.15 && _pv.y > -1.15 && _pv.y < 1.15;
     if (!inView) { it.el.style.display = 'none'; continue; }
-    // 缩得太远只留公共建筑，避免糊成一片
-    if (rig.dist > (PUB_KINDS.has(it.poi.k) ? 5200 : 1500)) { it.el.style.display = 'none'; continue; }
+    // 缩得太远只留公共建筑，避免糊成一片（按"视野半高"判断，2D 的 dist 语义不一样）
+    if (viewHalfH > (PUB_KINDS.has(it.poi.k) ? 1200 : 320)) { it.el.style.display = 'none'; continue; }
     it.el.style.display = '';
     it.el.style.left = ((_pv.x * 0.5 + 0.5) * W).toFixed(1) + 'px';
     it.el.style.top = ((-_pv.y * 0.5 + 0.5) * H).toFixed(1) + 'px';

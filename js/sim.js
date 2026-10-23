@@ -194,7 +194,6 @@ export class Sim {
     this.armed = new Uint8Array(NMAX);
     this.stam = new Float32Array(NMAX);          // 体力（逃跑会累）
     this.side = new Float32Array(NMAX);          // 绕墙偏好方向 ±1
-    this.fleeT = new Float32Array(NMAX);         // 本次逃跑剩余时长（已不再当退出条件）
     this.fleeDir = new Float32Array(NMAX);       // 逃跑方向（弧度，锁定后保持，避免来回翻转）
     this.fleeCd = new Float32Array(NMAX);        // 腿软期（这段时间不会再跑）
     this.actT = new Float32Array(NMAX);          // 当前活动剩余时长（走/站）
@@ -367,7 +366,6 @@ export class Sim {
     this.stam.fill(1); this.armed.fill(0); this.state.fill(0); this.ammo.fill(0);
     this.stuck.fill(0);
     this.side.fill(1);
-    this.fleeT.fill(0);
     this.fleeDir.fill(0);
     this.fleeCd.fill(0);
     this.nextSpecial = 8;
@@ -1782,18 +1780,6 @@ export class Sim {
     return n;
   }
 
-  /** 某点半径 r 内有多少丧尸（给"警局是否沦陷"用，调用很少） */
-  zombiesNear(x, z, r) {
-    let n = 0;
-    const r2 = r * r;
-    for (let j = 0; j < this.n && n < 8; j++) {
-      if (this.state[j] !== ST.ZOMBIE) continue;
-      const dx = this.px[j] - x, dz = this.pz[j] - z;
-      if (dx * dx + dz * dz <= r2) n++;
-    }
-    return n;
-  }
-
   /** 全城最近的"非丧尸单位"（平民/警察/士兵/动物）。带每帧预算，避免同时扫全城 */
   nearestPrey(i) {
     if (!(this.preyBudget > 0)) return -1;
@@ -2075,7 +2061,6 @@ export class Sim {
           if (j === i) continue;
           const st = this.state[j];
           const ok = want === 1 ? (st === ST.ZOMBIE || (this.chaos > 80 && st === ST.INFECTED))
-            : want === 2 ? (st === ST.CIV || st === ST.FLEE || st === ST.FIGHT || st === ST.INFECTED)
               : want === 4 ? (st === ST.CIV || st === ST.FLEE || st === ST.FIGHT || st === ST.INFECTED ||
                               st === ST.POLICE || st === ST.SOLDIER)
                 : want === 5 ? (st === ST.CIV || st === ST.FLEE || st === ST.FIGHT ||
@@ -2375,8 +2360,7 @@ export class Sim {
             const fdx = this.px[z] - this.px[i], fdz = this.pz[z] - this.pz[i];
             if (fdx * fdx + fdz * fdz < 15 * 15) {
               this.state[i] = ST.FLEE;
-              this.fleeT[i] = 3 + this.rng() * 2;
-              this.panic[i] = 1;
+                  this.panic[i] = 1;
               break;
             }
           }
@@ -2573,13 +2557,13 @@ export class Sim {
           }
           const dx = this.px[z] - this.px[i], dz = this.pz[z] - this.pz[i];
           const d2 = dx * dx + dz * dz;
-          if (d2 > 30 * 30) { this.state[i] = ST.FLEE; this.fleeT[i] = 3; break; }
+          if (d2 > 30 * 30) { this.state[i] = ST.FLEE; break; }
           this.heading[i] = Math.atan2(dz, dx);
           this.cool[i] -= dt;
           if (this.cool[i] <= 0) {
             const w = weaponOf(this.wpn[i]);
             if (!this.armed[i] || (this.mag[i] <= 0 && this.reserve[i] <= 0)) {
-              this.state[i] = ST.FLEE; this.fleeT[i] = 3 + rng() * 2; this.panic[i] = 1.4; break;
+              this.state[i] = ST.FLEE; this.panic[i] = 1.4; break;
             }
             this.cool[i] = (w.rate || 0.5) * (1 + rng() * 0.25);
             this.fireWeapon(i, z);
@@ -2749,7 +2733,6 @@ export class Sim {
                   // 真的不会感染的人（士兵/重装）或抵抗成功：挨一口然后跑
                   // 注意：已经潜伏的人**不能**改状态，否则感染计时会被踢掉
                   this.state[c] = ST.FLEE;
-                  this.fleeT[c] = 2;
                   this.panic[c] = 1.4;
                 }
               }
@@ -2965,7 +2948,7 @@ export class Sim {
     this.panic[i] = 0; this.stam[i] = 1;
     this.armed[i] = 1;
     this.tgt[i] = -1; this.nearZ[i] = -1; this.nearC[i] = -1;
-    this.fleeCd[i] = 0; this.fleeT[i] = 0; this.stuck[i] = 0; this.side[i] = 1;
+    this.fleeCd[i] = 0; this.stuck[i] = 0; this.side[i] = 1;
     this.stationOf[i] = 0;   // 新单位默认不属于任何警局（否则会继承上一局同下标的归属）
 
     // 传入数字就是物种 id（特感 / 载具）
