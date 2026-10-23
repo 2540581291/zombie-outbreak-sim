@@ -852,6 +852,27 @@ export class Sim {
     return true;
   }
 
+  /**
+   * 带侧向余量的视线检测：主线上每 0.6m 采一次，同时检查左右各 margin 米。
+   * 普通 losClear 只看中心线，会"看见"宽 1m 但走不过去的缝。
+   */
+  losClearWide(x0, z0, x1, z1, margin = 0.55) {
+    const dx = x1 - x0, dz = z1 - z0;
+    const d = Math.hypot(dx, dz);
+    if (d < 0.001) return true;
+    const ux = dx / d, uz = dz / d;
+    const px = -uz, pz = ux;
+    const n = Math.min(400, Math.max(1, Math.ceil(d / 0.6)));
+    for (let k = 1; k <= n; k++) {
+      const t = k / n;
+      const x = x0 + dx * t, z = z0 + dz * t;
+      if (!this.walkable(x, z)) return false;
+      if (!this.walkable(x + px * margin, z + pz * margin)) return false;
+      if (!this.walkable(x - px * margin, z - pz * margin)) return false;
+    }
+    return true;
+  }
+
   // ---------- 栅格工具 ----------
   walkable(x, z) {
     const nav = this.nav;
