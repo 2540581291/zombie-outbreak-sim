@@ -42,6 +42,10 @@ export class SpriteView {
 
     // 调试：?silforce=1 让所有人都画成剪影（验证绿/蓝/红三色用）
     this.forceSil = (typeof location !== 'undefined' && /[?&]silforce=1/.test(location.search));
+    // 实色精灵的"阵营色"强度：原版是 0（原画不变色），老版本是 0.35（一层绿玻璃）。
+    // 现在默认 0，想调回来用 ?tint=0.2 / ?tint=0.35。
+    const mt = (typeof location !== 'undefined' && location.search.match(/[?&]tint=([\d.]+)/));
+    this.tint = mt ? Math.max(0, Math.min(1, +mt[1])) : 0;
     this.atlas = null;
     this.tex = null;
     this.ready = false;
@@ -293,13 +297,13 @@ export class SpriteView {
         c = turning ? (body === 'police01' ? SIL.police : SIL.civ) : silColorFor(kind, st);
         buf.H[o] = 0;
       } else {
-        const base = UNIT_COLOR[turning ? (body === 'police01' ? 'POLICE' : 'CIV') : colorClassOf(kind, st)] || [1, 1, 1];
-        const K = 0.35;
-        c = [
-          1 * (1 - K) + base[0] * K * 1.9,
-          1 * (1 - K) + base[1] * K * 1.9,
-          1 * (1 - K) + base[2] * K * 1.9,
-        ];
+        const K = this.tint;
+        if (K > 0) {
+          const base = UNIT_COLOR[turning ? (body === 'police01' ? 'POLICE' : 'CIV') : colorClassOf(kind, st)] || [1, 1, 1];
+          c = [(1 - K) + base[0] * K * 1.9, (1 - K) + base[1] * K * 1.9, (1 - K) + base[2] * K * 1.9];
+        } else {
+          c = [1, 1, 1];        // 原版：实色精灵就是原画，只有剪影才上色
+        }
         buf.H[o] = (this.seed2[i % CAP] - 0.5) * 0.8;
       }
       buf.T[o * 3] = c[0]; buf.T[o * 3 + 1] = c[1]; buf.T[o * 3 + 2] = c[2];
@@ -339,6 +343,7 @@ export class SpriteView {
       actor: k, decal: dk, shadow: sk, dots: pk,
       sil: nSil, turn: nTurn, die: nDie, rise: nRise,
       silCiv: nSilCiv, silPolice: nSilPol, silZombie: nSilZom,
+      tint: this.tint,
       silTot: this.silTot,
     };
     actor.mesh.instanceMatrix.needsUpdate = true;
