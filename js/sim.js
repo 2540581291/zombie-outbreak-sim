@@ -2577,11 +2577,18 @@ export class Sim {
                   break;
                 }
                 // 下一个路点"看得见" → 直接跳过当前这个（少走一次拐弯）
-                if (k + 1 < this.pathN[i]) {
-                  const nx2 = this.pathX[i * 16 + k + 1], nz2 = this.pathZ[i * 16 + k + 1];
-                  if (this.losClear(this.px[i], this.pz[i], nx2, nz2)) {
-                    this.pathIdx[i] = k + 1;
-                    this.move(i, nx2 - this.px[i], nz2 - this.pz[i], this.spd[i] * wmul0, cdt);
+                // 往前看最多 3 个路点：最远的那个如果中心线可见就一次性跳过去
+                //   （路点每 4~8m 一个，少拐几次能明显减少"净位移打折"）
+                {
+                  let jumped = -1;
+                  for (let j = Math.min(k + 3, this.pathN[i] - 1); j > k; j--) {
+                    const nx2 = this.pathX[i * 16 + j], nz2 = this.pathZ[i * 16 + j];
+                    if (this.losClear(this.px[i], this.pz[i], nx2, nz2)) { jumped = j; break; }
+                  }
+                  if (jumped > k) {
+                    this.pathIdx[i] = jumped;
+                    const jx = this.pathX[i * 16 + jumped], jz = this.pathZ[i * 16 + jumped];
+                    this.move(i, jx - this.px[i], jz - this.pz[i], this.spd[i] * wmul0, cdt);
                     break;
                   }
                 }
