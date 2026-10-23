@@ -996,39 +996,90 @@ export class Sim {
     this.planPath.to = undefined;
     if (s === goal) return 0;
 
-    const gw = this.gw, gh = this.gh;
+    const gw = this.gw, gh = this.gh, grid = this.cgrid;
     const stamp = ++this.cstamp;
-    let head = 0, tail = 0;
-    this.cq[tail++] = goal;
-    this.cseen[goal] = stamp;
-    this.came[goal] = -1;
+    // A*：f = g + h（h 用曼哈顿距离，单位是粗格数）
+    if (!this.aG) {
+      const N = gw * gh;
+      this.aG = new Float32Array(N);
+      this.aF = new Float32Array(N);
+      this.aCame = new Int32Array(N);
+      this.aSeen = new Int32Array(N);
+      this.aClosed = new Int32Array(N);
+      this.aHeap = new Int32Array(N + 1);
+    }
+    const aG = this.aG, aF = this.aF, aCame = this.aCame, aSeen = this.aSeen;
+    const aClosed = this.aClosed, heap = this.aHeap;
+    const tcol = goal % gw, trow = (goal / gw) | 0;
+    const hDist = (k) => {
+      const c = k % gw, r = (k / gw) | 0;
+      return Math.abs(c - tcol) + Math.abs(r - trow);
+    };
+    let heapN = 0;
+    const push = (k) => {
+      let i = heapN++;
+      heap[i] = k;
+      while (i > 0) {
+        const p = (i - 1) >> 1;
+        if (aF[heap[p]] <= aF[heap[i]]) break;
+        const t2 = heap[p]; heap[p] = heap[i]; heap[i] = t2;
+        i = p;
+      }
+    };
+    const pop = () => {
+      const top = heap[0];
+      heap[0] = heap[--heapN];
+      let i = 0;
+      for (;;) {
+        const l = i * 2 + 1, r = l + 1;
+        let m = i;
+        if (l < heapN && aF[heap[l]] < aF[heap[m]]) m = l;
+        if (r < heapN && aF[heap[r]] < aF[heap[m]]) m = r;
+        if (m === i) break;
+        const t2 = heap[m]; heap[m] = heap[i]; heap[i] = t2;
+        i = m;
+      }
+      return top;
+    };
+
+    aG[s] = 0; aF[s] = hDist(s); aCame[s] = -1;
+    aSeen[s] = stamp;
+    push(s);
     let found = false;
-    while (head < tail && tail < 2500) {
-      const cur = this.cq[head++];
-      if (cur === s) { found = true; break; }
+    let expanded = 0;
+    while (heapN > 0 && expanded < 30000) {
+      const cur = pop();
+      if (aClosed[cur] === stamp) continue;
+      aClosed[cur] = stamp;
+      expanded++;
+      if (cur === goal) { found = true; break; }
       const cr = (cur / gw) | 0, cc = cur - cr * gw;
       for (let k = 0; k < 4; k++) {
         const nr = cr + (k === 0 ? -1 : k === 1 ? 1 : 0);
         const nc = cc + (k === 2 ? -1 : k === 3 ? 1 : 0);
         if (nr < 0 || nc < 0 || nr >= gh || nc >= gw) continue;
         const nk = nr * gw + nc;
-        if (this.cseen[nk] === stamp || !this.cgrid[nk]) continue;
-        this.cseen[nk] = stamp;
-        this.came[nk] = cur;
-        this.cq[tail++] = nk;
+        if (!grid[nk] || aClosed[nk] === stamp) continue;
+        // 斜向/对角切口：两个相邻正交格都要通，避免贴着墙角穿过去
+        const g2 = aG[cur] + 1;
+        if (aSeen[nk] === stamp && g2 >= aG[nk]) continue;
+        aSeen[nk] = stamp; aG[nk] = g2; aCame[nk] = cur; aF[nk] = g2 + hDist(nk);
+        push(nk);
       }
     }
     if (!found) return 0;
     this.pathBudget--;
-    // 回溯出完整格子链（起点侧 → 目标侧）
+
+    // 回溯出完整格子链（起点侧 → 目标侧），上限 400 格 ≈ 1.6km
     const raw = [];
-    let cur = s;
-    while (cur >= 0 && raw.length < 60) {
+    let cur = goal;
+    while (cur >= 0 && raw.length < 400) {
       const cr = (cur / gw) | 0, cc = cur - cr * gw;
       raw.push([(cc + 0.5) * this.nav.cell * this.cs - this.nav.halfW,
                 this.nav.halfH - (cr + 0.5) * this.nav.cell * this.cs]);
-      cur = this.came[cur];
+      cur = aCame[cur];
     }
+    raw.reverse();                       // 现在 raw[0] = 起点侧
     // 视线拉直（string pulling）：能直接看到更远的点就跳过中间路点，别走锯齿
     const pts = [];
     let cx = this.px[i], cz = this.pz[i];
@@ -1043,7 +1094,7 @@ export class Sim {
       cx = raw[far][0]; cz = raw[far][1];
       i0 = far + 1;
     }
-    const n = Math.min(16, pts.length);
+    let n = Math.min(16, pts.length);
     for (let k = 0; k < n; k++) {
       this.pathX[i * 16 + k] = pts[k][0];
       this.pathZ[i * 16 + k] = pts[k][1];
@@ -1374,6 +1425,12 @@ export class Sim {
   decide(i) {
     const st = this.state[i];
     if (st !== ST.CIV && st !== ST.FLEE && st !== ST.FIGHT && st !== ST.INFECTED) return;
+    // 玩家/系统下达的移动命令（右键点地、出警）优先：没走到之前不被社会决策覆盖
+    if (this.goal[i] === GOAL.MOVE_TO) {
+      const gp = this.goalPoint(i, GOAL.MOVE_TO);
+      if (gp && Math.hypot(gp[0] - this.px[i], gp[1] - this.pz[i]) < 6) this.setGoal(i, GOAL.NONE);
+      else return;
+    }
 
     // 发病的人：不管知不知道外面出事了，都会往医院跑（零号病人的核心叙事）
     if (this.sick[i] && this.state[i] === ST.INFECTED) {
