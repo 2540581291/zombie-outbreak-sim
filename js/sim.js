@@ -193,7 +193,8 @@ export class Sim {
     this.armed = new Uint8Array(NMAX);
     this.stam = new Float32Array(NMAX);          // 体力（逃跑会累）
     this.side = new Float32Array(NMAX);          // 绕墙偏好方向 ±1
-    this.fleeT = new Float32Array(NMAX);         // 本次逃跑剩余时长
+    this.fleeT = new Float32Array(NMAX);         // 本次逃跑剩余时长（已不再当退出条件）
+    this.fleeDir = new Float32Array(NMAX);       // 逃跑方向（弧度，锁定后保持，避免来回翻转）
     this.fleeCd = new Float32Array(NMAX);        // 腿软期（这段时间不会再跑）
     this.actT = new Float32Array(NMAX);          // 当前活动剩余时长（走/站）
     this.idle = new Uint8Array(NMAX);            // 1 = 站着发呆
@@ -362,6 +363,7 @@ export class Sim {
     this.stuck.fill(0);
     this.side.fill(1);
     this.fleeT.fill(0);
+    this.fleeDir.fill(0);
     this.fleeCd.fill(0);
     this.nextSpecial = 8;
     this.pow.fill(1);
@@ -2319,14 +2321,55 @@ export class Sim {
             this.stam[i] = Math.min(1, this.stam[i] + 0.25);
             break;
           }
-          // 方向：始终背离**离自己最近的那只丧尸**
-          const ax = this.px[i] - this.px[z], az = this.pz[i] - this.pz[z];
-          const s = this.pz[i] > this.pz[z] ? 1 : -1;
+          // 方向：把 40m 内**所有**丧尸的排斥向量叠加。
+          // 为什么不是"只背离最近那只"：左右各一只、距离差不多时，
+          // 最近的那只每帧都可能换人 → 方向每帧 180° 翻转 → 人在原地抖。
+          // 叠加之后，两侧夹击的合力接近 0，此时改走**垂直方向**从侧缝钻出去。
+          let rx = 0, rz = 0, sumW = 0;
+          if (this.forEachNear) {
+            this.forEachNear(this.px[i], this.pz[i], 40, (j) => {
+              if (this.state[j] !== ST.ZOMBIE) return;
+              const dx = this.px[i] - this.px[j], dz = this.pz[i] - this.pz[j];
+              const d2 = dx * dx + dz * dz;
+              if (d2 < 0.04) return;
+              const w = 1 / d2;                 // 越近排斥越强
+              rx += dx * w; rz += dz * w; sumW += w;
+            });
+          }
+          if (sumW === 0) {                     // 兜底：用最近那只
+            rx = this.px[i] - this.px[z]; rz = this.pz[i] - this.pz[z]; sumW = 1;
+          }
+          const rlen = Math.hypot(rx, rz);
+          if (rlen > sumW * 0.0012) {
+            // 合力够明确：就用它，并记住这个方向
+            this.fleeDir[i] = Math.atan2(rz, rx);
+          } else {
+            // 四周对称包围：合力抵消，改用**记住的那个方向**（没有就按 side 选侧向）
+            let a = this.fleeDir[i];
+            if (!a) {
+              const ax = this.px[i] - this.px[z], az = this.pz[i] - this.pz[z];
+              a = Math.atan2(az, ax) + Math.PI / 2 * (this.side[i] || 1);
+              this.fleeDir[i] = a;
+            }
+            // 这个方向可能正好是墙：绕一圈 8 个方向，挑一个真能走的
+            let ok = false, best = a;
+            for (let k = 0; k < 8; k++) {
+              const a2 = a + k * (Math.PI / 4) * (this.side[i] || 1);
+              if (this.walkable(this.px[i] + Math.cos(a2) * 3, this.pz[i] + Math.sin(a2) * 3)) {
+                best = a2; ok = true; break;
+              }
+            }
+            if (ok) this.fleeDir[i] = best;
+            rx = Math.cos(best); rz = Math.sin(best);
+          }
           // 体力：狂奔会累，但不会累到走不动（下限 0.65）
           this.stam[i] = Math.max(0.65, this.stam[i] - dt * 0.055);
           const sp = this.spd[i] * (1.0 + 0.90 * this.panic[i]) * this.stam[i];
-          // 主要是"背对丧尸"，只加一点点侧向偏移，避免所有人挤成一条线
-          this.move(i, ax - az * 0.2 * s, az + ax * 0.2 * s, sp, dt);
+          if (!this.move(i, rx, rz, sp, dt)) {
+            // 这个方向走不动（被堵住）：把记住的方向拧 70°，下次换个方向挤出去
+            this.fleeDir[i] = (this.fleeDir[i] || Math.atan2(rz, rx)) + 1.22;
+            this.side[i] = -(this.side[i] || 1);
+          }
           this.panic[i] = Math.min(1.4, this.panic[i] + dt * 0.6);
           break;
         }
