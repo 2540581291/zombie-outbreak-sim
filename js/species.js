@@ -24,6 +24,11 @@ export const SP = {
 // 阵营
 export const TEAM = { HUMAN: 0, ZOMBIE: 1, VEHICLE: 2, WILD: 3 };
 
+// 移速基准：丧尸永远比平民快 ZOMBIE_EXTRA（不再有「丧尸速度」滑杆）
+export const CIV_SPEED = 2.0;      // 平民 m/s
+export const ZOMBIE_EXTRA = 1.0;   // 丧尸比平民快多少
+export const ZOMBIE_SPEED = CIV_SPEED + ZOMBIE_EXTRA;
+
 /**
  * scale   体型倍率（也决定点云大小和渲染尺寸）
  * hp      血量
@@ -37,19 +42,19 @@ export const TEAM = { HUMAN: 0, ZOMBIE: 1, VEHICLE: 2, WILD: 3 };
  */
 export const SPECIES = {
   [SP.CIV1]: {
-    name: '平民', team: TEAM.HUMAN, scale: 1.0, hp: 100, speed: 2.00,
+    name: '平民', team: TEAM.HUMAN, scale: 1.0, hp: 100, speed: CIV_SPEED,
     dmg: 0, rate: 3, range: 26, biteR: 1.8,
     color: [0.30, 0.80, 0.44], infectedColor: [0.97, 0.72, 0.26],
     infectable: true,
   },
   [SP.CIV2]: {
-    name: '平民', team: TEAM.HUMAN, scale: 0.94, hp: 100, speed: 2.00,
+    name: '平民', team: TEAM.HUMAN, scale: 0.94, hp: 100, speed: CIV_SPEED,
     dmg: 0, rate: 3, range: 26, biteR: 1.8,
     color: [0.36, 0.78, 0.52], infectedColor: [0.97, 0.72, 0.26],
     infectable: true,
   },
   [SP.CIV3]: {
-    name: '胖子', team: TEAM.HUMAN, scale: 1.22, hp: 100, speed: 2.00,
+    name: '胖子', team: TEAM.HUMAN, scale: 1.22, hp: 100, speed: CIV_SPEED,
     dmg: 0, rate: 3, range: 26, biteR: 1.8,
     color: [0.42, 0.72, 0.56], infectedColor: [0.97, 0.72, 0.26],
     infectable: true,
@@ -73,7 +78,7 @@ export const SPECIES = {
     infectable: false,
   },
   [SP.ZOMBIE]: {
-    name: '丧尸', team: TEAM.ZOMBIE, scale: 1.0, hp: 100, speed: 3.0,
+    name: '丧尸', team: TEAM.ZOMBIE, scale: 1.0, hp: 100, speed: ZOMBIE_SPEED,
     dmg: 20, rate: 2.0, range: 60, biteR: 1.8,
     color: [0.94, 0.28, 0.18], infectedColor: [0.94, 0.28, 0.18],
     infectable: false,

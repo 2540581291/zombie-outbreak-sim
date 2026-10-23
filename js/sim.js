@@ -616,7 +616,7 @@ export class Sim {
       this.heading[i] = rng() * 6.2832;
       this.kind[i] = SP.ZOMBIE;
       this.hp[i] = SPECIES[SP.ZOMBIE].hp;
-      this.spd[i] = P.zombieSpeed * (0.85 + rng() * 0.3);
+      this.spd[i] = SPECIES[SP.ZOMBIE].speed * (0.85 + rng() * 0.3);
       this.state[i] = ST.ZOMBIE;
       this.phase[i] = rng();
     };
@@ -1962,7 +1962,7 @@ export class Sim {
             const x = wx + Math.cos(a) * r, z = wz + Math.sin(a) * r;
             if (this.walkable(x, z)) {
               const idx = this.addUnit(x, z, SP.ZOMBIE);
-              if (idx >= 0) this.spd[idx] = (this.params.zombieSpeed || 2) * (0.85 + this.rng() * 0.3);
+              if (idx >= 0) this.spd[idx] = SPECIES[SP.ZOMBIE].speed * (0.85 + this.rng() * 0.3);
               ok = true; break;
             }
           }
@@ -3262,7 +3262,7 @@ export class Sim {
     } else {
       this.kind[i] = SP.ZOMBIE;
       this.hp[i] = SPECIES[SP.ZOMBIE].hp;
-      this.spd[i] = this.params.zombieSpeed * (0.85 + this.rng() * 0.3);
+      this.spd[i] = SPECIES[SP.ZOMBIE].speed * (0.85 + this.rng() * 0.3);
     }
     this.nearC[i] = -1;
     this.tgt[i] = -1;
