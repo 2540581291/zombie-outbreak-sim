@@ -342,3 +342,17 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
 /* 已撤离：青绿，和死亡的红区分开 */
 .dot.saved{background:#3fe0b0}
 #tb-saved{color:#8ff0d6}
+
+/* 窄屏优先保住「平民/感染/丧尸/死亡/已撤离」这些硬数字，
+   百分比条（混乱/感染/知情）先让位 —— 它们在面板里也有 */
+@media (max-width:1560px){
+  .tb-right .tb-gauges{display:none}
+}
+
+/* 顶栏太挤：数字组优先，分隔线在窄屏去掉，标签缩到 9px 保清晰 */
+@media (max-width:1560px){
+  .tb-right{gap:6px}
+  .tb-div{display:none}
+  .tb-stat em{font-size:9px}
+  .tb-stat b{font-size:11.5px}
+}
