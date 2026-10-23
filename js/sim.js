@@ -266,6 +266,8 @@ export class Sim {
     this.pathX = new Float32Array(NMAX * 16);    // 粗网格寻路的路点（最多 16 个）
     this.pathZ = new Float32Array(NMAX * 16);
     this.forcePlan = new Uint8Array(NMAX); // 1 = 下一次决策必须规划路径（卡住过）
+    this.lastDir = new Float32Array(NMAX); // 上一次实际迈步方向（沿墙滑行时保持，避免来回抖）
+    this.lastDirT = new Float32Array(NMAX);
     this.armHome = new Uint8Array(NMAX);  // 1 = 正在回家补弹（这条 goal 不被 decide 覆盖）
     this.pet = new Uint8Array(NMAX);      // 动物：1 = 家养（绑主人家），0 = 野生
     this.fleeMode = new Uint8Array(NMAX); // 逃跑大类：0 无 / 1 即时（只为离开 40m）/ 2 有目标
@@ -356,6 +358,7 @@ export class Sim {
     this.pet.fill(0);
     this.armHome.fill(0);
     this.forcePlan.fill(0);
+    this.lastDir.fill(0); this.lastDirT.fill(0);
     // 关键：全部状态清零，否则上一局的残留会让结果不可复现
     this.cool.fill(0); this.timer.fill(0); this.panic.fill(0);
     this.wpn.fill(0); this.mag.fill(0); this.reserve.fill(0); this.skill.fill(0); this.rlUntil.fill(0);
@@ -2322,6 +2325,31 @@ export class Sim {
     // 然后目标在楼对面，卡死在里面。
     const meIn = nav.indoor ? nav.indoor(ox, oz) : false;
 
+    // 延续上一次的迈步方向：贴着墙走时，若每帧都从"期望方向"重新找，
+    // 会变成左一下右一下的锯齿（净位移被吃掉一半）。方向一旦偏出去，
+    // 只要还在 75° 以内就继续沿它走，直到能走回期望方向。
+    if (this.lastDirT[i] > this.time - 0.8) {
+      const la = this.lastDir[i];
+      let dv = la - base;
+      while (dv > Math.PI) dv -= Math.PI * 2;
+      while (dv < -Math.PI) dv += Math.PI * 2;
+      if (Math.abs(dv) < 1.31) {
+        const lx = ox + Math.cos(la) * stepLen;
+        const lz = oz + Math.sin(la) * stepLen;
+        if (this.walkable(lx, lz) && (meIn || !nav.indoor || !nav.indoor(lx, lz) || this.pathN[i] > 0)) {
+          this.px[i] = lx; this.pz[i] = lz;
+          if (this.walkable(this.px[i], this.pz[i])) {
+            this.heading[i] = la;
+            const spL = SPECIES[this.kind[i]] || SPECIES[SP.CIV1];
+            this.phase[i] = (this.phase[i] + (speed / (1.45 * (spL.scale || 1))) * dt) % 1;
+            this.stuck[i] = 0;
+            return true;
+          }
+          this.px[i] = ox; this.pz[i] = oz;
+        }
+      }
+    }
+
     // 先试"正前方"的三种步长：能直着走过去就别偏转
     //   （窄缝、门口这类地方，缩短步长就能过，比转 20° 划算得多）
     for (let sm = 0; sm < 2; sm++) {
@@ -2333,6 +2361,7 @@ export class Sim {
       this.px[i] = nx; this.pz[i] = nz;
       if (!this.walkable(this.px[i], this.pz[i])) { this.px[i] = ox; this.pz[i] = oz; continue; }
       this.heading[i] = base;
+      this.lastDir[i] = base; this.lastDirT[i] = this.time;
       const spB = SPECIES[this.kind[i]] || SPECIES[SP.CIV1];
       this.phase[i] = (this.phase[i] + (speed / (1.45 * (spB.scale || 1))) * dt) % 1;
       this.stuck[i] = 0;
@@ -2361,6 +2390,7 @@ export class Sim {
         continue;
       }
       this.heading[i] = a;
+      this.lastDir[i] = a; this.lastDirT[i] = this.time;
       // 步态：一个完整周期走 stride 米。人 1.45m、狗 0.8m、熊 2.4m
       const sp0 = SPECIES[this.kind[i]] || SPECIES[SP.CIV1];
       const stride = 1.45 * (sp0.scale || 1);
@@ -2638,11 +2668,11 @@ export class Sim {
                   const useGrad = (meIn || (tgtIn && d2g < 3600)) && this.time > this.freeT[i];
                   if (useGrad) {
                     const g = nav.doorGradient(this.px[i], this.pz[i]);
-                    if (g) { this.move(i, g.x, g.z, this.spd[i] * 0.9, cdt); break; }
+                    if (g) { this.move(i, g.x, g.z, this.spd[i], cdt); break; }
                   }
                 }
                 // 逃命是跑，不是散步
-                const mul = this.goal[i] === GOAL.FLEE ? 1.6 : 0.92;
+                const mul = this.goal[i] === GOAL.FLEE ? 1.6 : 1.0;
                 const ox = this.px[i], oz = this.pz[i];
                 this.moveSmart(i, adx, adz, this.spd[i] * mul, cdt);
                 // 卡住（被关在没门的屋里）：别一直原地跑，认命固守
