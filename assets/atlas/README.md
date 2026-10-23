@@ -1,0 +1,57 @@
+# `assets/atlas/` · v2 精灵图集
+
+> 由 `tools/build_atlas.py` 从 `reference/core`（反编译的 2009 原版）**自动生成，不要手改**。
+
+| 文件 | 说明 |
+|---|---|
+| `atlas.png` | RGBA，1:1 原像素（**不放大**），变量矩形密排，帧间 1px 缝隙 |
+| `atlas.json` | clip 表 |
+
+## 重建 / 校验 / 预览
+
+```bash
+python tools/build_atlas.py                     # ← 唯一权威构建（读 reference/core）
+python tools/audit_atlas.py                     # 校验帧数/帧长/rect 与源码一致、rect 不重叠
+python tools/preview_atlas.py guy01/turn01 10   # 切出帧条看图（第 2 参是采样帧数）
+```
+
+`build_atlas.py` 的**硬约束**：展开出的帧数必须等于动画类里 `_qk83()` 的声明值，否则 `exit 1`，不产出"差不多"的图集。
+
+## json 结构
+
+```jsonc
+{
+  "v": 2,
+  "w": 2048, "h": 784,
+  "variants": 1,                        // 衣服差异交给 shader 的色相偏移，不再烘焙副本
+  "shadow": [x, y, 20, 15],             // 原版 _dw934__vt862 软黑椭圆
+  "clips": {
+    "guy01/turn01":       { "n": 49, "ms": 150, "loop": false, "frames": [[x,y,w,h], ...] },
+    "guy01/turn01@sil":   { "n": 49, "ms": 150, "loop": false, "frames": [...] },   // 白剪影
+    "animals_dog/walk":   { "n": 6,  "ms": 150, "loop": true,  "frames": [...] }
+  },
+  "stats": { "clips": 160, "frames": 2890, "png_bytes": 136936 }
+}
+```
+
+约定：
+
+- **rect 原点在图集左上角**（three 里记得 `texture.flipY = false`，旧的 `retro.js:118-121` 就是踩了这个坑）。
+- **帧以画布中心对齐人物坐标**（原版就是 `translate(-w/2,-h/2)`，实测画布中心≈人物中心，偏差 <5px）。
+- `@sil` = 同一帧的剪影版，RGB 全白、alpha 不变；颜色由运行时按阵营 tint：
+  平民 `#40D43B` / 警察 `#1212FF` / 丧尸 `#E30000`。
+- `@sil` 与实色是**两套独立 rect**：它们的画布尺寸可能不同（例如 guy01 `idle01` 实色 15×17、剪影 15×14），切换时会有 1~2px 位移 —— 原版就是这样。
+- `ms` 是帧长，**不是帧率**；动画时长 = `n × ms`。
+- 同一 rect 被多个 clip 共用是**故意**的（原版 `police01` 的 `zwalk01/zwalk02/zattack01/zdie01` 直接复用 `guy01` 的对象）。
+
+## 规模（当前）
+
+| 项 | 值 |
+|---|---|
+| clips | 160（实色 72 / 剪影 72 / 动物 16） |
+| 帧槽 | 2,890 |
+| 唯一矩形 | 1,788（重复帧去重后） |
+| 图集 | 2048 × 784 |
+| PNG | 133.7 KB |
+| 显存（RGBA8） | **6.4 MB** |
+| 旧图集对比 | 2048 × 19520 = **159.9 MB**，且 39/68 支动画帧数偏少 |
