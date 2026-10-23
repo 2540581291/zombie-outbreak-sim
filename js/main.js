@@ -392,6 +392,8 @@ function buildEscapeMarker() {
   escapeMark = m;
 }
 
+let lastCardHtml = '';       // 卡片内容缓存：内容没变就不重建 DOM
+
 function selectAgent(i) {
   if (i === selected) {
     // 同一个人的情况下也要能"从地点视图回到他本人"
@@ -762,10 +764,14 @@ function renderAgentCard() {
     <div class="ac-row"><span>离家</span><em>${Math.hypot(sim.homeX[selected] - px, sim.homeZ[selected] - pz).toFixed(0)} m</em></div>
     <div class="ac-row"><span>位置</span><em>${(sim.nav && sim.nav.indoor && sim.nav.indoor(px, pz)) ? '楼里' : '街上'} · ${px.toFixed(0)}, ${pz.toFixed(0)}</em></div>`;
 
-  document.getElementById('ac-body').innerHTML =
-    sec1 + sec2 + fleeBlock(selected) + statBlock(selected) + sec3 + sec4 +
+  const bodyHtml = sec1 + sec2 + fleeBlock(selected) + statBlock(selected) + sec3 + sec4 +
     `<div class="ac-sec">当前状态</div>` + stateChips(selected, p) +
     attrBlock(selected) + explainBlock(selected);
+  const bodyEl = document.getElementById('ac-body');
+  if (bodyEl && bodyHtml !== lastCardHtml) {
+    bodyEl.innerHTML = bodyHtml;
+    lastCardHtml = bodyHtml;
+  }
 }
 
 // ---------- 地点名牌：投影到屏幕，公共建筑加发光 ----------
@@ -1961,7 +1967,7 @@ async function boot() {
 }
 
 // ---------- 主循环 ----------
-let last = 0, acc = 0, frames = 0, fpsT = 0, hudT = 0, fc = 0;
+let last = 0, acc = 0, frames = 0, fpsT = 0, hudT = 0, fc = 0, cardFrame = 0;
 const DT = 1 / 20;
 
 function startLoop() {
@@ -2071,6 +2077,13 @@ function loop(t) {
     renderer.render(scene, camera);
   }
   updatePoiLabels();   // 相机矩阵这一帧已更新，投影才不会 NaN
+  // 卡片实时刷新：约 20Hz（内容没变时不重建 DOM）
+  if (sim && selected >= 0 && (++cardFrame % 3 === 0)) {
+    const cEl = document.getElementById('agentcard');
+    if (cEl && !cEl.classList.contains('hidden')) {
+      try { renderAgentCard(); } catch (e) { window.__cardErr = String((e && e.message) || e); }
+    }
+  }
   if (++fc === 1) {
     document.title = 'R tris=' + renderer.info.render.triangles +
       ' calls=' + renderer.info.render.calls +
