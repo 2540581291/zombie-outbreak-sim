@@ -341,7 +341,7 @@ def _deck(g, a, b, halfw):
             g.set(g.col(px + nx * k), g.row(py + ny * k), OPEN)
 
 
-def build(city, cell=2.0, verbose=True, sat_path=None):
+def build(city, cell=1.0, verbose=True, sat_path=None):   # 默认 1m/格（和运行时 nav.cell 一致）
     W, H = city["size"]
     g = Grid(W, H, cell)
     per_m = 1.0 / cell
