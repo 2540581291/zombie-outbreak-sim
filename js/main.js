@@ -611,16 +611,31 @@ function agentRules(i, p) {
       if (sim.chaos > 80) rows.push(['通缉', '<b style="color:#ff8a5c">混乱 > 80%：被当作丧尸</b>']);
     }
     if (st === ST.FLEE) rows.push(['体力', (sim.stam[i] * 100).toFixed(0) + '% · 恐慌 ' + sim.panic[i].toFixed(2)]);
-    // 逃跑（独立大类）：即时逃跑 / 有目标逃跑（回家·警局·出城）
-    if (sim.fleeMode && sim.fleeMode[i]) {
-      const GOALS = ['回家', '去警局', '逃离城区'];
-      const t = sim.fleeMode[i] === 1
-        ? '<b style="color:#ffd479">即时逃跑</b>（只想离开 40m 内的丧尸）'
-        : `<b style="color:#ff9b6a">有目标逃跑 → ${GOALS[sim.fleeGoal[i]] || '?'}</b>` +
-          (sim.stationLost[i] ? '<span style="color:#7d8b99">（警局已沦陷，改道）</span>' : '');
-      rows.push(['逃跑', t]);
-    }
     return '<div class="ac-sec">属性</div>' +
+      rows.map(([k, v]) => `<div class="ac-row"><span>${k}</span><em>${v}</em></div>`).join('');
+  }
+
+  /** 逃跑（独立大类，和身份/状态/属性平级） */
+  function fleeBlock(i) {
+    const st = sim.state[i];
+    const GOALS = ['回家', '去警局', '逃离城区'];
+    const mode = sim.fleeMode ? sim.fleeMode[i] : 0;
+    let t;
+    if (mode === 1) t = '<b style="color:#ffd479">即时逃跑</b> <span style="color:#7d8b99">（只想离开 40m 内的丧尸）</span>';
+    else if (mode === 2) {
+      t = `<b style="color:#ff9b6a">有目标逃跑 → ${GOALS[sim.fleeGoal[i]] || '?'}</b>` +
+        (sim.stationLost[i] ? '<span style="color:#7d8b99">（警局已沦陷，改道）</span>' : '');
+    } else t = '<span style="color:#7d8b99">没有在逃跑</span>';
+    const rows = [['类型', t]];
+    if (mode) {
+      if (st === ST.FLEE) {
+        rows.push(['体力', (sim.stam[i] * 100).toFixed(0) + '%']);
+        rows.push(['恐慌', sim.panic[i].toFixed(2)]);
+      }
+      if (mode === 2) rows.push(['路线', GOALS[sim.fleeGoal[i]] === '回家' ? '先回家接人 / 固守' :
+        (sim.fleeGoal[i] === 1 ? '去最近的警察局避难' : '往撤离口方向出城')]);
+    }
+    return '<div class="ac-sec">逃跑</div>' +
       rows.map(([k, v]) => `<div class="ac-row"><span>${k}</span><em>${v}</em></div>`).join('');
   }
 
@@ -725,7 +740,7 @@ function renderAgentCard() {
     <div class="ac-sec">状态</div>
     <div class="ac-row"><span>状态</span><em><b class="st-${p.stateColor}">${p.stateTxt}</b></em></div>
     ${p.social ? `<div class="ac-row"><span>行程</span><em>${p.social}</em></div>` : ''}
-    ${p.awareText ? `<div class="ac-row"><span>知情</span><em>${p.awareText}</em></div>` : ''}
+    <div class="ac-row"><span>知情</span><em>${p.awareText || '一无所知'}</em></div>
     ${p.vipEscort ? `<div class="ac-row"><span>护送</span><em>${p.vipEscort}</em></div>` : ''}
     ${linkTo ? `<div class="ac-row"><span>连线</span><em><b class="link" data-act="unlink">→ ${linkTo.label}</b>（再点一次断开）</em></div>` : ''}
     <div class="ac-row"><span>血量</span><em>${p.hp} / ${p.hpMax}</em></div>
@@ -748,7 +763,7 @@ function renderAgentCard() {
     <div class="ac-row"><span>位置</span><em>${(sim.nav && sim.nav.indoor && sim.nav.indoor(px, pz)) ? '楼里' : '街上'} · ${px.toFixed(0)}, ${pz.toFixed(0)}</em></div>`;
 
   document.getElementById('ac-body').innerHTML =
-    sec1 + sec2 + statBlock(selected) + sec3 + sec4 +
+    sec1 + sec2 + fleeBlock(selected) + statBlock(selected) + sec3 + sec4 +
     `<div class="ac-sec">当前状态</div>` + stateChips(selected, p) +
     attrBlock(selected) + explainBlock(selected);
 }
