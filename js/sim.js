@@ -730,8 +730,9 @@ export class Sim {
         }
       }
     } else if (mode === 'multi') {
+      // 多点爆发：每处按"总数的 1/点数"分，不再用绝对值
       const pts = Math.max(1, Math.min(12, P.points | 0 || 3));
-      const per = Math.max(1, P.perPoint | 0 || 40);
+      const per = Math.max(1, Math.round(zCount / pts));
       for (let p = 0; p < pts; p++) {
         const [ox, oz] = this.randWalk(rng, 0.88);
         if (!first) first = [ox, oz];
@@ -751,14 +752,16 @@ export class Sim {
       first = this.randWalk(rng, 0.8);
       this.pushEvent('潜伏者已潜入', 'start');
     } else if (mode === 'waves') {
+      // 连环爆发：总人数按"波数"平均分，每波数量 = 总数 / 波数
+      const nWaves = Math.max(1, Math.min(12, P.waves | 0 || 4));
+      const perWave = Math.max(1, Math.round(zCount / nWaves));
       const [ox, oz] = this.randWalk(rng, 0.75);
       first = [ox, oz];
-      cluster(ox, oz, Math.max(1, P.initialZombies | 0), 50);
-      // 剩下的波次交给 step() 定时投放
-      this.waveLeft = Math.max(0, Math.min(12, P.waves | 0 || 4));
+      cluster(ox, oz, perWave, 50);          // 第 1 波立刻出现
+      this.waveLeft = nWaves - 1;            // 其余波次交给 step() 定时投放
       this.waveEvery = Math.max(5, P.waveInterval | 0 || 40);
       this.waveNext = this.waveEvery;
-      this.waveCount = Math.max(1, P.waveCount | 0 || 40);
+      this.waveCount = perWave;              // 每波数量（比例算出来的）
     } else if (mode === 'apocalypse') {
       // 全城随机：不聚集，撒满整张图
       for (let j = 0; j < zCount && k < NMAX; j++) {

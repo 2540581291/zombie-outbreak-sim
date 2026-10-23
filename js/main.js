@@ -973,14 +973,12 @@ const MODE_ROWS = {
           `<button data-dir="${k}" class="${MOPT.dir === k ? 'on' : ''}">${t}</button>`).join('')}
       </div></div>`,
   multi: () => `
-    <label class="p-row"><span>点位数</span><input type="range" id="o-points" min="1" max="12" step="1" value="${MOPT.points}"><b id="v-points">${MOPT.points}</b></label>
-    <label class="p-row"><span>每点丧尸</span><input type="range" id="o-per" min="5" max="200" step="5" value="${MOPT.perPoint}"><b id="v-per">${MOPT.perPoint}</b></label>`,
+    <label class="p-row"><span>点位数</span><input type="range" id="o-points" min="1" max="12" step="1" value="${MOPT.points}"><b id="v-points">${MOPT.points}</b></label>`,
   stealth: () => `
     <label class="p-row"><span>零号病人</span><input type="range" id="o-carriers" min="1" max="3" step="1" value="${MOPT.carriers}"><b id="v-carriers">${MOPT.carriers}</b></label>`,
   waves: () => `
     <label class="p-row"><span>波数</span><input type="range" id="o-waves" min="1" max="12" step="1" value="${MOPT.waves}"><b id="v-waves">${MOPT.waves}</b></label>
-    <label class="p-row"><span>间隔</span><input type="range" id="o-waveint" min="10" max="120" step="5" value="${MOPT.waveInterval}"><b id="v-waveint">${MOPT.waveInterval}s</b></label>
-    <label class="p-row"><span>每波丧尸</span><input type="range" id="o-wavecount" min="5" max="200" step="5" value="${MOPT.waveCount}"><b id="v-wavecount">${MOPT.waveCount}</b></label>`,
+    <label class="p-row"><span>间隔</span><input type="range" id="o-waveint" min="10" max="120" step="5" value="${MOPT.waveInterval}"><b id="v-waveint">${MOPT.waveInterval}s</b></label>`,
 };
 
 function buildModeUI() {
@@ -1008,11 +1006,9 @@ function buildModeUI() {
     };
   };
   bind('o-points', 'points');
-  bind('o-per', 'perPoint');
   bind('o-carriers', 'carriers');
   bind('o-waves', 'waves');
   bind('o-waveint', 'waveInterval', (v) => v + 's');
-  bind('o-wavecount', 'waveCount');
 }
 
 // ---------- 参数 ----------
