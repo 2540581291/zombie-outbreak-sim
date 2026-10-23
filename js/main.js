@@ -14,7 +14,6 @@ import { stockText } from './storage.js';
 import { AudioEngine } from './audio.js';
 import { openReport, closeReport, isReportOpen } from './report.js';
 import { openOverview, close as closeOverview, toggle as toggleOverview, isOpen as overviewIsOpen } from './overview.js';
-import { RetroView } from './retro.js';
 import { SpriteView } from '../src/sprite/index.js';
 import { TerrainOverlay } from './overlay.js';
 import { LayerEditor } from './editmode.js';
@@ -91,7 +90,9 @@ const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerH
 const sun = new THREE.DirectionalLight(0xfff0dd, 1.5);
 sun.position.set(-500, 900, 600);
 scene.add(sun);
-scene.add(new THREE.HemisphereLight(0x93b3d6, 0x1a1c18, 0.85));
+const hemi = new THREE.HemisphereLight(0x93b3d6, 0x1a1c18, 0.85);
+scene.add(hemi);
+const nightTint = document.getElementById('nighttint');
 
 // ---------- 相机机架 ----------
 const rig = {
@@ -677,6 +678,10 @@ function readParams() {
     dogs: +sDog.value, cats: +sCat.value,
     bears: +sBear.value, tigers: +sTiger.value,
     animalInfected: +sAinf.value / 100,
+    startMin: (() => {
+      const q = new URLSearchParams(location.search).get('hour');
+      return q == null ? 450 : Math.round(parseFloat(q) * 60);   // 默认 07:30
+    })(),
     // 信息传播
     infoRate: $('s-info') ? +$('s-info').value : 1,
     // 爆发模式
@@ -1280,10 +1285,8 @@ async function boot() {
   agents = new AgentRenderer(scene, 62000);
 
 // ---------- 2009 复古模式（图集 + 正交相机） ----------
-  // 精灵块 v2（src/sprite/）默认启用；?sprite=v1 回到旧的 js/retro.js 做 A/B 对比
-  const RetroCls = (Q.get('sprite') === 'v1') ? RetroView : SpriteView;
-  if (RetroCls === SpriteView) console.log('[ZOS-R] 2D 精灵：v2（src/sprite）');
-  retro = new RetroCls(scene);
+  // 精灵块 v2（src/sprite/）：图集来自 assets/atlas/，见 assets/atlas/README.md
+  retro = new SpriteView(scene);
   try {
     await retro.load();
   } catch (e) {
@@ -1558,6 +1561,16 @@ function loop(t) {
     ground.update({ cx: rig.target.x, cz: rig.target.z, dist: rig.dist,
       halfW: Math.max(60, rig.dist * 0.9), halfH: Math.max(60, rig.dist * 0.9) });
   }
+  // 夜间光照：太阳/环境光/城市夜灯/雾色都跟着夜色走
+  if (sim) {
+    const nf = sim.nightFactor;
+    if (sun) sun.intensity = 1.5 * (1 - nf * 0.92);
+    if (hemi) hemi.intensity = 0.85 * (1 - nf * 0.55);
+    if (cityRef?.mat) cityRef.mat.uniforms.uNight.value = 0.30 + nf * 0.65;
+    if (scene.fog) scene.fog.color.setRGB(0.48 - nf * 0.40, 0.56 - nf * 0.44, 0.68 - nf * 0.45);
+    if (nightTint) nightTint.style.opacity = (nf * 0.34).toFixed(3);
+  }
+
   sky.position.copy(camera.position);
   drawCompass();
   if (cityRef?.mat) {
@@ -1622,9 +1635,10 @@ function loop(t) {
       const heatBar = $('heat')?.firstElementChild;
       if (heatBar) heatBar.style.width = Math.round(Math.min(1, sim.heat || 0) * 100) + '%';
     }
-    const s = Math.floor(sim.time);
+    // 游戏时钟（1 模拟秒 = 1 游戏分钟）
+    const cm = sim.clockMin | 0;
     $('tb-clock').textContent =
-      `T+${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+      `第 ${sim.dayIndex} 天 ${String(Math.floor(cm / 60)).padStart(2, '0')}:${String(cm % 60).padStart(2, '0')} · ${sim.segName}`;
     frames = 0; hudT = 0;
 
     updateToolbar();
@@ -1650,6 +1664,7 @@ addEventListener('resize', () => {
 });
 
 boot().catch(e => fail('启动失败：' + (e?.message || e)));
+
 
 
 

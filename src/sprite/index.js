@@ -187,10 +187,21 @@ export class SpriteView {
       const kind = sim.kind ? sim.kind[i] : 0;
       const sp = SPECIES[kind] || SPECIES[SP.CIV1];
 
-      const stage = this._stage(i, sim, st);
+      // 阶段：sim 里有 aStage 就用它（A 方案，P3 之后就是这条路）；
+      // 没有（预览页的假 sim）才退回渲染层自己的状态跳变检测（方案 B）。
+      let stage, stageT, zDie;
+      if (sim.aStage) {
+        stage = sim.aStage[i];
+        stageT = sim.aT[i];
+        zDie = sim.aZ[i];
+      } else {
+        stage = this._stage(i, sim, st);
+        stageT = sim.time - this.stageAt[i];
+        zDie = this.zDie[i];
+      }
       const body = bodyFor(sim, i, st);
       this.bodyStr[i] = body;
-      let anim = animFor(sim, i, st, stage, this.zDie[i]);
+      let anim = animFor(sim, i, st, stage, zDie);
       // 动物只有 walk / idle01 两支，其余一律退到 walk（原版也是这样）
       if (body.startsWith('animals_')) anim = (anim === 'idle01' || anim === 'idle02') ? 'idle01' : 'walk';
 
@@ -204,7 +215,7 @@ export class SpriteView {
       // 帧号：阶段动画按"进入阶段后的秒数"，其余按步态相位
       let fi;
       if (stage) {
-        fi = frameAt(clip, sim.time - this.stageAt[i]);     // 阶段动画：从进入阶段起算
+        fi = frameAt(clip, stageT);                         // 阶段动画：从进入阶段起算
       } else if (st === ST.CORPSE) {
         fi = clip.n - 1;                                    // 躺尸：末帧定格
       } else {
@@ -279,8 +290,11 @@ export class SpriteView {
       // ---- 阴影：尸体 / 剪影 / 太远 都不画 ----
       if (sMesh && !corpse && !sil && naturalPx >= 3) {
         let alpha = SHADOW_ALPHA;
-        if (stage === STAGE.DIE) alpha *= Math.max(0, 1 - (sim.time - this.stageAt[i]) / this.stageDur[i]);
-        if (stage === STAGE.RISE) alpha *= Math.min(1, (sim.time - this.stageAt[i]) / this.stageDur[i]);
+        if (stage === STAGE.DIE || stage === STAGE.RISE) {
+          const d = sim.aStage ? sim.aDur[i] : this.stageDur[i];
+          const p = d > 0 ? Math.min(1, stageT / d) : 1;
+          alpha *= (stage === STAGE.DIE) ? (1 - p) : p;     // 原版：倒地淡出、爬起淡入
+        }
         if (alpha > 0.02) {
           const sw = 20 * M_PER_PX * (sp.scale || 1);
           const sh = 15 * M_PER_PX * (sp.scale || 1);

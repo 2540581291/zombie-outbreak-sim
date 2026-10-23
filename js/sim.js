@@ -8,6 +8,7 @@ import { jobOf, jobFor, ageOf, braveOf, JOB_POI, h } from './profiles.js';
 import { buildFamilies } from './family.js';
 import { WPN, WEAPONS, ROLE_WEAPON, skillFor, weaponOf } from './weapons.js';
 import { makeStock, makeStationStock, makeHomeStock, takeWeapon, hasWeapon, stockText } from './storage.js';
+import { STAGE, bodyOf, stageDur, stageAnim } from './bodymap.js';
 
 export const ST = {
   CIV: 0,      // 平民
@@ -26,6 +27,13 @@ const NMAX = 62000;
 
 // 潜伏期两套常量（决策 3）：默认 8 秒；零号病人模式 10–30 分钟
 export const INCFG = { quick: 8, long: [600, 1800] };
+
+// 一天 24 分钟：1 模拟秒 = 1 游戏分钟，1440 秒 = 24 小时（整数关系，不用换算）
+export const DAY_SECONDS = 1440;
+export const TIME_SEGS = [
+  { at: 0, name: '深夜' }, { at: 360, name: '早晨' }, { at: 540, name: '白天' },
+  { at: 1080, name: '傍晚' }, { at: 1200, name: '夜晚' }, { at: 1380, name: '深夜' },
+];
 
 // 混乱度权重（0-100 上限）：知情值 1% → 1 点，感染值 1% → 2 点
 export const CHAOS_W = { aware: 1, infect: 2, cap: 100 };
@@ -297,6 +305,13 @@ export class Sim {
     this.nearPoll = new Int32Array(NMAX).fill(-1); // 最近警察/士兵
     this.tgt = new Int32Array(NMAX).fill(-1);      // 丧尸的目标记忆
 
+    // ---- 动作阶段（正交于 state；原版的 turn01 / die01 / zrise01）----
+    this.aStage = new Uint8Array(NMAX);            // STAGE.*
+    this.aT = new Float32Array(NMAX);              // 阶段已过秒数
+    this.aDur = new Float32Array(NMAX);            // 阶段总时长（按体型）
+    this.aZ = new Uint8Array(NMAX);                // 这段动画是不是丧尸版（zdie）
+    this.riseAt = new Float32Array(NMAX);          // 尸变死线（绝对时刻；0 = 不会变）
+
     // ---- 空间哈希 ----
     this.hcell = 24;
     this.hcols = Math.ceil(nav.W / this.hcell) + 2;
@@ -347,6 +362,8 @@ export class Sim {
       p.store = makeStationStock(p.a || 200);
     }
     this.pop0 = Math.max(1, (P.population | 0));
+    // 游戏时钟：默认 07:30 开局
+    this.startMin = P.startMin == null ? 7 * 60 + 30 : (+P.startMin | 0);
     // 每局随机一条边作为"逃离线"：平民跑到这条线上就算撤离
     this.escapeSide = ['N', 'E', 'S', 'W'][(this.rng() * 4) | 0];
     this.nextWild = 45;
@@ -356,6 +373,7 @@ export class Sim {
     this.tx.fill(0); this.tz.fill(0);
     this.heading.fill(0); this.phase.fill(0);
     this.specialT.fill(0); this.tgt.fill(-1);
+    this.aStage.fill(0); this.aT.fill(0); this.aDur.fill(0); this.aZ.fill(0); this.riseAt.fill(0);
     this.waveLeft = 0; this.waveNext = 0; this.waveCount = 0;
     if (this.origins) this.origins.length = 0;
     this.acc.fill(0.2);
@@ -647,9 +665,7 @@ export class Sim {
       for (let tr = 0; tr < 200000 && made < want; tr++) {
         const i = (rng() * k) | 0;
         if (this.state[i] !== ST.CIV) continue;
-        this.state[i] = ST.INFECTED;
-        this.incTot[i] = this.rollIncubation();
-        this.timer[i] = this.incTot[i];
+        this.setInfected(i, this.rollIncubation());
         this.panic[i] = 0.6;
         made++;
       }
@@ -919,6 +935,34 @@ export class Sim {
     if (g === GOAL.ARM_HOME) { x = this.homeX[i]; z = this.homeZ[i]; }
     this.goal[i] = g;
     if (x !== undefined) { this.goalX[i] = x; this.goalZ[i] = z; }
+  }
+
+  /** 现在几点（游戏分钟 0..1439） */
+  get clockMin() {
+    return (this.startMin + Math.floor(this.time)) % DAY_SECONDS;
+  }
+
+  /** 第几天（从 1 开始） */
+  get dayIndex() {
+    return 1 + Math.floor((this.startMin + Math.floor(this.time)) / DAY_SECONDS);
+  }
+
+  /** 当前时段名（深夜/早晨/白天/傍晚/夜晚） */
+  get segName() {
+    const m = this.clockMin;
+    let name = '深夜';
+    for (const t of TIME_SEGS) if (m >= t.at) name = t.name;
+    return name;
+  }
+
+  /** 夜色 0..1：白天 0，19:00 起变暗，23:00 全黑，05:00 起变亮，06:30 天亮 */
+  get nightFactor() {
+    const h = this.clockMin / 60;
+    if (h >= 6.5 && h < 19) return 0;
+    if (h >= 19 && h < 23) return (h - 19) / 4;
+    if (h >= 23 || h < 5) return 1;
+    if (h >= 5 && h < 6.5) return 1 - (h - 5) / 1.5;
+    return 0;
   }
 
   /** 撤离口在哪里（给 UI 用）：返回 {name, x, z} —— 边的中点 */
@@ -1416,6 +1460,7 @@ export class Sim {
                                   st === ST.POLICE || st === ST.SOLDIER || st === ST.ZOMBIE)
                     : (st === ST.POLICE);
           if (!ok) continue;
+          if (this.aStage[j]) continue;      // 正在转身/倒地的不是有效目标
           const dx = this.px[j] - x0, dz = this.pz[j] - z0;
           const d2 = dx * dx + dz * dz;
           if (d2 < bd) {
@@ -1550,16 +1595,31 @@ export class Sim {
     const doPerception = (i) => ((i + this.tick) % 3) === 0;
 
     for (let i = 0; i < n; i++) {
-      const st = this.state[i];
-      if (st === ST.CORPSE || st === ST.SAVED) continue;
-
-      if (this.fleeCd[i] > 0) this.fleeCd[i] -= dt;
+      let st = this.state[i];
+      if (st === ST.SAVED) continue;
 
       const dxc = this.px[i] - camX, dzc = this.pz[i] - camZ;
       const far = dxc * dxc + dzc * dzc > far2;
       if (far && ((i + this.tick) & 3) !== 0) continue; // 视口外 5Hz
       // 视口外只更新 1/4 的帧 → 步长按 4 倍补偿，否则远处的人会"慢动作"
       const cdt = far ? dt * 4 : dt;
+
+      if (this.fleeCd[i] > 0) this.fleeCd[i] -= dt;
+
+      // 不可打断的动作（turn01 / die01 / zrise01）：先推进，再决定要不要冻结
+      if (this.aStage[i]) {
+        this.tickStage(i, cdt);
+        if (this.aStage[i]) continue;      // 还在播 → 不移动、不寻敌、不被咬
+        st = this.state[i];                // 阶段可能刚把 state 改成 ZOMBIE，必须刷新
+      }
+      // 尸体：躺够了就爬起来（和"活着转身"共用同一个绝对死线）
+      if (st === ST.CORPSE || this.state[i] === ST.CORPSE) {
+        if (this.riseAt[i] > 0 && this.time >= this.riseAt[i]) {
+          this.riseAt[i] = 0;
+          this.beginRise(i);
+        }
+        continue;
+      }
 
       // ---- 感知（staggered）----
       if (doPerception(i)) {
@@ -1770,22 +1830,8 @@ export class Sim {
             if (tx * tx + tz * tz < 4) this.pickWander(i);
             this.move(i, tx, tz, this.spd[i] * 0.55, dt);
           }
-          if (this.timer[i] <= 0) {
-            const zsp = SPECIES[this.kind[i]] || SPECIES[SP.CIV1];
-            this.state[i] = ST.ZOMBIE;
-            if (zsp.hpZombie) {
-              // 动物尸变：血量、速度、伤害都按物种强化（狗/猫变丧尸后更凶）
-              this.hp[i] = zsp.hpZombie;
-              this.spd[i] = zsp.speed * (zsp.zombieSpeedMul || 1);
-              this.pow[i] = zsp.zombiePow || 1;
-            } else {
-              this.kind[i] = SP.ZOMBIE;
-              this.hp[i] = SPECIES[SP.ZOMBIE].hp;
-              this.spd[i] = P.zombieSpeed * (0.85 + rng() * 0.3);
-            }
-            this.nearC[i] = -1;
-            this.pushAudio('groan', this.px[i], this.pz[i], 1);
-          }
+          // 到点：活着就站着转（turn01），转身期间不能动；播完在 tickStage 里变丧尸
+          if (this.time >= this.riseAt[i]) this.beginTurn(i);
           break;
         }
         // ---------------- 丧尸 / 野兽 ----------------
@@ -1837,7 +1883,10 @@ export class Sim {
                 this.tgt[i] = -1;
                 break;
               }
-              if (cs === ST.CIV || cs === ST.FLEE || cs === ST.FIGHT) {
+              // ST.INFECTED 也算：被咬过但还没发作的人，原版里仍然会被继续咬
+              if (cs === ST.CIV || cs === ST.FLEE || cs === ST.FIGHT || cs === ST.INFECTED) {
+                // 正在转身/倒地的人不该再被咬（原版：状态 6/7 没有 LiveHuman 位）
+                if (this.aStage[c]) { this.tgt[i] = -1; break; }
                 const vsp = SPECIES[this.kind[c]] || SPECIES[SP.CIV1];
                 this.hp[c] -= (sp.dmg || 2) * (this.pow[i] || 1);
                 this.panic[c] = 1.4;
@@ -1858,16 +1907,15 @@ export class Sim {
                 }
 
                 if (this.hp[c] <= 0) {
-                  // 咬死：直接倒下，但已经被感染，稍后会尸变
-                  this.state[c] = ST.INFECTED;
-                  this.incTot[c] = this.rollIncubation();
-                  this.timer[c] = this.incTot[c];
-                  this.hp[c] = 1;
+                  // 咬死：先倒地（die01），死线照走 —— 到点从尸体上爬起来
+                  const wait = this.rollIncubation();
+                  this.killAgent(c, i);
+                  this.riseAt[c] = this.time + wait;
                   this.infectBy[i] = (this.infectBy[i] || 0) + 1;
-                } else if (vsp.infectable !== false && this.rng() < (vsp.infectChance == null ? 1 : vsp.infectChance)) {
-                  this.state[c] = ST.INFECTED;
-                  this.incTot[c] = this.rollIncubation();
-                  this.timer[c] = this.incTot[c];
+                } else if (cs !== ST.INFECTED && vsp.infectable !== false &&
+                           this.rng() < (vsp.infectChance == null ? 1 : vsp.infectChance)) {
+                  // 只认第一次被咬：已经潜伏的人不重置死线（原版也是"首次被咬时刻 + 感染时长"）
+                  this.setInfected(c, this.rollIncubation());
                   this.cool[c] = 0;
                   this.infectBy[i] = (this.infectBy[i] || 0) + 1;
                 } else {
@@ -2610,6 +2658,89 @@ export class Sim {
     }
   }
 
+  // ---------------- 动作阶段（尸变链） ----------------
+  /**
+   * 感染：记倒计时 + **绝对死线**。
+   * 原版用的是"首次被咬时刻 + 感染时长"，不是倒计时 —— 因为人死了以后这条钟还得继续走，
+   * 而倒地动画期间没有人会去减它。
+   */
+  setInfected(i, seconds) {
+    this.state[i] = ST.INFECTED;
+    this.incTot[i] = seconds;
+    this.timer[i] = seconds;
+    this.riseAt[i] = this.time + seconds;
+  }
+
+  /** 站着变：turn01，播完才真的变丧尸。 */
+  beginTurn(i) {
+    if (this.aStage[i]) return;                       // 已经在播了，别叠
+    const body = bodyOf(i, this.kind[i], false);      // 用**还是人**时的体型
+    this.aStage[i] = STAGE.TURN;
+    this.aT[i] = 0;
+    this.aZ[i] = 0;
+    this.aDur[i] = stageDur(body, STAGE.TURN, false);
+    this.riseAt[i] = 0;
+    this.timer[i] = 0;
+    this.sick[i] = 0;
+    this.panic[i] = 0;
+    this.pushAudio('groan', this.px[i], this.pz[i], 0.9);
+  }
+
+  /** 倒地：die01 / zdie01，期间不动。 */
+  beginDie(i, wasZombie) {
+    const body = bodyOf(i, this.kind[i], !!wasZombie);
+    this.aStage[i] = STAGE.DIE;
+    this.aT[i] = 0;
+    this.aZ[i] = wasZombie ? 1 : 0;
+    this.aDur[i] = stageDur(body, STAGE.DIE, !!wasZombie);
+  }
+
+  /** 尸体爬起来：zrise01。 */
+  beginRise(i) {
+    const body = bodyOf(i, this.kind[i], false);      // 尸体还是"人"的体型；动物会退到 walk
+    this.aStage[i] = STAGE.RISE;
+    this.aT[i] = 0;
+    this.aZ[i] = 0;
+    this.aDur[i] = stageDur(body, STAGE.RISE, false);
+    this.pushAudio('groan', this.px[i], this.pz[i], 0.7);
+  }
+
+  /**
+   * 推进阶段；播完就回调。dt 要用 cdt（视口外 1/4 帧率时要 4 倍补偿），
+   * 否则远处的人变丧尸会比近处慢 4 倍。
+   */
+  tickStage(i, dt) {
+    const st = this.aStage[i];
+    if (!st) return;
+    const t = this.aT[i] + dt;
+    if (t < this.aDur[i]) { this.aT[i] = t; return; }
+    this.aT[i] = this.aDur[i];
+    this.aStage[i] = 0;
+    if (st === STAGE.TURN || st === STAGE.RISE) this.becomeZombie(i);
+  }
+
+  /** 从"人"变成丧尸：血、速度、伤害按物种；动物走强化分支。 */
+  becomeZombie(i) {
+    const zsp = SPECIES[this.kind[i]] || SPECIES[SP.CIV1];
+    this.state[i] = ST.ZOMBIE;
+    this.aStage[i] = 0;
+    this.riseAt[i] = 0;
+    if (zsp.hpZombie) {
+      // 动物尸变：狗/猫/熊/虎变丧尸后更凶
+      this.hp[i] = zsp.hpZombie;
+      this.spd[i] = zsp.speed * (zsp.zombieSpeedMul || 1);
+      this.pow[i] = zsp.zombiePow || 1;
+    } else {
+      this.kind[i] = SP.ZOMBIE;
+      this.hp[i] = SPECIES[SP.ZOMBIE].hp;
+      this.spd[i] = this.params.zombieSpeed * (0.85 + this.rng() * 0.3);
+    }
+    this.nearC[i] = -1;
+    this.tgt[i] = -1;
+    this.sick[i] = 0;
+    this.pushAudio('groan', this.px[i], this.pz[i], 1);
+  }
+
   /** 打死一个单位：丧尸/特感算击杀，人类算误伤 */
   killAgent(i, by) {
     const sp = SPECIES[this.kind[i]] || SPECIES[SP.CIV1];
@@ -2618,6 +2749,7 @@ export class Sim {
     this.state[i] = ST.CORPSE;
     this.timer[i] = 0;
     this.hp[i] = 0;
+    this.beginDie(i, wasZombie);          // 倒地动画（原版 die01 / zdie01）
     if (wasZombie) {
       this.kills++;
       if (by >= 0) this.killsBy[by] = (this.killsBy[by] || 0) + 1;
@@ -2639,8 +2771,7 @@ export class Sim {
       if (!sp || sp.team !== TEAM.HUMAN || !sp.infectable) continue;
       const dx = this.px[j] - this.px[i], dz = this.pz[j] - this.pz[i];
       if (dx * dx + dz * dz < R * R) {
-        this.state[j] = ST.INFECTED;
-        this.timer[j] = this.params.infectTime;
+        this.setInfected(j, this.params.infectTime);
         this.hp[j] = Math.max(1, this.hp[j] - 4);
         this.panic[j] = 1.4;
       }
@@ -2656,10 +2787,12 @@ export class Sim {
       if (s === ST.CORPSE) continue;
       const dx = this.px[i] - x, dz = this.pz[i] - z;
       if (dx * dx + dz * dz < r * r) {
+        const wasZ = (SPECIES[this.kind[i]] || {}).team === TEAM.ZOMBIE;
         if (s === ST.CIV || s === ST.FLEE || s === ST.FIGHT || s === ST.INFECTED) this.civDeaths++;
         else if (s === ST.ZOMBIE) this.kills++;
         this.state[i] = ST.CORPSE;
         this.timer[i] = 0;
+        this.beginDie(i, wasZ);
       }
     }
     this.countStats();
