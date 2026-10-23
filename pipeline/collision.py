@@ -24,7 +24,7 @@ ZOS-R · 碰撞层生成器（通用，不依赖具体城市）
 import math, zlib, base64, os
 from collections import deque
 
-WALL, OPEN, COVER, DOOR, WINDOW, INSIDE, FENCE, WATER = 0x00, 0x03, 0x07, 0x0F, 0x16, 0x1F, 0x22, 0x82
+WALL, OPEN, GRASS, DOOR, WINDOW, INSIDE, FENCE, FENCE_GAP, WATER = 0x00, 0x03, 0x07, 0x0F, 0x16, 0x1F, 0x42, 0x43, 0x82
 
 
 class Grid:

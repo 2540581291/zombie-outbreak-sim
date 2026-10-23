@@ -14,12 +14,12 @@ import { applyLayerPatch, codeOf } from './layerpatch.js';
 
 const VALUES = [
   ['wall', '墙'], ['room', '室内'], ['door', '门'], ['window', '窗'],
-  ['water', '水'], ['fence', '围栏'], ['cover', '草地'], ['open', '空地'],
+  ['water', '水'], ['fence', '围栏'], ['fencegate', '围栏门'], ['grass', '草地'], ['open', '空地'],
 ];
 const TOOLS = [['brush', '圆刷'], ['rect', '矩形'], ['line', '直线']];
 const SWATCH = {
   wall: '#e61919', room: '#ff8c1a', door: '#33ff59', window: '#33f2f2',
-  water: '#1966ff', fence: '#f2cc26', cover: '#33b340', open: '#d9d9d9',
+  water: '#1966ff', fence: '#f2cc26', fencegate: '#8fff7a', grass: '#33b340', open: '#d9d9d9',
 };
 
 const STYLE = `

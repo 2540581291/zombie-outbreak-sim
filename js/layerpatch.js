@@ -21,10 +21,10 @@
 // ============================================================
 
 export const VALUE_NAMES = {
-  wall: 0x00, open: 0x03, cover: 0x07, door: 0x0f,
-  window: 0x16, room: 0x1f, fence: 0x22, water: 0x82,
+  wall: 0x00, open: 0x03, grass: 0x07, door: 0x0f,
+  window: 0x16, room: 0x1f, fence: 0x42, fencegate: 0x43, water: 0x82,
   // 别名（编辑器里也认这些写法）
-  inside: 0x1f, indoor: 0x1f, building: 0x1f, grass: 0x07, forest: 0x07, erase: 0x03,
+  inside: 0x1f, indoor: 0x1f, building: 0x1f, forest: 0x07, cover: 0x07, erase: 0x03,
 };
 
 export const VALUE_LABELS = {

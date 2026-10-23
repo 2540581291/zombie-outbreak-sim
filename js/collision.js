@@ -4,7 +4,7 @@
 //  每格一个字节，2m 一格：
 //    0x00 墙          0x03 路/空地    0x07 树/林地
 //    0x0f 门          0x16 窗          0x1f 室内（可走！）
-//    0x22 围栏        0x82 水
+//    0x42 围栏        0x43 围栏门      0x82 水
 //  位：0x01 可走   0x02 视线可穿   0x04 有顶   0x08|0x10 室内
 // ============================================================
 
@@ -13,9 +13,9 @@ export const CL = {
 //   原版 3/7/15/22/31  = 我们 0x03/0x07/0x0f/0x16/0x1f（逐位一致）
 //   原版 66（bit1+bit6）= 围栏，我们记作 0x42；旧值 0x22 保留
 // 运行时只看 bit0（可走）和 0x18（室内），所以原版的原始表可以直接喂进来
-WALL: 0x00, OPEN: 0x03, COVER: 0x07, DOOR: 0x0f,
-  WINDOW: 0x16, INSIDE: 0x1f, FENCE: 0x22, WATER: 0x82,
-  WALK: 0x01, SIGHT: 0x02, COVER_BIT: 0x04, INDOOR: 0x18,
+WALL: 0x00, OPEN: 0x03, GRASS: 0x07, DOOR: 0x0f,
+  WINDOW: 0x16, INSIDE: 0x1f, FENCE: 0x42, FENCE_GAP: 0x43, WATER: 0x82,
+  WALK: 0x01, SIGHT: 0x02, INDOOR: 0x18,
 };
 
 async function inflate(b64) {
@@ -173,7 +173,7 @@ export function collisionStats(nav) {
   if (!nav || !nav.isCollision) return null;
   const names = {
     0x00: '墙', 0x03: '空地/路', 0x07: '林地', 0x0f: '门',
-    0x16: '窗', 0x1f: '室内', 0x22: '围栏', 0x42: '围栏（原版值）', 0x82: '水',
+    0x16: '窗', 0x1f: '室内', 0x42: '围栏', 0x43: '围栏门', 0x22: '围栏（旧值）', 0x82: '水',
   };
   const h = new Map();
   for (let i = 0; i < nav.grid.length; i++) {
