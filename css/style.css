@@ -301,3 +301,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
 #nighttint{position:fixed;inset:0;z-index:4;pointer-events:none;
   background:radial-gradient(circle at 50% 45%, rgba(10,18,40,.45), rgba(4,8,20,.78));
   opacity:0;transition:opacity .6s}
+
+/* 已故家属：点得进去，但一眼能看出人不在了 */
+.ac-row .link.gone { opacity: .45; text-decoration: line-through; }
+

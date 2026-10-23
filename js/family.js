@@ -135,6 +135,31 @@ export function relationTo(sim, i, j, ageOf) {
   return 'sibling';
 }
 
+/** 家属列表（带下标，档案里用它可以点人）：
+ *  返回 [{ j, role, name, age }]，role ∈ spouse / child / parent / sibling / grandparent */
+export function kinList(sim, i, ageOf, nameOf) {
+  if (!sim.hh || (sim.tourist && sim.tourist[i])) return [];
+  const fam = familyOf(sim, i);
+  if (fam.length <= 1) return [];
+  const ai = ageOf(i);
+  const out = [];
+  for (const j of fam) {
+    if (j === i) continue;
+    const aj = ageOf(j);
+    let role;
+    if (ai >= 18 && aj >= 18 && Math.abs(ai - aj) < 15) role = 'spouse';
+    else if (ai >= 18 && aj < 18) role = 'child';
+    else if (ai < 18 && aj >= 18) role = 'parent';
+    else if (aj >= 60) role = 'grandparent';
+    else role = 'sibling';
+    out.push({ j, role, name: nameOf(j), age: aj });
+  }
+  // 配偶 → 子女 → 父母 → 其他
+  const ord = { spouse: 0, child: 1, parent: 2, grandparent: 3, sibling: 4 };
+  out.sort((a, b) => ord[a.role] - ord[b.role]);
+  return out;
+}
+
 /** 给档案用的一句话：配偶 / 子女 / 独居 / 旅客 */
 export function kinText(sim, i, ageOf, nameOf) {
   if (!sim.hh) return '—';

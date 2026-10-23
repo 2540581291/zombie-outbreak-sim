@@ -9,7 +9,8 @@ import { loadCollision, collisionStats } from './collision.js';
 import { applyLayerPatch } from './layerpatch.js';
 import { AgentRenderer } from './agents.js';
 import { TOOLS, TOOL_BY_ID, HOTKEYS, fmtWan, fmtMoney } from './tools.js';
-import { profileFor } from './people.js';
+import { profileFor, shortName } from './people.js';
+import { kinList, ageOfAgent } from './family.js';
 import { SPECIES, SP } from './species.js';
 import { weaponOf } from './weapons.js';
 import { stockText } from './storage.js';
@@ -620,13 +621,27 @@ function renderAgentCard() {
 
   const isAnimal = sim.isAnimal ? sim.isAnimal(selected) : false;
   const kindName = (SPECIES[sim.kind[selected]] || SPECIES[SP.CIV1]).name;
+  // 家属：每个都做成可点的 chip（点了选中他，镜头跳过去）
+  const ROLE_TXT = { spouse: '配偶', child: '子女', parent: '父母', grandparent: '祖辈', sibling: '同住' };
+  const kins = isAnimal ? []
+    : kinList(sim, selected, (j) => (sim.age && sim.age[j]) || ageOfAgent(sim, j, () => 0), (j) => shortName(j, sim));
+  const kinHtml = kins.length
+    ? kins.map((k) => {
+        const dead = sim.state[k.j] === ST.CORPSE;
+        const zom = sim.state[k.j] === ST.ZOMBIE;
+        const mark = dead ? '†' : (zom ? '☠' : '');
+        const tip = `${ROLE_TXT[k.role] || '家人'} · ${k.age} 岁${dead ? ' · 已死亡' : (zom ? ' · 已尸变' : '')}`;
+        return `<b class="link${dead ? ' gone' : ''}" data-act="agent" data-i="${k.j}" title="${tip}">${k.name}${mark}</b>`;
+      }).join('<span style="color:#5b6a77"> · </span>')
+    : (p.family ? `<em>${p.family}</em>` : '<em>—</em>');
+
   const sec1 = `
     <div class="ac-sec">身份</div>
     ${isAnimal
       ? `<div class="ac-row"><span>种类</span><em>${kindName}（动物）</em></div>
          <div class="ac-row"><span>来历</span><em>街上的${kindName}，没有家和工作地</em></div>`
       : `<div class="ac-row"><span>职业</span><em>${p.job}</em></div>
-         <div class="ac-row"><span>家庭</span><em>${p.family}</em></div>`}`;
+         <div class="ac-row"><span>家庭</span><em>${kinHtml}</em></div>`}`;
 
   const sec2 = `
     <div class="ac-sec">状态</div>
@@ -645,8 +660,6 @@ function renderAgentCard() {
     <div class="ac-sec">地点（点一下看详情）</div>
     <div class="ac-row"><span>住址</span>${link(p.home, sim.homeX[selected], sim.homeZ[selected])}</div>
     <div class="ac-row"><span>工作地</span>${link(p.work, sim.workX[selected], sim.workZ[selected])}</div>
-    ${homeP ? `<div class="ac-row"><span>家附近</span><em>${KIND_NAME[homeP.k] || '地点'}${homeP.n ? ' · ' + homeP.n : ''}</em></div>` : ''}
-    ${workP ? `<div class="ac-row"><span>单位</span><em>${KIND_NAME[workP.k] || '地点'}${workP.n ? ' · ' + workP.n : ''}</em></div>` : ''}
     ${polP ? `<div class="ac-row"><span>最近警局</span>${link(`${Math.hypot(polP.x - px, polP.z - pz).toFixed(0)} m`, polP.x, polP.z)}</div>` : ''}
     ${hosP ? `<div class="ac-row"><span>最近医院</span>${link(`${Math.hypot(hosP.x - px, hosP.z - pz).toFixed(0)} m`, hosP.x, hosP.z)}</div>` : ''}`;
 
@@ -1272,8 +1285,20 @@ selectTool('select');
   // 点"住址 / 工作地 / 最近警局…" → 看地点
   const body = document.getElementById('ac-body');
   if (body) body.onclick = (ev) => {
+    if (!sim) return;
+    // 点家属：选中他，并把镜头挪过去（保持当前缩放）
+    const kin = ev.target.closest('[data-act="agent"]');
+    if (kin) {
+      ev.stopPropagation();
+      const j = +kin.dataset.i;
+      if (j >= 0 && j < sim.n) {
+        selectAgent(j);
+        rig.target.set(sim.px[j], 0, sim.pz[j]);
+      }
+      return;
+    }
     const a = ev.target.closest('[data-act="place"]');
-    if (!a || !sim) return;
+    if (!a) return;
     const x = parseFloat(a.dataset.x), z = parseFloat(a.dataset.z);
     const poi = placeNear(x, z, 220);
     placeView = poi || { k: '', x, z, n: '这个地址', a: 0 };
