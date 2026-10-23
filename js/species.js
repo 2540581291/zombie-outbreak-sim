@@ -139,6 +139,11 @@ export const SPECIES = {
 
 export const ANIMAL_KINDS = [SP.DOG, SP.CAT];
 
+// 动物不单列参数表：按人口比例混在人群里生成，属性和逻辑都走同一套。
+// 20,000 人里 2% = 400 只，其中 6 成是狗（≈240 狗 + 160 猫）。
+export const ANIMAL_SHARE = 0.02;
+export const ANIMAL_DOG_SHARE = 0.6;
+
 export function speciesOf(kind) {
   return SPECIES[kind] || SPECIES[SP.CIV1];
 }

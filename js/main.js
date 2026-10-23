@@ -539,7 +539,7 @@ function agentRules(i, p) {
     rows.push(['移动速度', sim.spd[i].toFixed(2) + ' m/s']);
     if (isZ) {
       rows.push(['命中率', '—（撕咬必中）']);
-      rows.push(['咬击伤害', (sp.dmg || 0) + ' / 口']);
+      rows.push(['咬击伤害', Math.round((sp.dmg || 0) * (sim.pow[i] || 1)) + ' / 口']);
       rows.push(['咬合间隔', '1.0 s']);
       rows.push(['追击半径', (sp.range || 0) + ' m']);
     } else {
@@ -617,10 +617,15 @@ function renderAgentCard() {
   const link = (label, x, z) =>
     `<em class="link" data-act="place" data-x="${x.toFixed(1)}" data-z="${z.toFixed(1)}">${label}</em>`;
 
+  const isAnimal = sim.isAnimal ? sim.isAnimal(selected) : false;
+  const kindName = (SPECIES[sim.kind[selected]] || SPECIES[SP.CIV1]).name;
   const sec1 = `
     <div class="ac-sec">身份</div>
-    <div class="ac-row"><span>职业</span><em>${p.job}</em></div>
-    <div class="ac-row"><span>家庭</span><em>${p.family}</em></div>`;
+    ${isAnimal
+      ? `<div class="ac-row"><span>种类</span><em>${kindName}（动物）</em></div>
+         <div class="ac-row"><span>来历</span><em>街上的${kindName}，没有家和工作地</em></div>`
+      : `<div class="ac-row"><span>职业</span><em>${p.job}</em></div>
+         <div class="ac-row"><span>家庭</span><em>${p.family}</em></div>`}`;
 
   const sec2 = `
     <div class="ac-sec">状态</div>
@@ -846,7 +851,6 @@ function buildModeUI() {
 // ---------- 参数 ----------
 const sPop = $('s-pop'), sZ0 = $('s-z0');
 const sArm = $('s-arm'), sPol = $('s-pol');
-const sDog = $('s-dog'), sCat = $('s-cat'), sAinf = $('s-ainf');
 
 // 难度档：一次调四组参数（人口 / 初始尸 / 持枪率 / 警力）
 // 城市名中文化
@@ -883,8 +887,6 @@ function readParams() {
     initialZombies: +sZ0.value,
     homeGunRate: +sArm.value / 100,   // 「家庭持枪率」：决定每户有没有枪
     police: +sPol.value,
-    dogs: +sDog.value, cats: +sCat.value,
-    animalInfected: +sAinf.value / 100,
     startMin: (() => {
       const q = new URLSearchParams(location.search).get('hour');
       return q == null ? 450 : Math.round(parseFloat(q) * 60);   // 默认 07:30
@@ -905,11 +907,8 @@ function syncLabels() {
   $('v-z0').textContent = sZ0.value;
   $('v-arm').textContent = sArm.value + '%';
   $('v-pol').textContent = sPol.value;
-  $('v-dog').textContent = sDog.value;
-  $('v-cat').textContent = sCat.value;
-  $('v-ainf').textContent = sAinf.value + '%';
 }
-[sPop, sZ0, sArm, sPol, sDog, sCat, sAinf].forEach(s => s.addEventListener('input', syncLabels));
+[sPop, sZ0, sArm, sPol].forEach(s => s.addEventListener('input', syncLabels));
 if ($('sel-mode')) {
   buildModeUI();
   $('sel-mode').onchange = buildModeUI;

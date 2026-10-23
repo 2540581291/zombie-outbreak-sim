@@ -3,7 +3,7 @@
 //  万物皆数组（SoA），固定步长，确定性 PRNG
 // ============================================================
 
-import { SP, TEAM, SPECIES, SPECIAL_KINDS, CIV_KINDS, ANIMAL_KINDS } from './species.js';
+import { SP, TEAM, SPECIES, SPECIAL_KINDS, CIV_KINDS, ANIMAL_SHARE, ANIMAL_DOG_SHARE } from './species.js';
 import { jobOf, jobFor, ageOf, braveOf, JOB_POI, h, attrFor } from './profiles.js';
 import { buildFamilies } from './family.js';
 import { WPN, WEAPONS, ROLE_WEAPON, skillFor, weaponOf } from './weapons.js';
@@ -443,7 +443,10 @@ export class Sim {
       const i = k++;
       this.px[i] = x; this.pz[i] = z;
       this.heading[i] = rng() * 6.2832;
-      const ck = CIV_KINDS[(rng() * CIV_KINDS.length) | 0];
+      // 人和动物共用这一个循环：先按比例抽是不是动物，再抽具体种类
+      const ck = rng() < ANIMAL_SHARE
+        ? (rng() < ANIMAL_DOG_SHARE ? SP.DOG : SP.CAT)
+        : CIV_KINDS[(rng() * CIV_KINDS.length) | 0];
       this.kind[i] = ck;
       this.hp[i] = SPECIES[ck].hp;
       this.spd[i] = SPECIES[ck].speed * (0.92 + rng() * 0.16);
@@ -462,7 +465,7 @@ export class Sim {
 
     // ---- 家庭（M2）：先把平民切成家庭，再按家庭分配住址 ----
     const civIdx = [];
-    for (let i = 0; i < k; i++) if (this.state[i] === ST.CIV) civIdx.push(i);
+    for (let i = 0; i < k; i++) if (this.state[i] === ST.CIV && !this.isAnimal(i)) civIdx.push(i);
     buildFamilies(this, civIdx, h);
 
     // ---- 家庭军械库（M8）：每个家庭按哈希决定有没有枪、有多少子弹 ----
@@ -490,6 +493,14 @@ export class Sim {
     const hhHome = new Map();
     for (let i = 0; i < k; i++) {
       if (this.state[i] !== ST.CIV) continue;
+      if (this.isAnimal(i)) {
+        // 动物没有家和工作地，就地在街上晃
+        this.homeX[i] = this.px[i]; this.homeZ[i] = this.pz[i];
+        this.workX[i] = this.px[i]; this.workZ[i] = this.pz[i];
+        this.goal[i] = GOAL.NONE;
+        this.commuteAt[i] = 1e9;
+        continue;
+      }
       if (this.tourist[i]) {
         // 旅客：没有家，就在出生点附近"住店"，也不通勤
         this.homeX[i] = this.px[i]; this.homeZ[i] = this.pz[i];
@@ -600,6 +611,7 @@ export class Sim {
       while (this.vips.length < want && guard++ < 20000) {
         const i = (rng() * k) | 0;              // 0..k-1 全是平民
         if (this.state[i] !== ST.CIV) continue;
+        if (this.isAnimal(i)) continue;
         if (this.vip[i]) continue;
         this.vip[i] = 1;
         this.vips.push(i);
@@ -716,59 +728,6 @@ export class Sim {
     }
     this.origin = first || [0, 0];
     this.origins.push(this.origin);
-    // 动物：数量由开局参数决定，其中一部分一开始就是感染者
-    const spawnList = [
-      [SP.DOG, P.dogs | 0], [SP.CAT, P.cats | 0],
-    ];
-    for (const [kind, count] of spawnList) {
-      const asp = SPECIES[kind];
-      for (let j = 0; j < count && k < NMAX; j++) {
-        // 先抽签：这只动物开局是不是感染者（零号病人模式不种，否则潜伏形同虚设）
-        const seeded = mode !== 'stealth' && rng() < (P.animalInfected || 0);
-        let x = 0, z = 0, ok = false;
-        // 单点/多波/潜伏这类模式里，开局的感染动物必须待在爆发点附近，
-        // 否则它们就是"全图随机分布的潜伏者"，一分钟后到处冒丧尸。
-        if (seeded && mode !== 'apocalypse' && first) {
-          for (let tr = 0; tr < 40; tr++) {
-            const a = rng() * 6.2832, r = 6 + rng() * 54;
-            const nx = first[0] + Math.cos(a) * r, nz = first[1] + Math.sin(a) * r;
-            if (this.walkable(nx, nz)) { x = nx; z = nz; ok = true; break; }
-          }
-        }
-        if (!ok) {
-          for (let tr = 0; tr < 60; tr++) {
-            const [nx, nz] = this.randWalk(rng, 1);
-            x = nx; z = nz; ok = true; break;
-          }
-        }
-        if (!ok) continue;
-        const i = k++;
-        this.px[i] = x; this.pz[i] = z;
-        this.heading[i] = rng() * 6.2832;
-        this.kind[i] = kind;
-        this.hp[i] = asp.hp;
-        this.spd[i] = asp.speed * (0.9 + rng() * 0.2);
-        this.phase[i] = rng();
-        this.pow[i] = 1;
-        const wild = asp.team === TEAM.WILD;
-        this.state[i] = wild ? ST.WILD : ST.CIV;
-        this.idle[i] = 0; this.actT[i] = 10 + rng() * 40;
-        // 初始感染：用上面已经抽好的签
-        if (seeded) {
-          if (wild) {
-            this.state[i] = ST.ZOMBIE;
-            this.hp[i] = asp.hpZombie || asp.hp;
-            this.spd[i] = asp.speed * (asp.zombieSpeedMul || 1);
-            this.pow[i] = asp.zombiePow || 1;
-          } else {
-            this.state[i] = ST.INFECTED;
-            this.incTot[i] = this.incubationFor(i, 1) * 0.6;
-            this.timer[i] = this.incTot[i];
-          }
-        }
-        this.pickWander(i);
-      }
-    }
     this.n = k;
     this.assignAttributes();
     this.countStats();
@@ -2071,7 +2030,7 @@ export class Sim {
             }
           }
           // 什么都不知道 / 没目标 → 照常通勤
-          if (this.goal[i] === GOAL.NONE && this.time >= this.commuteAt[i]) {
+          if (this.goal[i] === GOAL.NONE && !this.isAnimal(i) && this.time >= this.commuteAt[i]) {
             this.commuteAt[i] = this.time + 70 + this.rng() * 110;
             this.goal[i] = h(i, 33) < 0.5 ? GOAL.HOME : GOAL.WORK;
             this.idle[i] = 0;
@@ -3133,6 +3092,11 @@ export class Sim {
    * 命中率只有这一张表，写死（不再有武器精度 / 熟练度 / 滑杆等第二种来源）：
    *   警察 30%（含 SWAT、警车）    军队 80%（士兵 / 重装 / 装甲车）    平民 10%
    */
+  /** 是不是动物（狗/猫）。动物和人是同一套逻辑，只是属性不同。 */
+  isAnimal(i) {
+    return this.kind[i] >= SP.DOG;
+  }
+
   shotAccuracy(i) {
     const k = this.kind[i];
     if (k === SP.POLICE) return 0.30;
