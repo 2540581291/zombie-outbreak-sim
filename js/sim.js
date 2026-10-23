@@ -1249,7 +1249,9 @@ export class Sim {
     let i0 = 0;
     while (i0 < raw.length && pts.length < 15) {
       let far = i0;
-      const lim = Math.min(raw.length - 1, i0 + 10);
+      // 往前看 10 个粗格（≈40m）太短：长绕行会被切成 10+ 个短段，
+      // 每一段都要拐弯，实测 40m 楼的用例因此出到 11 个路点。放宽到 60 格（≈240m）
+      const lim = Math.min(raw.length - 1, i0 + 60);
       for (let k = lim; k > i0; k--) {
         if (this.losClear(cx, cz, raw[k][0], raw[k][1])) { far = k; break; }
       }

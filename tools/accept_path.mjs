@@ -94,6 +94,12 @@ function citySpeed() {
 const b40 = pickBuilding(34, 56) || pickBuilding(30, 80);
 const bBig = pickBuilding(60, 500);
 const cases = [];
+const sizeOf = (b) => {
+  if (!b) return '无';
+  const xs = b.p.map((q) => q[0]), zs = b.p.map((q) => q[1]);
+  return (Math.max(...xs) - Math.min(...xs)).toFixed(0) + 'x' + (Math.max(...zs) - Math.min(...zs)).toFixed(0);
+};
+console.log(`选中：40m=${sizeOf(b40)}  大楼=${sizeOf(bBig)}`);
 for (const [name, b] of [['40m 楼', b40], ['大楼', bBig]]) {
   if (!b) continue;
   cases.push([`${name}·东西`, detour(b, 'ew')]);
