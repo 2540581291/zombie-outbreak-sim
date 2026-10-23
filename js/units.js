@@ -321,11 +321,6 @@ export function unitGeometry(kind) {
       headR: 0.19, body: [0.46, 0.32, 0.18], dark: [0.24, 0.16, 0.09], head: [0.50, 0.35, 0.20] }); break;
     case SP.CAT: parts = quadruped({ bodyL: 0.52, bodyW: 0.20, bodyH: 0.20, legH: 0.30,
       headR: 0.14, body: [0.46, 0.46, 0.50], dark: [0.24, 0.24, 0.28], head: [0.50, 0.50, 0.55] }); break;
-    case SP.BEAR: parts = quadruped({ bodyL: 1.75, bodyW: 0.80, bodyH: 0.80, legH: 0.52,
-      headR: 0.34, body: [0.24, 0.18, 0.13], dark: [0.13, 0.10, 0.07], head: [0.28, 0.21, 0.15] }); break;
-    case SP.TIGER: parts = quadruped({ bodyL: 1.55, bodyW: 0.56, bodyH: 0.56, legH: 0.62,
-      headR: 0.28, body: [0.82, 0.46, 0.12], dark: [0.14, 0.10, 0.06], head: [0.86, 0.50, 0.14],
-      stripe: [0.16, 0.11, 0.07] }); break;
     default: parts = humanoid({}); break;
   }
   const geo = mergeParts(parts);
@@ -345,8 +340,6 @@ export function unitHeight(kind) {
     case SP.ELITE: return 2.0;
     case SP.DOG: return 1.0;
     case SP.CAT: return 0.7;
-    case SP.BEAR: return 1.9;
-    case SP.TIGER: return 1.5;
     default: return 1.8;
   }
 }

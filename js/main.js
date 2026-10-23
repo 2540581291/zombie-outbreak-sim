@@ -846,7 +846,7 @@ function buildModeUI() {
 // ---------- 参数 ----------
 const sPop = $('s-pop'), sZ0 = $('s-z0');
 const sArm = $('s-arm'), sPol = $('s-pol');
-const sDog = $('s-dog'), sCat = $('s-cat'), sBear = $('s-bear'), sTiger = $('s-tiger'), sAinf = $('s-ainf');
+const sDog = $('s-dog'), sCat = $('s-cat'), sAinf = $('s-ainf');
 
 // 难度档：一次调四组参数（人口 / 初始尸 / 持枪率 / 警力）
 // 城市名中文化
@@ -884,7 +884,6 @@ function readParams() {
     homeGunRate: +sArm.value / 100,   // 「家庭持枪率」：决定每户有没有枪
     police: +sPol.value,
     dogs: +sDog.value, cats: +sCat.value,
-    bears: +sBear.value, tigers: +sTiger.value,
     animalInfected: +sAinf.value / 100,
     startMin: (() => {
       const q = new URLSearchParams(location.search).get('hour');
@@ -908,11 +907,9 @@ function syncLabels() {
   $('v-pol').textContent = sPol.value;
   $('v-dog').textContent = sDog.value;
   $('v-cat').textContent = sCat.value;
-  $('v-bear').textContent = sBear.value;
-  $('v-tiger').textContent = sTiger.value;
   $('v-ainf').textContent = sAinf.value + '%';
 }
-[sPop, sZ0, sArm, sPol, sDog, sCat, sBear, sTiger, sAinf].forEach(s => s.addEventListener('input', syncLabels));
+[sPop, sZ0, sArm, sPol, sDog, sCat, sAinf].forEach(s => s.addEventListener('input', syncLabels));
 if ($('sel-mode')) {
   buildModeUI();
   $('sel-mode').onchange = buildModeUI;

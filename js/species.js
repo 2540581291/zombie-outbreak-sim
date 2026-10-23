@@ -17,8 +17,6 @@ export const SP = {
   APC: 11,                        // 装甲车
   DOG: 12,                        // 狗（会被感染）
   CAT: 13,                        // 猫（会被感染）
-  BEAR: 14,                       // 熊（野生，直接敌对）
-  TIGER: 15,                      // 老虎（野生，直接敌对）
 };
 
 // 阵营
@@ -137,26 +135,9 @@ export const SPECIES = {
     hpZombie: 14, zombieSpeedMul: 1.45, zombiePow: 2.0,
     zombieKind: 'animals_cat_z',
   },
-  [SP.BEAR]: {
-    name: '熊', team: TEAM.WILD, scale: 1.05, hp: 420, speed: 2.2,
-    dmg: 22, rate: 1.5, range: 90, biteR: 2.8,
-    color: [0.30, 0.22, 0.16], infectedColor: [0.85, 0.35, 0.20],
-    special: 'tank',
-    infectable: true, infectChance: 0.35,      // 皮糙肉厚，难感染
-    hpZombie: 520, zombieSpeedMul: 1.15, zombiePow: 1.3, zombieKind: 'animals_bear_z',
-  },
-  [SP.TIGER]: {
-    name: '老虎', team: TEAM.WILD, scale: 0.95, hp: 300, speed: 3.4,
-    dmg: 18, rate: 1.2, range: 90, biteR: 2.4,
-    color: [0.85, 0.48, 0.14], infectedColor: [0.90, 0.30, 0.18],
-    special: 'charge',
-    infectable: true, infectChance: 0.40,
-    hpZombie: 380, zombieSpeedMul: 1.20, zombiePow: 1.4, zombieKind: 'animals_tiger_z',
-  },
 };
 
 export const ANIMAL_KINDS = [SP.DOG, SP.CAT];
-export const WILD_KINDS = [SP.BEAR, SP.TIGER];
 
 export function speciesOf(kind) {
   return SPECIES[kind] || SPECIES[SP.CIV1];

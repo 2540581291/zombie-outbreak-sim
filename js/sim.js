@@ -3,7 +3,7 @@
 //  万物皆数组（SoA），固定步长，确定性 PRNG
 // ============================================================
 
-import { SP, TEAM, SPECIES, SPECIAL_KINDS, CIV_KINDS, ANIMAL_KINDS, WILD_KINDS } from './species.js';
+import { SP, TEAM, SPECIES, SPECIAL_KINDS, CIV_KINDS, ANIMAL_KINDS } from './species.js';
 import { jobOf, jobFor, ageOf, braveOf, JOB_POI, h, attrFor } from './profiles.js';
 import { buildFamilies } from './family.js';
 import { WPN, WEAPONS, ROLE_WEAPON, skillFor, weaponOf } from './weapons.js';
@@ -719,15 +719,27 @@ export class Sim {
     // 动物：数量由开局参数决定，其中一部分一开始就是感染者
     const spawnList = [
       [SP.DOG, P.dogs | 0], [SP.CAT, P.cats | 0],
-      [SP.BEAR, P.bears | 0], [SP.TIGER, P.tigers | 0],
     ];
     for (const [kind, count] of spawnList) {
       const asp = SPECIES[kind];
       for (let j = 0; j < count && k < NMAX; j++) {
+        // 先抽签：这只动物开局是不是感染者（零号病人模式不种，否则潜伏形同虚设）
+        const seeded = mode !== 'stealth' && rng() < (P.animalInfected || 0);
         let x = 0, z = 0, ok = false;
-        for (let tr = 0; tr < 60; tr++) {
-          const [nx, nz] = this.randWalk(rng, 1);
-          x = nx; z = nz; ok = true; break;
+        // 单点/多波/潜伏这类模式里，开局的感染动物必须待在爆发点附近，
+        // 否则它们就是"全图随机分布的潜伏者"，一分钟后到处冒丧尸。
+        if (seeded && mode !== 'apocalypse' && first) {
+          for (let tr = 0; tr < 40; tr++) {
+            const a = rng() * 6.2832, r = 6 + rng() * 54;
+            const nx = first[0] + Math.cos(a) * r, nz = first[1] + Math.sin(a) * r;
+            if (this.walkable(nx, nz)) { x = nx; z = nz; ok = true; break; }
+          }
+        }
+        if (!ok) {
+          for (let tr = 0; tr < 60; tr++) {
+            const [nx, nz] = this.randWalk(rng, 1);
+            x = nx; z = nz; ok = true; break;
+          }
         }
         if (!ok) continue;
         const i = k++;
@@ -741,8 +753,8 @@ export class Sim {
         const wild = asp.team === TEAM.WILD;
         this.state[i] = wild ? ST.WILD : ST.CIV;
         this.idle[i] = 0; this.actT[i] = 10 + rng() * 40;
-        // 初始感染：按感染率抽签
-        if (rng() < (P.animalInfected || 0)) {
+        // 初始感染：用上面已经抽好的签
+        if (seeded) {
           if (wild) {
             this.state[i] = ST.ZOMBIE;
             this.hp[i] = asp.hpZombie || asp.hp;
@@ -2020,7 +2032,7 @@ export class Sim {
           // 警察有电台，但只有"城里真的还有丧尸"时他们才知道
           if (!this.longInc && this.stats.zombie > 0 && this.aware[i] < 3) this.setAware(i, 3);
         } else if (st === ST.WILD) {
-          const wsp = SPECIES[this.kind[i]] || SPECIES[SP.BEAR];
+          const wsp = SPECIES[this.kind[i]] || SPECIES[SP.CIV1];
           this.nearC[i] = this.findNearest(i, 6, wsp.range || 90);
         } else if (st === ST.CIV || st === ST.FLEE || st === ST.FIGHT || st === ST.INFECTED) {
           this.nearZ[i] = this.findNearest(i, 1, 26);

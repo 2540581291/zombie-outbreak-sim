@@ -19,7 +19,6 @@ const TYPE_TO_SPRITE = {
   [SP.TANK]: 'fat01', [SP.CHARGER]: 'guy01', [SP.BOOMER]: 'fat01', [SP.SPITTER]: 'girl01',
   [SP.APC]: 'police01',
   [SP.DOG]: 'animals_dog', [SP.CAT]: 'animals_cat',
-  [SP.BEAR]: 'animals_bear', [SP.TIGER]: 'animals_tiger',
 };
 
 /**

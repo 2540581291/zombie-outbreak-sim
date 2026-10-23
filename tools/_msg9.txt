@@ -1,0 +1,25 @@
+去掉熊和老虎；修「单点爆发却全图冒丧尸」
+
+1) 动物只剩狗和猫
+   - js/species.js：删掉 SP.BEAR / SP.TIGER 两个物种和 WILD_KINDS
+   - js/bodymap.js / js/units.js：删掉对应的体型映射和 3D 模型分支
+   - js/sim.js：出生表只剩 DOG/CAT，SP.BEAR 的兜底改成 SP.CIV1
+   - index.html + js/main.js：删掉「熊」「老虎」两个滑块
+   - tools/test_colors.mjs / README：同步
+
+2) 全图冒丧尸的根因：开局动物感染是「全图随机撒点 + 抽签」
+   狗猫本身是 randWalk(rng, 1) 随机撒满全图的；默认动物感染率 15%，
+   400 只里约 60 只一开始就是感染者（狗猫走 INFECTED，0.6× 潜伏后变丧尸）。
+   于是开局一分钟后，地图各处陆续"凭空"冒出丧尸 —— 和单点爆发完全冲突。
+
+   修法（js/sim.js 出生循环）：
+   - 除 apocalypse 外，开局感染的动物一律生成在爆发点 60 m 内
+   - stealth（零号病人）模式完全不种感染动物
+   - 健康动物仍然全图随机（街头本来就有狗猫）
+
+   实测（4000 人 / 60 初始丧尸 / single / 15% 动物感染率 / 1200×1200 m）：
+     修前：感染动物撒满全图（最远可达数百米）
+     修后：开局感染动物 64 只全部在原点 59 m 内；
+           90 秒后丧尸 4615 只，离原点最远 270 m，>300 m 的 0 只 —— 是一条扩散前线
+
+测试：test_chain 5/5、test_sim determinism PASS。
