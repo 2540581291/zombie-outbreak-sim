@@ -89,7 +89,8 @@ export function profileFor(sim, i) {
   let job = jobFor(i, age);
   const kind = sim.kind ? sim.kind[i] : 0;
   const isAnimalKind = (kind === 12 || kind === 13);
-  const animalWild = isAnimalKind ? (h(i, 92) < 0.45) : false;   // 45% 野生，55% 家养
+  // 家养/野生由 sim 出生时决定（sim.pet），UI 只读不重算，避免两边不一致
+  const animalWild = isAnimalKind ? !(sim.pet && sim.pet[i]) : false;
   if (kind === 12) job = animalWild ? '流浪狗' : '家养宠物狗';
   else if (kind === 13) job = animalWild ? '流浪猫' : '家养宠物猫';
   else if (kind === 3) job = '警察';

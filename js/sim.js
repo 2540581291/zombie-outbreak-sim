@@ -265,6 +265,7 @@ export class Sim {
     this.freeT = new Float32Array(NMAX);         // 刚出门的"别再找门"保护期
     this.pathX = new Float32Array(NMAX * 16);    // 粗网格寻路的路点（最多 16 个）
     this.pathZ = new Float32Array(NMAX * 16);
+    this.pet = new Uint8Array(NMAX);      // 动物：1 = 家养（绑主人家），0 = 野生
     this.fleeMode = new Uint8Array(NMAX); // 逃跑大类：0 无 / 1 即时（只为离开 40m）/ 2 有目标
     this.fleeGoal = new Uint8Array(NMAX); // 有目标逃跑的目标：0 回家 / 1 警局 / 2 逃离城区
     this.stationLost = new Uint8Array(NMAX); // 1 = 亲眼确认过警局沦陷，不再选"去警局"
@@ -350,6 +351,7 @@ export class Sim {
     this.nearZ.fill(-1); this.nearC.fill(-1); this.nearPoll.fill(-1); this.tgt.fill(-1);
     this.lockT.fill(0); this.lockOn.fill(0);
     this.fleeMode.fill(0); this.fleeGoal.fill(0); this.stationLost.fill(0);
+    this.pet.fill(0);
     // 关键：全部状态清零，否则上一局的残留会让结果不可复现
     this.cool.fill(0); this.timer.fill(0); this.panic.fill(0);
     this.wpn.fill(0); this.mag.fill(0); this.reserve.fill(0); this.skill.fill(0); this.rlUntil.fill(0);
@@ -455,6 +457,8 @@ export class Sim {
       const ck = rng() < ANIMAL_SHARE
         ? (rng() < ANIMAL_DOG_SHARE ? SP.DOG : SP.CAT)
         : CIV_KINDS[(rng() * CIV_KINDS.length) | 0];
+      // 动物里 55% 是家养（会绑一个主人家庭，活动范围锁在住处附近）
+      if (ck === SP.DOG || ck === SP.CAT) this.pet[i] = h(i, 92) < 0.45 ? 0 : 1;
       this.kind[i] = ck;
       this.hp[i] = SPECIES[ck].hp;
       this.spd[i] = SPECIES[ck].speed * (0.92 + rng() * 0.16);
@@ -571,6 +575,22 @@ export class Sim {
         this.goal[i] = GOAL.NONE;
       }
       this.commuteAt[i] = this.time + 25 + rng() * 95;
+    }
+    // 家养动物：绑一个主人家庭，家 = 那户的住址（活动范围锁在附近）
+    if (hhHome.size) {
+      for (let i = 0; i < k; i++) {
+        if (!this.pet[i]) continue;
+        const hid = (h(i, 93) * hhHome.size) | 0;
+        let base = null;
+        let n = 0;
+        for (const v of hhHome.values()) { if (n++ === hid) { base = v; break; } }
+        if (!base) { for (const v of hhHome.values()) { base = v; break; } }
+        if (!base) continue;
+        let hx = base[0] + (rng() - 0.5) * 6, hz = base[1] + (rng() - 0.5) * 6;
+        if (!this.walkable(hx, hz)) { hx = base[0]; hz = base[1]; }
+        this.homeX[i] = hx; this.homeZ[i] = hz;
+        this.px[i] = hx; this.pz[i] = hz;
+      }
     }
     if (typeof window === 'undefined') {   // 只在 Node 里打印
       // 只在 Node 里打印（浏览器控制台另有日志），方便自检
@@ -780,8 +800,11 @@ export class Sim {
     for (let t = 0; t < 8; t++) {
       // 先在近处试（楼里走动的人只能在楼内晃），不行再放大半径
       const a = rng() * 6.2832, d = t < 5 ? (3 + rng() * 9) : (14 + rng() * 40);
-      let x = this.px[i] + Math.cos(a) * d;
-      let z = this.pz[i] + Math.sin(a) * d;
+      // 家养动物围绕主人家门口晃；其它人围绕自己当前位置
+      const cxp = this.pet[i] ? this.homeX[i] : this.px[i];
+      const czp = this.pet[i] ? this.homeZ[i] : this.pz[i];
+      let x = cxp + Math.cos(a) * d;
+      let z = czp + Math.sin(a) * d;
       if (x < -nav.halfW + 8) x = -nav.halfW + 8;
       if (x > nav.halfW - 8) x = nav.halfW - 8;
       if (z < -nav.halfH + 8) z = -nav.halfH + 8;
