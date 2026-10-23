@@ -265,6 +265,7 @@ export class Sim {
     this.freeT = new Float32Array(NMAX);         // 刚出门的"别再找门"保护期
     this.pathX = new Float32Array(NMAX * 16);    // 粗网格寻路的路点（最多 16 个）
     this.pathZ = new Float32Array(NMAX * 16);
+    this.forcePlan = new Uint8Array(NMAX); // 1 = 下一次决策必须规划路径（卡住过）
     this.armHome = new Uint8Array(NMAX);  // 1 = 正在回家补弹（这条 goal 不被 decide 覆盖）
     this.pet = new Uint8Array(NMAX);      // 动物：1 = 家养（绑主人家），0 = 野生
     this.fleeMode = new Uint8Array(NMAX); // 逃跑大类：0 无 / 1 即时（只为离开 40m）/ 2 有目标
@@ -354,6 +355,7 @@ export class Sim {
     this.fleeMode.fill(0); this.fleeGoal.fill(0); this.stationLost.fill(0);
     this.pet.fill(0);
     this.armHome.fill(0);
+    this.forcePlan.fill(0);
     // 关键：全部状态清零，否则上一局的残留会让结果不可复现
     this.cool.fill(0); this.timer.fill(0); this.panic.fill(0);
     this.wpn.fill(0); this.mag.fill(0); this.reserve.fill(0); this.skill.fill(0); this.rlUntil.fill(0);
@@ -2029,7 +2031,10 @@ export class Sim {
             this.side[i] = -(this.side[i] || 1);
             const gp3 = this.goalPoint(i, this.goal[i]);
             // 只有到目标的直线走不通时才值得花预算寻路（开阔街上直接走就行）
-      if (gp3 && !this.losClear(this.px[i], this.pz[i], gp3[0], gp3[1])) this.planPath(i, gp3[0], gp3[1]);
+      if (gp3 && (this.forcePlan[i] || !this.losClear(this.px[i], this.pz[i], gp3[0], gp3[1]))) {
+        this.planPath(i, gp3[0], gp3[1]);
+        this.forcePlan[i] = 0;      // 规划过一次就清标记
+      }
           }
           // 第 5 秒：还不行就随机抖一下方向，打破对称
           else if (this.stuckT[i] === 5) { this.side[i] = -(this.side[i] || 1); }
@@ -2408,7 +2413,8 @@ export class Sim {
       this.side[i] = -side;       // 先翻边，下个 tick 往另一侧绕
       this.stuck[i] = 0;
       this.pathN[i] = 0;          // 卡住了：清路径
-      this.decT[i] = 0;           // 并**立刻**重新决策/重算路径（原来要等 1~2 秒节流）
+      this.decT[i] = 0;           // 并**立刻**重新决策
+      this.forcePlan[i] = 1;      // 且强制规划路径（实测卡住的个体 100% 都没有路径）
     }
     return false;
   }
