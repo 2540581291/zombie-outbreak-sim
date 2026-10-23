@@ -459,8 +459,6 @@ export class Sim {
       const ck = rng() < ANIMAL_SHARE
         ? (rng() < ANIMAL_DOG_SHARE ? SP.DOG : SP.CAT)
         : CIV_KINDS[(rng() * CIV_KINDS.length) | 0];
-      // 动物里 55% 是家养（会绑一个主人家庭，活动范围锁在住处附近）
-      if (ck === SP.DOG || ck === SP.CAT) this.pet[i] = h(i, 92) < 0.45 ? 0 : 1;
       this.kind[i] = ck;
       this.hp[i] = SPECIES[ck].hp;
       this.spd[i] = SPECIES[ck].speed * (0.92 + rng() * 0.16);
@@ -579,6 +577,14 @@ export class Sim {
       this.commuteAt[i] = this.time + 25 + rng() * 95;
     }
     // 家养动物：绑一个主人家庭，家 = 那户的住址（活动范围锁在附近）
+    //   注意：家养/野生的抽签也放在这里 —— 如果出生时就写 this.pet[i]，
+    //   出生阶段的 pickWander 会去读上一次 reset 残留的 homeX，导致随机数消耗不一样，
+    //   同一个 seed 两次开局的动物数量都会不同（确定性就崩了）。
+    for (let i = 0; i < k; i++) {
+      const kk = this.kind[i];
+      if (kk !== SP.DOG && kk !== SP.CAT) continue;
+      this.pet[i] = h(i, 92) < 0.45 ? 0 : 1;   // 0 野生 / 1 家养
+    }
     if (hhHome.size) {
       for (let i = 0; i < k; i++) {
         if (!this.pet[i]) continue;
