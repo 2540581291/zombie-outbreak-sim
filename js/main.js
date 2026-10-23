@@ -396,7 +396,20 @@ function buildEscapeMarker() {
   escapeMark = m;
 }
 
+let selHist = [];            // 最近看过的人（点家属/来路跳转用）
+
 function selectAgent(i) {
+  if (i === selected) {
+    // 同一个人的情况下也要能"从地点视图回到他本人"
+    placeView = null;
+    renderAgentCard();
+    return;
+  }
+  if (selected >= 0) {
+    selHist = selHist.filter((x) => x !== selected);
+    selHist.unshift(selected);
+    if (selHist.length > 6) selHist.length = 6;
+  }
   selected = i;
   placeView = null;           // 换人时回到"角色视图"
   const el = document.getElementById('agentcard');
@@ -405,8 +418,20 @@ function selectAgent(i) {
   renderAgentCard();
 }
 
+/** 选中某人并把镜头挪过去（卡片内部的跳转都走这里） */
+function visit(i) {
+  if (!sim || i < 0 || i >= sim.n) return;
+  selectAgent(i);
+  rig.target.set(sim.px[i], 0, sim.pz[i]);
+}
+
 function setFollow(on) {
   followSelected = !!on;
+  const trEl = document.getElementById('ac-trace');
+  if (trEl) trEl.onclick = (ev) => {
+    const c = ev.target.closest('[data-i]');
+    if (c) visit(+c.dataset.i);
+  };
   const f = document.getElementById('ac-follow');
   if (f) {
     f.textContent = followSelected ? '停止跟随' : '跟随镜头';
@@ -611,6 +636,7 @@ function renderAgentCard() {
   if (!sim || selected < 0) return;
   const el = document.getElementById('agentcard');
   if (!el) return;
+  renderTrace();                     // 来路：地点视图里也要在
   if (placeView) { renderPlace(); return; }
 
   const p = profileFor(sim, selected);
@@ -690,6 +716,16 @@ function renderAgentCard() {
     sec1 + sec2 + statBlock(selected) + sec3 + sec4 +
     `<div class="ac-sec">当前状态</div>` + stateChips(selected, p) +
     attrBlock(selected) + explainBlock(selected);
+}
+
+/** 卡片顶部的"来路"：最近看过的人，点一下跳回去 */
+function renderTrace() {
+  const tr = document.getElementById('ac-trace');
+  if (!tr) return;
+  const list = selHist.filter((j) => j >= 0 && j < (sim ? sim.n : 0)).slice(0, 5);
+  tr.innerHTML = list
+    .map((j) => `<b class="chip" data-i="${j}" title="回到 ${shortName(j, sim)}">← ${shortName(j, sim)}</b>`)
+    .join('');
 }
 
 function hoverAt(e) {
@@ -1309,10 +1345,7 @@ selectTool('select');
     if (kin) {
       ev.stopPropagation();
       const j = +kin.dataset.i;
-      if (j >= 0 && j < sim.n) {
-        selectAgent(j);
-        rig.target.set(sim.px[j], 0, sim.pz[j]);
-      }
+      visit(j);
       return;
     }
     const a = ev.target.closest('[data-act="place"]');
