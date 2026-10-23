@@ -2392,11 +2392,19 @@ export class Sim {
             }
           }
           if (c < 0 && this.nearC[i] >= 0) c = this.nearC[i];
-          // 锁敌：注意力范围（60m）内一个活人都没有时，每 60 秒抓一个"全城最近的人"
+          // 锁敌：**注意力范围（60m）里真的一个活人都没有**时，每 60 秒抓一个"全城最近的人"。
+          // 注意不能只看缓存的 nearC（它每 3 tick 才刷一次，可能过时），
+          // 真要锁之前现场再确认一次 60m 内是空的；只要有人就不锁，直接用他。
           if (c < 0 && this.time >= this.lockT[i]) {
-            this.lockT[i] = this.time + 60;
-            const j = this.nearestPrey(i);
-            if (j >= 0) { c = j; this.lockOn[i] = 1; }
+            const near = this.findNearest(i, 4, 60);
+            if (near >= 0) {
+              c = near;
+              this.nearC[i] = near;
+            } else {
+              this.lockT[i] = this.time + 60;
+              const j = this.nearestPrey(i);
+              if (j >= 0) { c = j; this.lockOn[i] = 1; }
+            }
           }
           this.tgt[i] = c;
 
