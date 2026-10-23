@@ -714,18 +714,24 @@ export class Sim {
 
     if (mode === 'invade') {
       const dir = P.invadeDir || 'N';
-      const [ex, ez] = edgePoint(dir);
-      first = [ex, ez];
-      // 沿边铺开一条 ~180m 宽的入侵带，向城内推进
+      // 沿**整条边**均匀涌入（原来只有中间 180m 宽的一条带）
+      const hw = (this.nav.W || this.nav.halfW * 2) / 2;
+      const hh = (this.nav.H || this.nav.halfH * 2) / 2;
+      const alongMax = (dir === 'N' || dir === 'S') ? hw : hh;
+      const inset = 25;                 // 离边界的距离
+      const bandDeep = 70;              // 向内铺 0~70m 的厚度
+      // 记录一个代表点（边的中点）给 origin/UI 用
+      first = dir === 'N' ? [0, -hh + inset] : dir === 'S' ? [0, hh - inset]
+        : dir === 'E' ? [hw - inset, 0] : [-hw + inset, 0];
       for (let j = 0; j < zCount && k < NMAX; j++) {
         for (let tr = 0; tr < 40; tr++) {
-          const along = (rng() - 0.5) * 180;         // 沿边方向 ±90m
-          const depth = rng() * 45;                  // 向内 0~45m
+          const along = (rng() * 2 - 1) * (alongMax - inset * 2);   // 整条边（留边距）
+          const depth = rng() * bandDeep;
           let x, z;
-          if (dir === 'N') { x = ex + along; z = ez + depth; }
-          else if (dir === 'S') { x = ex + along; z = ez - depth; }
-          else if (dir === 'E') { z = ez + along; x = ex - depth; }
-          else { z = ez + along; x = ex + depth; }
+          if (dir === 'N') { x = along; z = -hh + inset + depth; }
+          else if (dir === 'S') { x = along; z = hh - inset - depth; }
+          else if (dir === 'E') { z = along; x = hw - inset - depth; }
+          else { z = along; x = -hw + inset + depth; }
           if (this.walkable(x, z)) { putZombie(x, z); break; }
         }
       }
