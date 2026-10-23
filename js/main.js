@@ -15,6 +15,7 @@ import { AudioEngine } from './audio.js';
 import { openReport, closeReport, isReportOpen } from './report.js';
 import { openOverview, close as closeOverview, toggle as toggleOverview, isOpen as overviewIsOpen } from './overview.js';
 import { RetroView } from './retro.js';
+import { SpriteView } from '../src/sprite/index.js';
 import { TerrainOverlay } from './overlay.js';
 import { LayerEditor } from './editmode.js';
 
@@ -1279,7 +1280,10 @@ async function boot() {
   agents = new AgentRenderer(scene, 62000);
 
 // ---------- 2009 复古模式（图集 + 正交相机） ----------
-  retro = new RetroView(scene);
+  // 精灵块 v2（src/sprite/）默认启用；?sprite=v1 回到旧的 js/retro.js 做 A/B 对比
+  const RetroCls = (Q.get('sprite') === 'v1') ? RetroView : SpriteView;
+  if (RetroCls === SpriteView) console.log('[ZOS-R] 2D 精灵：v2（src/sprite）');
+  retro = new RetroCls(scene);
   try {
     await retro.load();
   } catch (e) {

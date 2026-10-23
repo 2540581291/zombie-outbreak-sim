@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>精灵块 v2 · 预览（开发用）</title>
+<style>
+  html,body{margin:0;height:100%;background:#12141a;overflow:hidden;font:12px/1.4 system-ui}
+  #hud{position:fixed;left:10px;top:8px;color:#dfe3ea;background:rgba(0,0,0,.45);padding:6px 10px;border-radius:6px}
+  #hud b{color:#8fd6ff}
+</style>
+</head>
+<body>
+<div id="hud">精灵块 v2 预览 · <b id="fps">–</b> · 每 6 秒切换一次"被咬 → 尸变"演示</div>
+<script type="importmap">
+{ "imports": { "three": "../vendor/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { SpriteView } from '../src/sprite/index.js';
+import { SP, TEAM, SPECIES } from '../js/species.js';
+
+// ---- 假 sim：只提供 SpriteView 需要的字段，不跑任何逻辑 ----
+const N = 96;
+const sim = {
+  n: 0, time: 0,
+  state: new Int8Array(N), kind: new Int8Array(N),
+  px: new Float32Array(N), pz: new Float32Array(N),
+  heading: new Float32Array(N), phase: new Float32Array(N),
+  idle: new Uint8Array(N), tgt: new Int32Array(N).fill(-1),
+  nav: null,
+};
+// 状态码沿用 sim.js 的 ST
+const ST = { CIV: 0, FLEE: 1, FIGHT: 2, POLICE: 3, ZOMBIE: 4, CORPSE: 5, SOLDIER: 6, INFECTED: 7, SAVED: 8, WILD: 9 };
+
+// 四排展示：平民 / 警察士兵 / 丧尸 / 屋内的剪影（nav.indoor 只在第四排返回 true）
+const ROWS = [
+  { y: -6.0, st: ST.CIV, kinds: [SP.CIV1, SP.CIV2, SP.CIV3], label: '平民 walk' },
+  { y: -2.0, st: ST.POLICE, kinds: [SP.POLICE, SP.SOLDIER, SP.ELITE], label: '警察/士兵' },
+  { y: 2.0, st: ST.ZOMBIE, kinds: [SP.ZOMBIE], label: '丧尸' },
+  { y: 6.0, st: ST.CIV, kinds: [SP.CIV1, SP.CIV2, SP.CIV3], label: '屋内 → 剪影' },
+];
+let i = 0;
+for (const row of ROWS) {
+  for (let c = 0; c < 8; c++) {
+    sim.state[i] = row.st;
+    sim.kind[i] = row.kinds[c % row.kinds.length];
+    sim.px[i] = -7 + c * 2;
+    sim.pz[i] = row.y;
+    sim.heading[i] = -0.6 + c * 0.2;
+    sim.phase[i] = (c * 0.13) % 1;
+    i++;
+  }
+}
+// 每排第 4 个改成别的状态，看 idle / infected / corpse
+for (let r = 0; r < 4; r++) { sim.state[r * 8 + 3] = ST.CIV; sim.idle[r * 8 + 3] = 1; }
+sim.state[8 + 4] = ST.FIGHT;      // 开火
+sim.state[8 + 5] = ST.SOLDIER;
+sim.state[2 * 8 + 3] = ST.CORPSE; // 丧尸尸体
+sim.state[2 * 8 + 4] = ST.CORPSE; // 人类尸体
+sim.kind[2 * 8 + 4] = SP.CIV1;
+sim.state[3 * 8 + 3] = ST.ZOMBIE; // 屋内丧尸 → 红剪影
+sim.kind[3 * 8 + 3] = SP.ZOMBIE;
+sim.n = i;
+
+sim.nav = { indoor: (x, z) => z > 4.0 };
+
+// ---- three ----
+const renderer = new THREE.WebGLRenderer({ antialias: false });
+renderer.setPixelRatio(1);
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1d23);
+// 一块"地面"色块，否则透明背景上看不清阴影
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(40, 26),
+  new THREE.MeshBasicMaterial({ color: 0x3a3f35 })
+);
+ground.rotateX(-Math.PI / 2);
+ground.position.set(0, 0.1, 0);
+scene.add(ground);
+
+const HALF_H = 9.5;                       // 视高 19 m ≈ 小人在屏上 ~66 px
+const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 500);
+cam.position.set(0, 120, 0);
+cam.up.set(0, 0, -1);
+cam.lookAt(0, 0, 0);
+
+const view = new SpriteView(scene);
+await view.load('../assets/atlas/atlas.json');
+view.group.visible = true;
+
+let t0 = performance.now(), frames = 0, fpsT = 0;
+
+function camObj() {
+  const aspect = innerWidth / innerHeight;
+  return { cx: 0, cz: 0, halfW: HALF_H * aspect, halfH: HALF_H, pxPerM: innerHeight / (2 * HALF_H) };
+}
+
+const A_IDX = 1, B_IDX = 6, C_IDX = 7;
+function demo() {
+  // 1.2~1.5 s：两个平民进入潜伏期
+  if (sim.time >= 1.2 && sim.time < 1.5) {
+    if (sim.state[A_IDX] === ST.CIV) sim.state[A_IDX] = ST.INFECTED;
+    if (sim.state[B_IDX] === ST.CIV) sim.state[B_IDX] = ST.INFECTED;
+  }
+  // 1.5 s：INFECTED → ZOMBIE，渲染层检测到跳变 → 播 turn01（方案 B）
+  if (sim.time >= 1.5) {
+    if (sim.state[A_IDX] === ST.INFECTED) sim.state[A_IDX] = ST.ZOMBIE;
+    if (sim.state[B_IDX] === ST.INFECTED) sim.state[B_IDX] = ST.ZOMBIE;
+  }
+  // 2.0 s：第七个被打死 → die01
+  if (sim.time >= 2.0 && sim.state[C_IDX] !== ST.CORPSE) sim.state[C_IDX] = ST.CORPSE;
+}
+
+// 预热到 ?t= 指定的时刻（避开无头浏览器虚拟时间被加载吃掉的坑）
+{
+  const T0 = +(new URLSearchParams(location.search).get('t') || 0);
+  for (let k = 0; k < T0 * 60; k++) {
+    sim.time += 1 / 60;
+    demo();
+    view.update(sim, camObj());
+  }
+  // ?dbg=1 把"这一帧画了什么"打到页面上，方便对拍
+  if (new URLSearchParams(location.search).has('dbg')) {
+    view.trace = [];
+    view.update(sim, camObj());
+    const pre = document.createElement('pre');
+    pre.style.cssText = 'position:fixed;right:8px;top:8px;max-height:96vh;overflow:auto;color:#cfe;background:rgba(0,0,0,.75);padding:8px;font-size:11px;z-index:9';
+    pre.textContent = 't=' + sim.time.toFixed(2) + '  drawn=' + view.trace.length + '\n' +
+      view.trace.map(r => [r.i, 'st=' + r.st, 'sg=' + (r.corpse ? 'CORPSE' : r.stage), r.anim, 'f=' + r.fi,
+        'x=' + r.x.toFixed(1), 'z=' + r.z.toFixed(1)].join(' ')).join('\n');
+    document.body.appendChild(pre);
+    view.trace = null;
+  }
+}
+
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dtReal = Math.min(0.1, (now - t0) / 1000); t0 = now;
+  sim.time += dtReal;
+
+  demo();
+  // 步态相位跟着时间走
+  for (let k = 0; k < sim.n; k++) sim.phase[k] = (sim.phase[k] + dtReal * 1.6) % 1;
+
+  const aspect = innerWidth / innerHeight;
+  cam.left = -HALF_H * aspect; cam.right = HALF_H * aspect;
+  cam.top = HALF_H; cam.bottom = -HALF_H;
+  cam.updateProjectionMatrix();
+
+  view.update(sim, { cx: 0, cz: 0, halfW: HALF_H * aspect, halfH: HALF_H, pxPerM: innerHeight / (2 * HALF_H) });
+  renderer.render(scene, cam);
+
+  frames++; fpsT += dtReal;
+  if (fpsT > 0.5) { document.getElementById('fps').textContent = (frames / fpsT).toFixed(0) + ' fps · sprites ' + view.count; frames = 0; fpsT = 0; }
+}
+requestAnimationFrame(loop);
+window.addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); });
+</script>
+</body>
+</html>
+
+
+
+
