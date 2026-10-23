@@ -260,7 +260,7 @@ def main():
     ap.add_argument("--maxlon", type=float, required=True)
     ap.add_argument("--out", default=None)
     ap.add_argument("--overpass", action="store_true")
-    ap.add_argument("--cell", type=float, default=1.0, help="碰撞格边长（米）")
+    ap.add_argument("--cell", type=float, default=0.4, help="碰撞格边长（米），默认 0.4 对齐原版精度")
     args = ap.parse_args()
 
     mlat, mlon, xlat, xlon = args.minlat, args.minlon, args.maxlat, args.maxlon

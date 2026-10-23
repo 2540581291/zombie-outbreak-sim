@@ -98,6 +98,16 @@ export async function loadCollision(city) {
      */
     buildDoorField() {
       const n = this.cols * this.rows;
+      // 门场要开 3 个 Int32 数组（dist/queue/doorOf）= 12 字节/格。
+      // 0.4m 格的 3km 城市会到 4750 万格 → 570MB，直接 OOM。
+      // 超过 2000 万格就先不建门场（大图退化：屋内寻路靠 doorGradient/exitProbe）。
+      if (n > 20000000) {
+        this.doorDist = null;
+        if (typeof window === "undefined") {
+          console.log(`[ZOS-R] 门场跳过：${(n / 1e6).toFixed(1)}M 格太多（>20M），已降级`);
+        }
+        return 0;
+      }
       const dist = new Int32Array(n).fill(-1);
       const queue = new Int32Array(n);
       let head = 0, tail = 0;
