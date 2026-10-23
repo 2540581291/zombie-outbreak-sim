@@ -601,7 +601,10 @@ function agentRules(i, p) {
       if (armed) rows.push(['武器', w.name + ' · ' + sim.mag[i] + (sim.reserve[i] ? '/' + sim.reserve[i] : '')]);
       rows.push(['感知半径', (st === ST.POLICE ? 46 : st === ST.SOLDIER ? 60 : 26) + ' m']);
     }
-    if (st === ST.INFECTED) rows.push(['尸变倒计时', Math.max(0, sim.timer[i]).toFixed(1) + ' s']);
+    if (st === ST.INFECTED) {
+      rows.push(['尸变倒计时', Math.max(0, sim.timer[i]).toFixed(1) + ' s']);
+      if (sim.chaos > 80) rows.push(['通缉', '<b style="color:#ff8a5c">混乱 > 80%：被当作丧尸</b>']);
+    }
     if (st === ST.FLEE) rows.push(['体力', (sim.stam[i] * 100).toFixed(0) + '% · 恐慌 ' + sim.panic[i].toFixed(2)]);
     return '<div class="ac-sec">属性</div>' +
       rows.map(([k, v]) => `<div class="ac-row"><span>${k}</span><em>${v}</em></div>`).join('');

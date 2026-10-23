@@ -1535,6 +1535,16 @@ export class Sim {
     return Math.max(0, Math.min(1, 1 - d / 40));
   }
 
+  /**
+   * 混乱度 > 80 之后，"潜伏期（还没变）的人"在**判定上**等同于丧尸：
+   * 警察/士兵/持枪平民会把他当威胁。外观上他仍然是正常人（能不能看出来是另一回事）。
+   */
+  zombieLike(j) {
+    const st = this.state[j];
+    if (st === ST.ZOMBIE) return true;
+    return this.chaos > 80 && st === ST.INFECTED;
+  }
+
   /** 附近同类人数（粗算，用于从众项） */
   nearFriends(i) {
     // 用空间哈希里同格附近的人头数近似，避免额外遍历
@@ -1798,7 +1808,7 @@ export class Sim {
           const j = this.hOrder[p];
           if (j === i) continue;
           const st = this.state[j];
-          const ok = want === 1 ? (st === ST.ZOMBIE)
+          const ok = want === 1 ? (st === ST.ZOMBIE || (this.chaos > 80 && st === ST.INFECTED))
             : want === 2 ? (st === ST.CIV || st === ST.FLEE || st === ST.FIGHT || st === ST.INFECTED)
               : want === 4 ? (st === ST.CIV || st === ST.FLEE || st === ST.FIGHT || st === ST.INFECTED ||
                               st === ST.POLICE || st === ST.SOLDIER)
@@ -2444,6 +2454,9 @@ export class Sim {
         // ---------------- 警察 ----------------
         case ST.SOLDIER:      // 士兵和警察共用一套行为（以前士兵没有 case，是"隐形"的）
         case ST.POLICE: {
+          // 开火冷却每帧递减（原来只有"锁定目标"那条分支递减，
+          // 结果回局/驻守/赶路的警察 cool 永远停在初始随机值上 → 一辈子不开枪）
+          if (this.cool[i] > 0) this.cool[i] -= cdt;
           // ---- 护送任务最高优先级：要员在哪我就在哪（混乱 50% 回局的规则也压不住）----
           if (this.escortOf[i]) {
             const v = this.vips[this.escortOf[i] - 1];
@@ -2524,7 +2537,6 @@ export class Sim {
           if (z >= 0) {
             const dx = this.px[z] - this.px[i], dz = this.pz[z] - this.pz[i];
             this.heading[i] = Math.atan2(dz, dx);
-            this.cool[i] -= dt;
             if (this.cool[i] <= 0) {
               if (this.ammo[i] <= 0) { this.state[i] = ST.FLEE; this.panic[i] = 1.4; this.stam[i] = 1; break; }
               this.ammo[i]--;
