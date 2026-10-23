@@ -2309,32 +2309,25 @@ export class Sim {
         }
         // ---------------- 逃跑 ----------------
         case ST.FLEE: {
-          this.fleeT[i] -= dt;
-          if (this.fleeT[i] <= 0) {
-            // 跑不动了：回去继续走，同时进入腿软期（丧尸终于能追上）
+          // 结束条件只有一个：感知半径内（平民 40m）已经没有丧尸了。
+          // 不是"跑够几秒就回去上班"—— 丧尸还在旁边就继续跑。
+          const z = this.nearZ[i];
+          if (z < 0) {
             this.state[i] = ST.CIV;
             this.panic[i] = 0;
-            this.fleeCd[i] = 3 + rng() * 2;
+            this.fleeCd[i] = 2 + rng() * 2;   // 惊魂未定，短时间内不再触发逃跑
+            this.stam[i] = Math.min(1, this.stam[i] + 0.25);
             break;
           }
-          const z = this.nearZ[i];
-          if (z >= 0) {
-            const ax = this.px[i] - this.px[z], az = this.pz[i] - this.pz[z];
-            // 逃离 + 侧向扰动（避免所有人一条直线）
-            const s = this.pz[i] > this.pz[z] ? 1 : -1;
-            // 体力：狂奔会累（约 6 秒后被丧尸追上）
-            this.stam[i] = Math.max(0.65, this.stam[i] - dt * 0.055);
-            const sp = this.spd[i] * (1.0 + 0.90 * this.panic[i]) * this.stam[i];
-            this.move(i, ax - az * 0.25 * s, az + ax * 0.25 * s, sp, dt);
-            this.panic[i] = Math.min(1.4, this.panic[i] + dt * 0.6);
-          } else {
-            this.stam[i] = Math.min(1, this.stam[i] + dt * 0.12);
-            this.panic[i] -= dt * 0.35;
-            if (this.panic[i] <= 0) { this.state[i] = ST.CIV; this.panic[i] = 0; break; }
-            const tx = this.tx[i] - this.px[i], tz = this.tz[i] - this.pz[i];
-            if (tx * tx + tz * tz < 4) this.pickWander(i);
-            this.move(i, tx, tz, this.spd[i] * 1.4, dt);
-          }
+          // 方向：始终背离**离自己最近的那只丧尸**
+          const ax = this.px[i] - this.px[z], az = this.pz[i] - this.pz[z];
+          const s = this.pz[i] > this.pz[z] ? 1 : -1;
+          // 体力：狂奔会累，但不会累到走不动（下限 0.65）
+          this.stam[i] = Math.max(0.65, this.stam[i] - dt * 0.055);
+          const sp = this.spd[i] * (1.0 + 0.90 * this.panic[i]) * this.stam[i];
+          // 主要是"背对丧尸"，只加一点点侧向偏移，避免所有人挤成一条线
+          this.move(i, ax - az * 0.2 * s, az + ax * 0.2 * s, sp, dt);
+          this.panic[i] = Math.min(1.4, this.panic[i] + dt * 0.6);
           break;
         }
         // ---------------- 持枪还击 ----------------
