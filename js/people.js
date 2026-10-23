@@ -88,8 +88,10 @@ export function profileFor(sim, i) {
   // 职业：平民按年龄/哈希算，但动物、警察、军队、要员有固定身份
   let job = jobFor(i, age);
   const kind = sim.kind ? sim.kind[i] : 0;
-  if (kind === 12) job = '宠物狗';
-  else if (kind === 13) job = '宠物猫';
+  const isAnimalKind = (kind === 12 || kind === 13);
+  const animalWild = isAnimalKind ? (h(i, 92) < 0.45) : false;   // 45% 野生，55% 家养
+  if (kind === 12) job = animalWild ? '流浪狗' : '家养宠物狗';
+  else if (kind === 13) job = animalWild ? '流浪猫' : '家养宠物猫';
   else if (kind === 3) job = '警察';
   else if (kind === 4) job = '士兵';
   else if (kind === 5) job = '重装兵';
@@ -111,9 +113,11 @@ export function profileFor(sim, i) {
   // 家庭：真的按 household 算（配偶 / 子女 / 父母 / 独居 / 旅客）
   const kinAge = (j) => ageOfAgent(sim, j, ageOf);
   let family = kinText(sim, i, kinAge, (j) => shortName(j, sim));
-  // 家属文本也按身份：动物没有家属；警察/军人住宿舍，家属不随行
-  if (kind === 12 || kind === 13) family = '—（动物没有家庭）';
-  else if (kind === 3) family = '住警队宿舍，家属不随行';
+  // 家属文本按身份：
+  //   警察是本地人，正常有家（不覆盖）
+  //   士兵/重装兵住部队营房
+  //   动物分家养（有主人）/ 野生（无主）
+  if (isAnimalKind) family = animalWild ? '—（野生，无主）' : '有主人照料（在住处附近活动）';
   else if (kind === 4 || kind === 5) family = '住部队营房，家属不随行';
 
   const state = sim.state[i];
@@ -124,14 +128,17 @@ export function profileFor(sim, i) {
   const awareText = aw > 0 ? AWARE_TXT[Math.min(3, aw)] : null;
   const social = (state === ST.CIV || state === ST.FLEE || state === ST.FIGHT) ? g : null;
 
-  const PET = ['旺财', '来福', '豆豆', '可乐', '大黄', '花卷', '雪球', '咪咪', '黑豆', '汤圆'];
-  const petName = PET[Math.floor(h(i, 89) * PET.length) | 0];
+  const DOG_NAME = ['旺财', '来福', '大黄', '黑豆', '豆豆', '可乐'];
+  const CAT_NAME = ['咪咪', '雪球', '花卷', '汤圆', '布丁', '奶糖'];
+  const namePool = kind === 13 ? CAT_NAME : DOG_NAME;
+  const petName = namePool[Math.floor(h(i, 89) * namePool.length) | 0];
   return {
     idx: i,
     name: (kind === 12 || kind === 13) ? petName : `${f[0]}·${l[0]}`,
     nameEn: `${f[1]} ${l[1]}`,
     age, male, job, home, work, family,
     isAnimal: !!(sim.kind && sim.kind[i] >= 12),
+    animalWild,
     state, stateTxt, stateColor,
     social,                     // 通勤状态（回家/上班/在单位/在家）或 null
     aware: aw,

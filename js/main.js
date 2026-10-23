@@ -686,7 +686,7 @@ function renderAgentCard() {
   // 家属：每个都做成可点的 chip（点了选中他，镜头跳过去）
   const ROLE_TXT = { spouse: '配偶', child: '子女', parent: '父母', grandparent: '祖辈', sibling: '同住' };
   const knd = sim.kind[selected];
-  const forceKind = (knd === 3 || knd === 4 || knd === 5);   // 警察 / 士兵 / 重装兵：住宿舍
+  const forceKind = (knd === 4 || knd === 5);   // 士兵 / 重装兵住营房；警察是本地人，正常有家
   const kins = (isAnimal || forceKind) ? []
     : kinList(sim, selected, (j) => (sim.age && sim.age[j]) || ageOfAgent(sim, j, () => 0), (j) => shortName(j, sim));
   const kinChip = (k) => {
