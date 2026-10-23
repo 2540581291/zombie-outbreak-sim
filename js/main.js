@@ -2077,8 +2077,8 @@ function loop(t) {
     renderer.render(scene, camera);
   }
   updatePoiLabels();   // 相机矩阵这一帧已更新，投影才不会 NaN
-  // 卡片实时刷新：约 20Hz（内容没变时不重建 DOM）
-  if (sim && selected >= 0 && (++cardFrame % 3 === 0)) {
+  // 卡片实时刷新：每帧（内容没变时不重建 DOM，所以不贵）
+  if (sim && selected >= 0) {
     const cEl = document.getElementById('agentcard');
     if (cEl && !cEl.classList.contains('hidden')) {
       try { renderAgentCard(); } catch (e) { window.__cardErr = String((e && e.message) || e); }
