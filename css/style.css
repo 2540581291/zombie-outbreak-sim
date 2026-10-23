@@ -338,3 +338,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
 .poilabel.gov{color:#c8a8ff;text-shadow:0 0 6px rgba(190,150,255,.95),0 0 12px rgba(160,110,255,.55)}
 .poilabel.transit{color:#9fe4ff;text-shadow:0 0 5px rgba(140,220,255,.85)}
 .poilabel.on{opacity:1;outline:1px solid rgba(255,255,255,.7);transform:translate(-50%,-100%) scale(1.12)}
+
+/* 已撤离：青绿，和死亡的红区分开 */
+.dot.saved{background:#3fe0b0}
+#tb-saved{color:#8ff0d6}

@@ -2405,6 +2405,13 @@ export class Sim {
             }
           }
           // 什么都不知道 / 没目标 → 照常通勤
+          // 走到撤离口（穿过那条绿线）就算撤离成功：标记 SAVED，从地图上消失
+          if (this.goal[i] === GOAL.FLEE && this.onEscapeLine && this.onEscapeLine(i)) {
+            this.state[i] = ST.SAVED;
+            this.goal[i] = GOAL.NONE;
+            this.aStage[i] = 0;
+            break;
+          }
           if (this.goal[i] === GOAL.NONE && !this.isAnimal(i) && this.time >= this.commuteAt[i]) {
             this.commuteAt[i] = this.time + 70 + this.rng() * 110;
             this.goal[i] = h(i, 33) < 0.5 ? GOAL.HOME : GOAL.WORK;

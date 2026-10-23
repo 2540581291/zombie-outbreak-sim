@@ -2095,6 +2095,7 @@ function loop(t) {
     $('n-inf').textContent = sim.stats.infected.toLocaleString();
     $('n-zomb').textContent = sim.stats.zombie.toLocaleString();
     $('n-dead').textContent = sim.stats.dead.toLocaleString();
+    if ($('n-saved')) $('n-saved').textContent = (sim.stats.saved || 0).toLocaleString();
     if ($('n-flee')) {
       const st2 = sim.stats;
       $('n-flee').textContent = ((st2.fleeTotal || 0) + (st2.fleeImm || 0)).toLocaleString();
