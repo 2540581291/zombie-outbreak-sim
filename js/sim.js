@@ -264,6 +264,8 @@ export class Sim {
     this.freeT = new Float32Array(NMAX);         // 刚出门的"别再找门"保护期
     this.pathX = new Float32Array(NMAX * 16);    // 粗网格寻路的路点（最多 16 个）
     this.pathZ = new Float32Array(NMAX * 16);
+    this.lockT = new Float32Array(NMAX);   // 下次锁敌时间（每 60s 一次）
+    this.lockOn = new Uint8Array(NMAX);    // 目标来自锁敌（允许远距离追击）
     this.pathN = new Uint8Array(NMAX);
     this.pathIdx = new Uint8Array(NMAX);
     this.infectRate = 0;                         // 感染率（尸 + 潜伏）/ 总人口
@@ -342,6 +344,7 @@ export class Sim {
     this.rng = mulberry32(P.seed >>> 0);
     this.tracers.length = 0; this.booms.length = 0;
     this.nearZ.fill(-1); this.nearC.fill(-1); this.nearPoll.fill(-1); this.tgt.fill(-1);
+    this.lockT.fill(0); this.lockOn.fill(0);
     // 关键：全部状态清零，否则上一局的残留会让结果不可复现
     this.cool.fill(0); this.timer.fill(0); this.panic.fill(0);
     this.wpn.fill(0); this.mag.fill(0); this.reserve.fill(0); this.skill.fill(0); this.rlUntil.fill(0);
@@ -1545,6 +1548,23 @@ export class Sim {
     return this.chaos > 80 && st === ST.INFECTED;
   }
 
+  /** 全城最近的"非丧尸单位"（平民/警察/士兵/动物）。带每帧预算，避免同时扫全城 */
+  nearestPrey(i) {
+    if (!(this.preyBudget > 0)) return -1;
+    this.preyBudget--;
+    let best = -1, bd = Infinity;
+    const x = this.px[i], z = this.pz[i];
+    for (let j = 0; j < this.n; j++) {
+      const st = this.state[j];
+      if (st === ST.ZOMBIE || st === ST.CORPSE || st === ST.SAVED) continue;
+      if (this.aStage[j] === 2 || this.aStage[j] === 3) continue;   // 正在倒地/爬起的不算
+      const dx = this.px[j] - x, dz = this.pz[j] - z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < bd) { bd = d2; best = j; }
+    }
+    return best;
+  }
+
   /** 附近同类人数（粗算，用于从众项） */
   nearFriends(i) {
     // 用空间哈希里同格附近的人头数近似，避免额外遍历
@@ -2028,6 +2048,7 @@ export class Sim {
     }
 
     this.pathBudget = 40;      // 每帧恢复寻路预算（只给看不见目标的人用）
+    this.preyBudget = 8;       // 每帧锁敌扫描预算（一次扫全城 n 个，8/帧 ≈ 160/s）
     this.stepInfo(dt);
     this.rebuildHash();
 
@@ -2360,13 +2381,23 @@ export class Sim {
           if (c >= 0) {
             const cs = this.state[c];
             if (!(cs === ST.CIV || cs === ST.FLEE || cs === ST.FIGHT || cs === ST.INFECTED ||
-                  (isWild && (cs === ST.ZOMBIE || cs === ST.POLICE || cs === ST.SOLDIER)))) c = -1;
+                  (isWild && (cs === ST.ZOMBIE || cs === ST.POLICE || cs === ST.SOLDIER)))) {
+              c = -1; this.lockOn[i] = 0;
+            }
             else {
               const ddx = this.px[c] - this.px[i], ddz = this.pz[c] - this.pz[i];
-              if (ddx * ddx + ddz * ddz > 90 * 90) c = -1;
+              // 锁敌目标允许跨远距离追杀；普通目标超过 90m 就丢
+              const leash = this.lockOn[i] ? 1e9 : 90;
+              if (ddx * ddx + ddz * ddz > leash * leash) c = -1;
             }
           }
           if (c < 0 && this.nearC[i] >= 0) c = this.nearC[i];
+          // 锁敌：注意力范围（60m）内一个活人都没有时，每 60 秒抓一个"全城最近的人"
+          if (c < 0 && this.time >= this.lockT[i]) {
+            this.lockT[i] = this.time + 60;
+            const j = this.nearestPrey(i);
+            if (j >= 0) { c = j; this.lockOn[i] = 1; }
+          }
           this.tgt[i] = c;
 
           if (c >= 0) {
