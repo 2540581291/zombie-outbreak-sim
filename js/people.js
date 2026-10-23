@@ -83,9 +83,24 @@ export function goalText(sim, i) {
 
 export function profileFor(sim, i) {
   const f = firstNameOf(sim, i), l = surnameOf(sim, i);
-  const age = ageOfAgent(sim, i, ageOf);     // 平民用家庭分配的年龄，其余按哈希
+  let age = ageOfAgent(sim, i, ageOf);       // 平民用家庭分配的年龄，其余按哈希（后面会按身份修正）
   const male = maleOf(i);
-  const job = jobFor(i, age);
+  // 职业：平民按年龄/哈希算，但动物、警察、军队、要员有固定身份
+  let job = jobFor(i, age);
+  const kind = sim.kind ? sim.kind[i] : 0;
+  if (kind === 12) job = '宠物狗';
+  else if (kind === 13) job = '宠物猫';
+  else if (kind === 3) job = '警察';
+  else if (kind === 4) job = '士兵';
+  else if (kind === 5) job = '重装兵';
+  else if (kind === 11) job = '装甲车组';
+  else if (sim.vip && sim.vip[i]) job = '政府要员';
+
+  // 年龄也按身份修正（警察/军人/要员不该出现 66 岁一线执勤）
+  if (kind === 4 || kind === 5) age = 19 + Math.floor(h(i, 88) * 22);        // 士兵 19~40
+  else if (kind === 3) age = 24 + Math.floor(h(i, 88) * 30);                 // 警察 24~53
+  else if (sim.vip && sim.vip[i]) age = 40 + Math.floor(h(i, 88) * 32);      // 要员 40~71
+  else if (kind === 12 || kind === 13) age = 1 + Math.floor(h(i, 88) * 12);  // 猫狗 1~12 岁
 
   const st1 = pick(STREETS, i, 6), st2 = pick(STREETS, i, 7), st3 = pick(STREETS, i, 8);
   const home = `${st1} ${1 + Math.floor(h(i, 9) * 140)} 号`;
@@ -105,11 +120,14 @@ export function profileFor(sim, i) {
   const awareText = aw > 0 ? AWARE_TXT[Math.min(3, aw)] : null;
   const social = (state === ST.CIV || state === ST.FLEE || state === ST.FIGHT) ? g : null;
 
+  const PET = ['旺财', '来福', '豆豆', '可乐', '大黄', '花卷', '雪球', '咪咪', '黑豆', '汤圆'];
+  const petName = PET[Math.floor(h(i, 89) * PET.length) | 0];
   return {
     idx: i,
-    name: `${f[0]}·${l[0]}`,
+    name: (kind === 12 || kind === 13) ? petName : `${f[0]}·${l[0]}`,
     nameEn: `${f[1]} ${l[1]}`,
     age, male, job, home, work, family,
+    isAnimal: !!(sim.kind && sim.kind[i] >= 12),
     state, stateTxt, stateColor,
     social,                     // 通勤状态（回家/上班/在单位/在家）或 null
     aware: aw,

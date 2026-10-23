@@ -667,8 +667,9 @@ function renderAgentCard() {
 
   const p = profileFor(sim, selected);
   document.getElementById('ac-name').textContent = p.name;
-  document.getElementById('ac-sub').textContent =
-    `${p.nameEn} · ${p.male ? '男' : '女'} ${p.age} 岁 · ${p.job}`;
+  document.getElementById('ac-sub').textContent = p.isAnimal
+    ? `${p.nameEn} · 动物 · ${p.job}`
+    : `${p.nameEn} · ${p.male ? '男' : '女'} ${p.age} 岁 · ${p.job}`;
   document.getElementById('ac-vip').style.display = p.vip ? 'inline-block' : 'none';
 
   const px = sim.px[selected], pz = sim.pz[selected];
