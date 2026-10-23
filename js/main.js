@@ -845,8 +845,7 @@ function readParams() {
     initialZombies: +sZ0.value,
     zombieSpeed: +sZspd.value,
     infectTime: +sInc.value,
-    armedRate: +sArm.value / 100,
-    homeGunRate: +sArm.value / 100,   // 同一个滑块：现在表示"家庭持枪率"
+    homeGunRate: +sArm.value / 100,   // 「家庭持枪率」：决定每户有没有枪
     police: +sPol.value,
     policeAccuracy: +sPacc.value / 100,
     dogs: +sDog.value, cats: +sCat.value,

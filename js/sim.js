@@ -26,7 +26,9 @@ export const ST = {
 const NMAX = 62000;
 
 // 潜伏期两套常量（决策 3）：默认 8 秒；零号病人模式 10–30 分钟
-export const INCFG = { quick: 8, bite: [60, 120], contact: [360, 1440], long: [600, 1800] };
+// 潜伏时长区间（秒）。实际值 = 区间 × (面板「咬伤潜伏」/ 90)，再按年龄体质加权。
+// bite = 被咬；contact = 间接接触（自爆喷溅等）
+export const INCFG = { bite: [60, 120], contact: [360, 1440] };
 
 // 一天 24 分钟：1 模拟秒 = 1 游戏分钟，1440 秒 = 24 小时（整数关系，不用换算）
 export const DAY_SECONDS = 1440;
@@ -3037,7 +3039,9 @@ export class Sim {
   /** 真正带个体年龄的版本（上面的占位由它替换） */
   incubationFor(i, route) {
     const r = route || 1;
-    const [lo, hi] = r === 2 ? INCFG.contact : INCFG.bite;
+    const k = (this.params.infectTime || 90) / 90;      // 滑杆 90 s = 原本的 60–120 s
+    const [lo0, hi0] = r === 2 ? INCFG.contact : INCFG.bite;
+    const lo = lo0 * k, hi = hi0 * k;
     const age = ageOf(i);
     const consti = age > 65 ? 0.25 : (age < 18 ? 0.6 : (age < 25 ? 0.75 : 0.5));
     const score = 0.6 * consti + 0.4 * h(i, 77);
@@ -3135,7 +3139,10 @@ export class Sim {
     this.mag[i]--;
     this.ammo[i] = this.mag[i];                            // 兼容旧字段
     const sk = this.skill[i] / 255;
-    const acc = w.acc * (0.6 + 0.4 * sk);
+    // 警察用滑杆（原版就是一个"命中率"数字），其他枪手用武器精度 × 熟练度
+    const acc = this.kind[i] === SP.POLICE
+      ? (this.params.policeAccuracy || 0.6)
+      : w.acc * (0.6 + 0.4 * sk);
     this.shoot(i, to, acc, w.range, w.dmg);
     this.addNoise(this.px[i], this.pz[i], w.noise);
     return true;
