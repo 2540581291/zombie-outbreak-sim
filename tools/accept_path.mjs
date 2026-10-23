@@ -46,7 +46,18 @@ function pickBuilding(lo, hi) {
       probe.reset({ seed: 1, population: 1, initialZombies: 0, police: 0, homeGunRate: 0 });
       const e = endpoints(bb, dir);
       probe.px[0] = e.sx; probe.pz[0] = e.sz;
-      if (probe.planPath(0, e.gx, e.gz) <= 0) { ok = false; break; }
+      const n = probe.planPath(0, e.gx, e.gz);
+      if (n <= 0) { ok = false; break; }
+      // 路径长度不能比直线距离长太多：这条用例考的是"绕一栋楼"，
+      // 不是"在死胡同堆里找出一条约 2 倍长的唯一通路"
+      let len = 0, lx = e.sx, lz = e.sz;
+      for (let k = 0; k < probe.pathN[0]; k++) {
+        const wx = probe.pathX[0 * 16 + k], wz = probe.pathZ[0 * 16 + k];
+        len += Math.hypot(wx - lx, wz - lz); lx = wx; lz = wz;
+      }
+      len += Math.hypot(e.gx - lx, e.gz - lz);
+      const straight = Math.hypot(e.gx - e.sx, e.gz - e.sz);
+      if (len > straight * 1.7) { ok = false; break; }
     }
     if (ok) return bb;
   }
@@ -70,7 +81,7 @@ function detour(b, dir) {
     best = Math.min(best, d);
     if (d < 8) { arr = sim.time; break; }
   }
-  return { dir, total, arr, best, planned };
+  return { dir, total, arr, best, planned, fx: sim.px[i], fz: sim.pz[i], gx: e.gx, gz: e.gz };
 }
 
 function citySpeed() {
@@ -112,7 +123,7 @@ for (const [name, r] of cases) {
   const limit = name.startsWith('大楼') ? 120 : 60;
   const good = r.arr >= 0 && r.arr <= limit;
   if (!good) ok = false;
-  console.log(`${name}: ${r.arr >= 0 ? '✅ ' + r.arr.toFixed(1) + 's' : '❌ 90s 未到（最近 ' + r.best.toFixed(0) + 'm）'}  ${r.total.toFixed(0)}m  限 ${limit}s  开局路点=${r.planned}  到点最近=${r.best.toFixed(0)}m`);
+  console.log(`${name}: ${r.arr >= 0 ? '✅ ' + r.arr.toFixed(1) + 's' : '❌ 90s 未到（最近 ' + r.best.toFixed(0) + 'm）'}  ${r.total.toFixed(0)}m  限 ${limit}s  开局路点=${r.planned}  终点(${r.gx.toFixed(0)},${r.gz.toFixed(0)}) 最终(${r.fx.toFixed(0)},${r.fz.toFixed(0)})`);
 }
 const spdOk = spd >= 1.8;
 if (!spdOk) ok = false;

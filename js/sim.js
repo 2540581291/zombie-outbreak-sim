@@ -1158,6 +1158,14 @@ export class Sim {
     const goal = this.planPath.to !== undefined ? this.planPath.to : t;
     this.planPath.to = undefined;
     if (s === goal) return 0;
+    // 目标粗格如果离真正想去的地方太远（说明目标那片在粗网格里根本不可达），
+    // 就别拿这条"最接近可达点"的路径上路 —— 否则人会朝反方向走几十米（实测 91m）。
+    {
+      const gw0 = this.gw, gc = goal % gw0, gr = (goal / gw0) | 0;
+      const wx = (gc + 0.5) * this.cs - this.nav.halfW;
+      const wz = this.nav.halfH - (gr + 0.5) * this.cs;
+      if (Math.hypot(wx - tx, wz - tz) > 30) return 0;
+    }
 
     const gw = this.gw, gh = this.gh, grid = this.cgrid;
     const stamp = ++this.cstamp;
