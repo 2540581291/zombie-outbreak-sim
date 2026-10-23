@@ -24,8 +24,10 @@ function endpoints(b, dir) {
   const ew = dir === 'ew';
   let sx = ew ? cx - hw - 12 : cx, sz = ew ? cz : cz - hh - 12;
   let gx = ew ? cx + hw + 12 : cx, gz = ew ? cz : cz + hh + 12;
-  for (let k = 0; k < 25 && !openAt(sx, sz); k++) { if (ew) sx -= 2; else sz -= 2; }
-  for (let k = 0; k < 25 && !openAt(gx, gz); k++) { if (ew) gx += 2; else gz += 2; }
+  // 不再往外硬推 25 次：理想端点（楼外 12m）本来就该是开阔地，
+  // 由 pickBuilding 负责挑这样的楼，这样测出来的距离才是真实绕行距离
+  for (let k = 0; k < 3 && !openAt(sx, sz); k++) { if (ew) sx -= 2; else sz -= 2; }
+  for (let k = 0; k < 3 && !openAt(gx, gz); k++) { if (ew) gx += 2; else gz += 2; }
   return { sx, sz, gx, gz };
 }
 
@@ -35,6 +37,9 @@ function pickBuilding(lo, hi) {
     const xs = bb.p.map((q) => q[0]), zs = bb.p.map((q) => q[1]);
     const w = Math.max(...xs) - Math.min(...xs), h = Math.max(...zs) - Math.min(...zs);
     if (!(w > lo && w < hi && h > lo && h < hi)) continue;
+    const e0 = endpoints(bb, 'ew'), e1 = endpoints(bb, 'ns');
+    if (!openAt(e0.sx, e0.sz) || !openAt(e0.gx, e0.gz)) continue;
+    if (!openAt(e1.sx, e1.sz) || !openAt(e1.gx, e1.gz)) continue;
     const probe = new Sim(nav, city);
     let ok = true;
     for (const dir of ['ew', 'ns']) {
@@ -56,6 +61,7 @@ function detour(b, dir) {
   sim.px[i] = e.sx; sim.pz[i] = e.sz; sim.state[i] = 0;
   sim.vip[i] = 0; sim.actT[i] = 0; sim.idle[i] = 0;
   sim.setGoal(i, GOAL.MOVE_TO, e.gx, e.gz);
+  const planned = sim.planPath(i, e.gx, e.gz);
   const total = Math.hypot(e.gx - e.sx, e.gz - e.sz);
   let best = 1e9, arr = -1;
   for (let k = 0; k < 20 * 90; k++) {
@@ -64,7 +70,7 @@ function detour(b, dir) {
     best = Math.min(best, d);
     if (d < 8) { arr = sim.time; break; }
   }
-  return { dir, total, arr, best };
+  return { dir, total, arr, best, planned };
 }
 
 function citySpeed() {
@@ -100,7 +106,7 @@ for (const [name, r] of cases) {
   const limit = name.startsWith('大楼') ? 120 : 60;
   const good = r.arr >= 0 && r.arr <= limit;
   if (!good) ok = false;
-  console.log(`${name}: ${r.arr >= 0 ? '✅ ' + r.arr.toFixed(1) + 's' : '❌ 90s 未到（最近 ' + r.best.toFixed(0) + 'm）'}  ${r.total.toFixed(0)}m  限 ${limit}s`);
+  console.log(`${name}: ${r.arr >= 0 ? '✅ ' + r.arr.toFixed(1) + 's' : '❌ 90s 未到（最近 ' + r.best.toFixed(0) + 'm）'}  ${r.total.toFixed(0)}m  限 ${limit}s  开局路点=${r.planned}  到点最近=${r.best.toFixed(0)}m`);
 }
 const spdOk = spd >= 1.8;
 if (!spdOk) ok = false;

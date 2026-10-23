@@ -266,6 +266,7 @@ export class Sim {
     this.pathX = new Float32Array(NMAX * 16);    // 粗网格寻路的路点（最多 16 个）
     this.pathZ = new Float32Array(NMAX * 16);
     this.forcePlan = new Uint8Array(NMAX); // 1 = 下一次决策必须规划路径（卡住过）
+    this.pathBlock = new Uint8Array(NMAX);  // 连续走不到当前路点的次数（超过就跳过它）
     this.lastDir = new Float32Array(NMAX); // 上一次实际迈步方向（沿墙滑行时保持，避免来回抖）
     this.lastDirT = new Float32Array(NMAX);
     this.armHome = new Uint8Array(NMAX);  // 1 = 正在回家补弹（这条 goal 不被 decide 覆盖）
@@ -359,6 +360,7 @@ export class Sim {
     this.armHome.fill(0);
     this.forcePlan.fill(0);
     this.lastDir.fill(0); this.lastDirT.fill(0);
+    this.pathBlock.fill(0);
     // 关键：全部状态清零，否则上一局的残留会让结果不可复现
     this.cool.fill(0); this.timer.fill(0); this.panic.fill(0);
     this.wpn.fill(0); this.mag.fill(0); this.reserve.fill(0); this.skill.fill(0); this.rlUntil.fill(0);
@@ -2661,14 +2663,15 @@ export class Sim {
                     break;
                   }
                 }
-                // 当前路点看得见 → 直走（不走扇形探测，避免沿墙磨）
-                if (this.losClear(this.px[i], this.pz[i], wx, wz)) {
-                  this.move(i, wdx, wdz, this.spd[i] * wmul0, cdt);
-                  break;
+                // 朝当前路点走；**连续走不动就跳过这个路点**
+                //   （实测有些路径的第 1 个路点根本到不了，人就永远卡在起点不动）
+                const okMove = this.move(i, wdx, wdz, this.spd[i] * wmul0, cdt);
+                if (okMove) this.pathBlock[i] = 0;
+                else if (++this.pathBlock[i] > 6) {
+                  this.pathBlock[i] = 0;
+                  this.pathIdx[i]++;
+                  if (this.pathIdx[i] >= this.pathN[i]) this.pathN[i] = 0;
                 }
-                // 看不见：不再清路径（那会导致"算路→清路"死循环，实测 40 秒只挪 13m），
-                // 而是照常朝路点走，让 move() 的探测扇形处理小障碍
-                this.move(i, wdx, wdz, this.spd[i] * wmul0, cdt);
                 break;
               }
               let ax = gp[0], az = gp[1];
