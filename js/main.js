@@ -399,9 +399,14 @@ function selectAgent(i) {
     renderAgentCard();
     return;
   }
-  clearLink();                // 换人：断开上一条连线
+  // 换人 = 全新的一次选择：上一个人身上的所有临时状态一律清掉
+  clearLink();                // 黑色连线
+  pathKey = '';               // 路径缓存失效
+  if (pathLine) pathLine.visible = false;
+  if (pathRing) pathRing.visible = false;
   selected = i;
-  placeView = null;           // 换人时回到"角色视图"
+  placeView = null;           // 回到"角色视图"
+  if (followSelected) rig.target.set(sim.px[i], 0, sim.pz[i]);   // 跟随中就直接对准新人
   const el = document.getElementById('agentcard');
   if (!el) return;
   el.classList.remove('hidden');
