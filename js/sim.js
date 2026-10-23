@@ -161,7 +161,7 @@ export class Sim {
     this.buildCoarseGrid();
     this.poiSnapped = snapped;
     this.poiDropped = dropped;
-    this.poiCount = (this.city?.pois || []).length;
+    this.poiCount = this.pois.length;   // 现在用的是生成出来的 POI，不是 city.json 里那批
     // 一次性预处理：每个可走格到最近门的步数（让被墙挡住的人会找门）
     if (typeof nav.buildDoorField === 'function' && !nav.doorDist) {
       const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -627,6 +627,18 @@ export class Sim {
         this.vips.push(i);
       }
       this.vipTotal = this.vips.length;
+      // 政府至少有一位要员：把第一位要员安置在政府大楼里
+      const gov = (this.poiByKind.gov || [])[0];
+      if (gov && this.vips.length) {
+        const v = this.vips[0];
+        this.px[v] = gov.x; this.pz[v] = gov.z;
+        this.homeX[v] = gov.x; this.homeZ[v] = gov.z;
+        this.goal[v] = GOAL.HOLD;
+        this.idle[v] = 1;
+        this.actT[v] = 1e9;              // 待在政府不走
+        this.chainStep[v] = 0;
+        this.vipGov = v;                 // 记录一下，方便 UI/日志
+      }
     }
 
     // ---------------- 爆发模式 ----------------
@@ -1657,6 +1669,7 @@ export class Sim {
     const MIN_D = { police: 700, hospital: 800, fire: 700, school: 450, market: 250, transit: 600, pharmacy: 200, gov: 700 };
     const MIN_A = { police: 250, hospital: 400, fire: 150, school: 300, market: 120, transit: 250, pharmacy: 80, gov: 300 };
     const BIG = new Set(['police', 'hospital', 'gov', 'transit', 'fire']);
+    const CAP = { gov: 1 };        // 政府最多 1 个
 
     // 候选：楼 → 面积 + 内部点（用多边形质心，凹形会被后面的吸附兜住）
     const cand = [];
@@ -1697,7 +1710,8 @@ export class Sim {
     };
     for (const kind in DENS) {
       const [dens, minN] = DENS[kind];
-      const want = Math.max(1, minN, Math.round(km2 * dens));   // 每种至少 1 个（防 bug）
+      let want = Math.max(1, minN, Math.round(km2 * dens));     // 每种至少 1 个（防 bug）
+      if (CAP[kind]) want = Math.min(want, CAP[kind]);          // 再套上限
       // 大楼优先（只在前 40% 里挑），但别把候选池压得太小
       const pool = BIG.has(kind) ? cand.slice(0, Math.max(40, Math.round(cand.length * 0.4))) : cand;
       let made = 0;
