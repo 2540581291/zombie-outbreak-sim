@@ -265,6 +265,7 @@ export class Sim {
     this.freeT = new Float32Array(NMAX);         // 刚出门的"别再找门"保护期
     this.pathX = new Float32Array(NMAX * 16);    // 粗网格寻路的路点（最多 16 个）
     this.pathZ = new Float32Array(NMAX * 16);
+    this.armHome = new Uint8Array(NMAX);  // 1 = 正在回家补弹（这条 goal 不被 decide 覆盖）
     this.pet = new Uint8Array(NMAX);      // 动物：1 = 家养（绑主人家），0 = 野生
     this.fleeMode = new Uint8Array(NMAX); // 逃跑大类：0 无 / 1 即时（只为离开 40m）/ 2 有目标
     this.fleeGoal = new Uint8Array(NMAX); // 有目标逃跑的目标：0 回家 / 1 警局 / 2 逃离城区
@@ -352,6 +353,7 @@ export class Sim {
     this.lockT.fill(0); this.lockOn.fill(0);
     this.fleeMode.fill(0); this.fleeGoal.fill(0); this.stationLost.fill(0);
     this.pet.fill(0);
+    this.armHome.fill(0);
     // 关键：全部状态清零，否则上一局的残留会让结果不可复现
     this.cool.fill(0); this.timer.fill(0); this.panic.fill(0);
     this.wpn.fill(0); this.mag.fill(0); this.reserve.fill(0); this.skill.fill(0); this.rlUntil.fill(0);
@@ -1482,6 +1484,14 @@ export class Sim {
   decide(i) {
     const st = this.state[i];
     if (st !== ST.CIV && st !== ST.FLEE && st !== ST.FIGHT && st !== ST.INFECTED) return;
+    // 回家补弹：这条 goal 要粘住，直到到家拿到子弹
+    if (this.armHome[i]) {
+      if (this.goal[i] !== GOAL.ARM_HOME) this.setGoal(i, GOAL.ARM_HOME, this.homeX[i], this.homeZ[i]);
+      // 家通常是"楼里的点"，人进不去 —— 目标改成家门口，走到门口就算到家
+      const dpA = this.doorOf(this.homeX[i], this.homeZ[i]);
+      if (dpA) { this.goalX[i] = dpA[0]; this.goalZ[i] = dpA[1]; }
+      return;
+    }
     // 玩家/系统下达的移动命令（右键点地、出警）优先：没走到之前不被社会决策覆盖
     if (this.goal[i] === GOAL.MOVE_TO) {
       const gp = this.goalPoint(i, GOAL.MOVE_TO);
@@ -1584,6 +1594,22 @@ export class Sim {
           this.ammo[i] = this.mag[i];
         }
       }
+      // 已经有枪但打空了：从自家军械库补弹（不再只是"有枪就不给"）
+      else if (this.armed[i] && this.mag[i] <= 0 && this.reserve[i] <= 0 &&
+               this.hhStart && this.hh[i] < this.nHh) {
+        const stock2 = this.homeStocks.get(this.hh[i]);
+        const wid = this.wpn[i], w2 = weaponOf(wid);
+        const avail = stock2 && stock2.a ? (stock2.a[wid] || 0) : 0;
+        const got = Math.min(w2.mag * 3, avail);
+        if (got > 0) {
+          stock2.a[wid] = avail - got;
+          this.mag[i] = Math.min(w2.mag, got);
+          this.reserve[i] = Math.max(0, Math.min(255, got - this.mag[i]));
+          this.ammo[i] = this.mag[i];
+          this.rlUntil[i] = this.time + w2.reload;
+        }
+      }
+      this.armHome[i] = 0;
       this.setGoal(i, GOAL.HOLD, this.homeX[i], this.homeZ[i]);
       this.idle[i] = 1;
       this.actT[i] = 5 + this.rng() * 8;
@@ -2615,6 +2641,18 @@ export class Sim {
           if (this.cool[i] <= 0) {
             const w = weaponOf(this.wpn[i]);
             if (!this.armed[i] || (this.mag[i] <= 0 && this.reserve[i] <= 0)) {
+              // 家里有枪且不在"有目标逃跑"状态 → 先回家补弹（ARM_HOME 链），
+              // 只有没家底 / 正在逃命时才掉头就跑
+              if (this.armed[i] && this.homeHasGun(i) && this.fleeMode[i] !== 2) {
+                this.state[i] = ST.CIV;
+                this.armHome[i] = 1;
+                this.setGoal(i, GOAL.ARM_HOME, this.homeX[i], this.homeZ[i]);
+                {
+                  const dpH = this.doorOf(this.homeX[i], this.homeZ[i]);
+                  if (dpH) { this.goalX[i] = dpH[0]; this.goalZ[i] = dpH[1]; }
+                }
+                break;
+              }
               this.state[i] = ST.FLEE; this.panic[i] = 1.4; break;
             }
             this.cool[i] = (w.rate || 0.5) * (1 + rng() * 0.25);
