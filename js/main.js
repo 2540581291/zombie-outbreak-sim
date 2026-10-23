@@ -294,9 +294,8 @@ let escapeMark = null;      // 逃离线的绿色光带
 // 选中角色的行走路径（虚线折线）
 let pathLine = null;
 let pathRing = null;
-let selRingA = null, selRingB = null;   // 选中标记：亮白细环 + 外圈光晕（实例化）
-const MARK_CAP = 24;
-let marked = [];                        // 选中过的个体（新的在前，最多 MARK_CAP 个）
+let linkLine = null;                    // 纯黑连线：选中的那个人 → 点到的另一个角色/地点
+let linkTo = null;                      // { kind: 'agent'|'place', i, x, z, label }
 let pathKey = '';
 
 function ensurePathGfx() {
@@ -320,24 +319,17 @@ function ensurePathGfx() {
   pathRing.visible = false;
   scene.add(pathRing);
 
-  // 选中标记：白色荧光圈（加法混合，两层 —— 亮白细环 + 外圈光晕）
-  const mkRing = (r0, r1, op) => new THREE.InstancedMesh(
-    new THREE.RingGeometry(r0, r1, 40),
-    new THREE.MeshBasicMaterial({
-      color: 0xffffff, transparent: true, opacity: op, side: THREE.DoubleSide,
-      depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,
-    }),
-    MARK_CAP
-  );
-  selRingA = mkRing(1.05, 1.32, 0.95);      // 芯
-  selRingB = mkRing(1.32, 1.95, 0.28);      // 光晕
-  for (const m of [selRingA, selRingB]) {
-    m.frustumCulled = false;
-    m.renderOrder = 8;
-    m.visible = false;
-    m.count = 0;
-    m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    scene.add(m);
+  // 纯黑连线（两点，每帧更新端点）
+  {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+    linkLine = new THREE.Line(geo, new THREE.LineBasicMaterial({
+      color: 0x000000, transparent: false, depthTest: false, depthWrite: false,
+    }));
+    linkLine.frustumCulled = false;
+    linkLine.renderOrder = 9;
+    linkLine.visible = false;
+    scene.add(linkLine);
   }
 }
 
@@ -407,7 +399,7 @@ function selectAgent(i) {
     renderAgentCard();
     return;
   }
-  markAgent(i);               // 选中即留下一个荧光圈（之前选中的人不动）
+  clearLink();                // 换人：断开上一条连线
   selected = i;
   placeView = null;           // 换人时回到"角色视图"
   const el = document.getElementById('agentcard');
@@ -416,51 +408,40 @@ function selectAgent(i) {
   renderAgentCard();
 }
 
-/** 选中某人并把镜头挪过去（卡片内部的跳转都走这里） */
-function visit(i) {
-  if (!sim || i < 0 || i >= sim.n) return;
-  selectAgent(i);
-  rig.target.set(sim.px[i], 0, sim.pz[i]);
+/** 连线：把"当前选中的人"接到另一个角色 / 一个地点上（纯黑线，镜头不动） */
+function setLink(kind, key, label) {
+  if (!sim || selected < 0) return;
+  const same = linkTo && linkTo.kind === kind &&
+    (kind === 'agent' ? linkTo.i === key
+      : (Math.abs(linkTo.x - key[0]) < 0.5 && Math.abs(linkTo.z - key[1]) < 0.5));
+  if (same) { clearLink(); toast('已断开连线'); return; }
+  linkTo = kind === 'agent'
+    ? { kind, i: key, x: 0, z: 0, label }
+    : { kind, i: -1, x: key[0], z: key[1], label };
+  toast('连线：' + label);
 }
 
-/** 选中即留下一个荧光圈（集合：之前选中的人不清，点空白才清） */
-function markAgent(i) {
-  if (!sim || i < 0 || i >= sim.n) return;
-  marked = marked.filter((x) => x !== i);
-  marked.unshift(i);
-  if (marked.length > MARK_CAP) marked.length = MARK_CAP;
+function clearLink() {
+  linkTo = null;
+  if (linkLine) linkLine.visible = false;
 }
 
-function clearMarks() { marked.length = 0; }
-
-const _mkM = new THREE.Matrix4();
-const _mkQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
-const _mkP = new THREE.Vector3();
-const _mkS = new THREE.Vector3(1, 1, 1);
-
-/** 每帧把 marked 里的人全部画成白色荧光圈（带一点呼吸） */
-function updateMarks(t) {
-  if (!selRingA) return;
-  const pulse = 1 + Math.sin((t || 0) / 700) * 0.07;
-  // 圈是世界尺寸，拉远会看不见 —— 按当前视距放大，上限 6 倍
-  const zoomK = Math.min(6, Math.max(1, (rig.dist || 0) / 260));
-  const sc = pulse * zoomK;
-  let n = 0;
-  for (const i of marked) {
-    if (!sim || i < 0 || i >= sim.n) continue;
-    _mkP.set(sim.px[i], 2.0, sim.pz[i]);
-    _mkS.set(sc, sc, sc);
-    _mkM.compose(_mkP, _mkQ, _mkS);
-    selRingA.setMatrixAt(n, _mkM);
-    selRingB.setMatrixAt(n, _mkM);
-    if (++n >= MARK_CAP) break;
+/** 每帧刷新连线两端（人是活的，会走） */
+function updateLink() {
+  if (!linkLine) return;
+  if (!sim || selected < 0 || !linkTo) { linkLine.visible = false; return; }
+  let tx = linkTo.x, tz = linkTo.z;
+  if (linkTo.kind === 'agent') {
+    const i = linkTo.i;
+    if (i < 0 || i >= sim.n) { linkLine.visible = false; return; }
+    tx = sim.px[i]; tz = sim.pz[i];
   }
-  selRingA.count = n; selRingB.count = n;
-  selRingA.visible = n > 0; selRingB.visible = n > 0;
-  if (n) {
-    selRingA.instanceMatrix.needsUpdate = true;
-    selRingB.instanceMatrix.needsUpdate = true;
-  }
+  const a = linkLine.geometry.attributes.position.array;
+  a[0] = sim.px[selected]; a[1] = 2.4; a[2] = sim.pz[selected];
+  a[3] = tx; a[4] = 2.4; a[5] = tz;
+  linkLine.geometry.attributes.position.needsUpdate = true;
+  linkLine.geometry.computeBoundingSphere();
+  linkLine.visible = true;
 }
 
 function setFollow(on) {
@@ -474,7 +455,7 @@ function setFollow(on) {
 
 function deselectAgent() {
   selected = -1;
-  clearMarks();               // 点空白：选中概念整组消失
+  clearLink();                // 点空白：连线一并消失
   followSelected = false;
   const el = document.getElementById('agentcard');
   if (el) el.classList.add('hidden');
@@ -726,6 +707,7 @@ function renderAgentCard() {
     ${p.social ? `<div class="ac-row"><span>行程</span><em>${p.social}</em></div>` : ''}
     ${p.awareText ? `<div class="ac-row"><span>知情</span><em>${p.awareText}</em></div>` : ''}
     ${p.vipEscort ? `<div class="ac-row"><span>护送</span><em>${p.vipEscort}</em></div>` : ''}
+    ${linkTo ? `<div class="ac-row"><span>连线</span><em><b class="link" data-act="unlink">→ ${linkTo.label}</b>（再点一次断开）</em></div>` : ''}
     <div class="ac-row"><span>血量</span><em>${p.hp} / ${p.hpMax}</em></div>
     <div class="ac-bar ${p.hp / p.hpMax < 0.35 ? 'on' : ''}"><i style="width:${Math.min(100, (p.hp / p.hpMax) * 100).toFixed(0)}%"></i></div>
     <div class="ac-row"><span>武器</span><em>${p.weaponTxt
@@ -1017,7 +999,7 @@ if ($('sel-mode')) {
 syncLabels();
 
 $('btn-restart').onclick = () => {
-  clearMarks();
+  clearLink();
   closeReport();
   closeOverview();
   deselectAgent();
@@ -1054,8 +1036,8 @@ if (new URLSearchParams(location.search).has('pick')) {
 window.addEventListener('error', (e) => {
   window.__err = (e.message || 'err') + ' @' + String(e.filename || '').split('/').pop() + ':' + e.lineno;
 });
-window.__zosRestart = () => { clearMarks(); sim.reset(readParams()); buildEscapeMarker(); hideBanner(); };
-$('btn-seed').onclick = () => { clearMarks(); seed = (Math.random() * 1e9) | 0; sim.reset(readParams()); buildEscapeMarker(); hideBanner(); };
+window.__zosRestart = () => { clearLink(); sim.reset(readParams()); buildEscapeMarker(); hideBanner(); };
+$('btn-seed').onclick = () => { clearLink(); seed = (Math.random() * 1e9) | 0; sim.reset(readParams()); buildEscapeMarker(); hideBanner(); };
 $('p-toggle').onclick = () => {
   const b = $('p-body');
   b.classList.toggle('hide');
@@ -1365,22 +1347,23 @@ selectTool('select');
   if (body) body.onclick = (ev) => {
     if (!sim) return;
     // 点家属：选中他，并把镜头挪过去（保持当前缩放）
+    const unl = ev.target.closest('[data-act="unlink"]');
+    if (unl) { ev.stopPropagation(); clearLink(); renderAgentCard(); return; }
     const kin = ev.target.closest('[data-act="agent"]');
     if (kin) {
       ev.stopPropagation();
       const j = +kin.dataset.i;
-      visit(j);
+      // 连线到这位家属（镜头不动、选中不变）
+      setLink('agent', j, (shortName(j, sim) || ('#' + j)));
+      renderAgentCard();
       return;
     }
     const a = ev.target.closest('[data-act="place"]');
     if (!a) return;
     const x = parseFloat(a.dataset.x), z = parseFloat(a.dataset.z);
     const poi = placeNear(x, z, 220);
-    placeView = poi || { k: '', x, z, n: '这个地址', a: 0 };
-    const bk2 = document.getElementById('ac-back');
-    if (bk2) bk2.classList.remove('hidden');
-    setFollow(false);               // 看地点时不要跟着人跑
-    rig.target.set(x, 0, z);        // 镜头直接跳过去
+    const label = poi ? ((KIND_NAME[poi.k] || '地点') + (poi.n ? ' · ' + poi.n : '')) : a.textContent || '地点';
+    setLink('place', [x, z], label);
     renderAgentCard();
   };
   const f = document.getElementById('ac-follow');
@@ -1971,7 +1954,7 @@ function loop(t) {
   // 跟随 + 选中圈：每帧更新，2D/3D 都生效
   if (sim) {
     if (followSelected && selected >= 0) rig.target.set(sim.px[selected], 0, sim.pz[selected]);
-    updateMarks(t);
+    updateLink();
   }
 
   if (retroMode && retro && retro.ready) {
