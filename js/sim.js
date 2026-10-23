@@ -2815,6 +2815,32 @@ export class Sim {
           // 开火冷却每帧递减（原来只有"锁定目标"那条分支递减，
           // 结果回局/驻守/赶路的警察 cool 永远停在初始随机值上 → 一辈子不开枪）
           if (this.cool[i] > 0) this.cool[i] -= cdt;
+          // ---- 弹药打光 → 先回警局补给（不看有没有目标）----
+          //   优先级：有目标逃跑（fleeMode 2）> 补给 > 原地待命
+          if (this.ammo[i] <= 0 && this.mag[i] <= 0 && this.reserve[i] <= 0 && this.fleeMode[i] !== 2) {
+            const siR = this.stationOf[i] - 1;
+            const stR = siR >= 0 ? (this.poiByKind.police || [])[siR] : null;
+            if (stR) {
+              const dxR = stR.x - this.px[i], dzR = stR.z - this.pz[i];
+              const ddR = Math.hypot(dxR, dzR);
+              if (ddR > 16) {
+                this.setGoal(i, GOAL.SHELTER, stR.x, stR.z);
+                this.move(i, dxR, dzR, this.spd[i] * 1.05, cdt);
+                break;
+              }
+              const wid = this.wpn[i], wR = weaponOf(wid);
+              const avail = stR.store && stR.store.a ? (stR.store.a[wid] || 0) : 0;
+              const got = Math.min(wR.mag * 4, avail);
+              if (got > 0) {
+                stR.store.a[wid] = avail - got;
+                this.mag[i] = Math.min(wR.mag, got);
+                this.reserve[i] = Math.min(255, got - this.mag[i]);
+                this.ammo[i] = this.mag[i];
+                this.rlUntil[i] = this.time + wR.reload;
+                break;
+              }
+            }
+          }
           // ---- 护送任务最高优先级：要员在哪我就在哪（混乱 50% 回局的规则也压不住）----
           if (this.escortOf[i]) {
             const v = this.vips[this.escortOf[i] - 1];
@@ -2896,7 +2922,39 @@ export class Sim {
             const dx = this.px[z] - this.px[i], dz = this.pz[z] - this.pz[i];
             this.heading[i] = Math.atan2(dz, dx);
             if (this.cool[i] <= 0) {
-              if (this.ammo[i] <= 0) { this.state[i] = ST.FLEE; this.panic[i] = 1.4; this.stam[i] = 1; break; }
+              if (this.ammo[i] <= 0 && this.reserve[i] <= 0) {
+                // 没子弹了：先去最近的警局补给（弹药是共用的），
+                // 但"有目标逃跑"的优先级更高 —— 正在逃跑就先跑，不回去拿子弹。
+                if (this.fleeMode[i] !== 2) {
+                  const si2 = this.stationOf[i] - 1;
+                  const st2 = si2 >= 0 ? (this.poiByKind.police || [])[si2] : null;
+                  if (st2) {
+                    const dx2 = st2.x - this.px[i], dz2 = st2.z - this.pz[i];
+                    const dd = Math.hypot(dx2, dz2);
+                    if (dd > 16) {
+                      this.setGoal(i, GOAL.SHELTER, st2.x, st2.z);
+                      this.move(i, dx2, dz2, this.spd[i] * 1.05, cdt);
+                      break;
+                    }
+                    // 到局了：从共用弹药池补一个弹匣 + 3 个备弹匣
+                    const wid = this.wpn[i];
+                    const w2 = weaponOf(wid);
+                    const avail = st2.store && st2.store.a ? (st2.store.a[wid] || 0) : 0;
+                    const need = w2.mag * 4;
+                    const got = Math.min(need, avail);
+                    if (got > 0) {
+                      st2.store.a[wid] = avail - got;
+                      this.reserve[i] = Math.min(255, (this.reserve[i] || 0) + got);
+                      this.mag[i] = Math.min(w2.mag, this.reserve[i]);
+                      this.reserve[i] -= this.mag[i];
+                      this.ammo[i] = this.mag[i];
+                      this.rlUntil[i] = this.time + w2.reload;
+                      break;
+                    }
+                  }
+                }
+                this.state[i] = ST.FLEE; this.panic[i] = 1.4; this.stam[i] = 1; break;
+              }
               this.ammo[i]--;
               const msp = SPECIES[this.kind[i]] || SPECIES[SP.POLICE];
               this.cool[i] = msp.rate * (0.85 + rng() * 0.3);
