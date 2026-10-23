@@ -405,6 +405,15 @@ function selectAgent(i) {
   renderAgentCard();
 }
 
+function setFollow(on) {
+  followSelected = !!on;
+  const f = document.getElementById('ac-follow');
+  if (f) {
+    f.textContent = followSelected ? '停止跟随' : '跟随镜头';
+    f.classList.toggle('on', followSelected);
+  }
+}
+
 function deselectAgent() {
   selected = -1;
   followSelected = false;
@@ -625,15 +634,24 @@ function renderAgentCard() {
   const ROLE_TXT = { spouse: '配偶', child: '子女', parent: '父母', grandparent: '祖辈', sibling: '同住' };
   const kins = isAnimal ? []
     : kinList(sim, selected, (j) => (sim.age && sim.age[j]) || ageOfAgent(sim, j, () => 0), (j) => shortName(j, sim));
-  const kinHtml = kins.length
-    ? kins.map((k) => {
-        const dead = sim.state[k.j] === ST.CORPSE;
-        const zom = sim.state[k.j] === ST.ZOMBIE;
-        const mark = dead ? '†' : (zom ? '☠' : '');
-        const tip = `${ROLE_TXT[k.role] || '家人'} · ${k.age} 岁${dead ? ' · 已死亡' : (zom ? ' · 已尸变' : '')}`;
-        return `<b class="link${dead ? ' gone' : ''}" data-act="agent" data-i="${k.j}" title="${tip}">${k.name}${mark}</b>`;
-      }).join('<span style="color:#5b6a77"> · </span>')
-    : (p.family ? `<em>${p.family}</em>` : '<em>—</em>');
+  const kinChip = (k) => {
+    const dead = sim.state[k.j] === ST.CORPSE;
+    const zom = sim.state[k.j] === ST.ZOMBIE;
+    const mark = dead ? '†' : (zom ? '☠' : '');
+    const tip = `${ROLE_TXT[k.role] || '家人'} · ${k.age} 岁${dead ? ' · 已死亡' : (zom ? ' · 已尸变' : '')}`;
+    return `<b class="link${dead ? ' gone' : ''}" data-act="agent" data-i="${k.j}" title="${tip}">${k.name}${mark}</b>`;
+  };
+  const SEP = '<span style="color:#5b6a77"> · </span>';
+  // 按关系分组：配偶 / 子女 / 父母 / 祖辈 / 同住，各占一行
+  const kinGroups = new Map();
+  for (const k of kins) {
+    if (!kinGroups.has(k.role)) kinGroups.set(k.role, []);
+    kinGroups.get(k.role).push(k);
+  }
+  const kinRows = [...kinGroups.entries()]
+    .map(([role, arr]) => `<div class="ac-row"><span>${ROLE_TXT[role] || '家人'}</span><em>${arr.map(kinChip).join(SEP)}</em></div>`)
+    .join('');
+  const kinHtml = kinRows || (p.family ? `<div class="ac-row"><span>家庭</span><em>${p.family}</em></div>` : '<div class="ac-row"><span>家庭</span><em>—</em></div>');
 
   const sec1 = `
     <div class="ac-sec">身份</div>
@@ -641,7 +659,7 @@ function renderAgentCard() {
       ? `<div class="ac-row"><span>种类</span><em>${kindName}（动物）</em></div>
          <div class="ac-row"><span>来历</span><em>街上的${kindName}，没有家和工作地</em></div>`
       : `<div class="ac-row"><span>职业</span><em>${p.job}</em></div>
-         <div class="ac-row"><span>家庭</span><em>${kinHtml}</em></div>`}`;
+         ${kinHtml}`}`;
 
   const sec2 = `
     <div class="ac-sec">状态</div>
@@ -1304,12 +1322,14 @@ selectTool('select');
     placeView = poi || { k: '', x, z, n: '这个地址', a: 0 };
     const bk2 = document.getElementById('ac-back');
     if (bk2) bk2.classList.remove('hidden');
+    setFollow(false);               // 看地点时不要跟着人跑
+    rig.target.set(x, 0, z);        // 镜头直接跳过去
     renderAgentCard();
   };
   const f = document.getElementById('ac-follow');
   if (f) f.onclick = (ev) => {
     ev.stopPropagation();
-    followSelected = !followSelected;
+    setFollow(!followSelected);
     f.textContent = followSelected ? '停止跟随' : '跟随镜头';
     f.classList.toggle('on', followSelected);
   };
