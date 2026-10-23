@@ -208,7 +208,6 @@ export class Sim {
     this.pow.fill(1);
     this.nextWild = 45;                          // 下一次刷野生动物的秒数
     this.ammo = new Int16Array(NMAX);            // 弹药（打光就完蛋）
-    this.acc = new Float32Array(NMAX);           // 个人命中率
     // ---- 武器（M5）----
     this.wpn = new Uint8Array(NMAX);             // 武器 id
     this.mag = new Uint8Array(NMAX);             // 弹匣里还有几发
@@ -394,7 +393,6 @@ export class Sim {
     this.aStage.fill(0); this.aT.fill(0); this.aDur.fill(0); this.aZ.fill(0); this.riseAt.fill(0);
     this.waveLeft = 0; this.waveNext = 0; this.waveCount = 0;
     if (this.origins) this.origins.length = 0;
-    this.acc.fill(0.2);
     this.killsBy.fill(0); this.infectBy.fill(0);
     this.stats.shots = 0;
 
@@ -458,7 +456,6 @@ export class Sim {
       // 原版节奏：一半人站着发呆 25~60 秒，另一半在街上走 60~140 秒
       this.idle[i] = rng() < 0.5 ? 1 : 0;
       this.actT[i] = this.idle[i] ? (25 + rng() * 35) : (60 + rng() * 80);
-      this.acc[i] = 0.22;
       this.pickWander(i);
       idx++;
     }
@@ -593,7 +590,6 @@ export class Sim {
       this.giveWeapon(i, ROLE_WEAPON.police + (this.rng() < 0.25 ? 3 : 0), skillFor('police'));
       this.phase[i] = rng(); this.timer[i] = 0; this.cool[i] = rng();
       this.ammo[i] = 40;                       // 一个弹匣，打光就跑
-      this.acc[i] = P.policeAccuracy;
       this.pickWander(i);
     }
 
@@ -2452,7 +2448,7 @@ export class Sim {
               this.ammo[i]--;
               const msp = SPECIES[this.kind[i]] || SPECIES[SP.POLICE];
               this.cool[i] = msp.rate * (0.85 + rng() * 0.3);
-              this.shoot(i, z, this.acc[i], msp.range || 30);
+              this.shoot(i, z, this.shotAccuracy(i), msp.range || 30);
             }
             const d2 = dx * dx + dz * dz;
             if (d2 > 18 * 18) this.move(i, dx, dz, this.spd[i], dt);
@@ -2562,7 +2558,6 @@ export class Sim {
       this.hp[i] = sp.hp;
       this.spd[i] = sp.speed;
       this.ammo[i] = sp.team === TEAM.HUMAN ? 999 : 0;
-      this.acc[i] = sp.acc || 0;
       this.state[i] = sp.team === TEAM.HUMAN
         ? (kind === SP.ELITE ? ST.SOLDIER : ST.POLICE)
         : ST.ZOMBIE;
@@ -2576,14 +2571,12 @@ export class Sim {
       this.hp[i] = SPECIES[SP.SOLDIER].hp;
       this.spd[i] = SPECIES[SP.SOLDIER].speed;
       this.ammo[i] = 60;
-      this.acc[i] = 0.65;
     } else if (kind === 'elite') {
       this.kind[i] = SP.ELITE;
       this.state[i] = ST.SOLDIER;
       this.hp[i] = SPECIES[SP.ELITE].hp;
       this.spd[i] = SPECIES[SP.ELITE].speed;
       this.ammo[i] = 240;
-      this.acc[i] = 0.72;
     } else if (kind === 'apc') {
       this.kind[i] = SP.APC;
       this.state[i] = ST.POLICE;
@@ -2591,7 +2584,6 @@ export class Sim {
       this.hp[i] = SPECIES[SP.APC].hp;
       this.spd[i] = SPECIES[SP.APC].speed;
       this.ammo[i] = 9999;
-      this.acc[i] = 0.6;
     } else if (kind === 'swat') {
       this.kind[i] = SP.POLICE;
       this.state[i] = ST.POLICE;
@@ -2599,7 +2591,6 @@ export class Sim {
       this.hp[i] = SPECIES[SP.POLICE].hp;
       this.spd[i] = 2.7 + this.rng() * 0.3;
       this.ammo[i] = 80;
-      this.acc[i] = 0.55;
     } else {
       this.kind[i] = SP.POLICE;
       this.state[i] = ST.POLICE;
@@ -2607,7 +2598,6 @@ export class Sim {
       this.hp[i] = SPECIES[SP.POLICE].hp;
       this.spd[i] = 2.4 + this.rng() * 0.4;
       this.ammo[i] = 40;
-      this.acc[i] = this.params.policeAccuracy;
     }
     this.pickWander(i);
     return i;
@@ -3039,9 +3029,7 @@ export class Sim {
   /** 真正带个体年龄的版本（上面的占位由它替换） */
   incubationFor(i, route) {
     const r = route || 1;
-    const k = (this.params.infectTime || 90) / 90;      // 滑杆 90 s = 原本的 60–120 s
-    const [lo0, hi0] = r === 2 ? INCFG.contact : INCFG.bite;
-    const lo = lo0 * k, hi = hi0 * k;
+    const [lo, hi] = r === 2 ? INCFG.contact : INCFG.bite;
     const age = ageOf(i);
     const consti = age > 65 ? 0.25 : (age < 18 ? 0.6 : (age < 25 ? 0.75 : 0.5));
     const score = 0.6 * consti + 0.4 * h(i, 77);
@@ -3111,10 +3099,20 @@ export class Sim {
     this.reserve[i] = w.reserve;
     this.skill[i] = Math.round(Math.max(0, Math.min(1, skill01)) * 255);
     this.armed[i] = 1;
-    this.acc[i] = 0.4 + skill01 * 0.4;
   }
 
   /** 开火：查弹匣 / 装填 / 射程 / 精度（受熟练度影响）/ 噪音 */
+  /**
+   * 命中率只有这一张表，写死（不再有武器精度 / 熟练度 / 滑杆等第二种来源）：
+   *   警察 30%（含 SWAT、警车）    军队 80%（士兵 / 重装 / 装甲车）    平民 10%
+   */
+  shotAccuracy(i) {
+    const k = this.kind[i];
+    if (k === SP.POLICE) return 0.30;
+    if (k === SP.SOLDIER || k === SP.ELITE || k === SP.APC) return 0.80;
+    return 0.10;
+  }
+
   fireWeapon(i, to) {
     const w = weaponOf(this.wpn[i]);
     if (w.id === 0 || !this.armed[i]) return false;
@@ -3138,11 +3136,7 @@ export class Sim {
     if (d2 > w.range * w.range) return false;
     this.mag[i]--;
     this.ammo[i] = this.mag[i];                            // 兼容旧字段
-    const sk = this.skill[i] / 255;
-    // 警察用滑杆（原版就是一个"命中率"数字），其他枪手用武器精度 × 熟练度
-    const acc = this.kind[i] === SP.POLICE
-      ? (this.params.policeAccuracy || 0.6)
-      : w.acc * (0.6 + 0.4 * sk);
+    const acc = this.shotAccuracy(i);
     this.shoot(i, to, acc, w.range, w.dmg);
     this.addNoise(this.px[i], this.pz[i], w.noise);
     return true;
@@ -3399,7 +3393,7 @@ export class Sim {
       stations,
       kills: this.kills || 0,
       civKilled: this.civDeaths || 0,
-      accuracy: (this.params && this.params.policeAccuracy) || 0,
+      accuracy: 0.30,                       // 警察命中率（写死）
     };
   }
 

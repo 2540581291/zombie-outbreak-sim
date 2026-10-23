@@ -806,8 +806,8 @@ function buildModeUI() {
 }
 
 // ---------- 参数 ----------
-const sPop = $('s-pop'), sZ0 = $('s-z0'), sZspd = $('s-zspd'), sInc = $('s-inc');
-const sArm = $('s-arm'), sPol = $('s-pol'), sPacc = $('s-pacc');
+const sPop = $('s-pop'), sZ0 = $('s-z0'), sZspd = $('s-zspd');
+const sArm = $('s-arm'), sPol = $('s-pol');
 const sDog = $('s-dog'), sCat = $('s-cat'), sBear = $('s-bear'), sTiger = $('s-tiger'), sAinf = $('s-ainf');
 
 // 难度档：一次调四组参数（人口 / 初始尸 / 持枪率 / 警力）
@@ -844,10 +844,8 @@ function readParams() {
     population: +sPop.value,
     initialZombies: +sZ0.value,
     zombieSpeed: +sZspd.value,
-    infectTime: +sInc.value,
     homeGunRate: +sArm.value / 100,   // 「家庭持枪率」：决定每户有没有枪
     police: +sPol.value,
-    policeAccuracy: +sPacc.value / 100,
     dogs: +sDog.value, cats: +sCat.value,
     bears: +sBear.value, tigers: +sTiger.value,
     animalInfected: +sAinf.value / 100,
@@ -870,17 +868,15 @@ function syncLabels() {
   $('v-pop').textContent = (+sPop.value).toLocaleString();
   $('v-z0').textContent = sZ0.value;
   $('v-zspd').textContent = (+sZspd.value).toFixed(1);
-  $('v-inc').textContent = sInc.value + 's';
   $('v-arm').textContent = sArm.value + '%';
   $('v-pol').textContent = sPol.value;
-  $('v-pacc').textContent = sPacc.value + '%';
   $('v-dog').textContent = sDog.value;
   $('v-cat').textContent = sCat.value;
   $('v-bear').textContent = sBear.value;
   $('v-tiger').textContent = sTiger.value;
   $('v-ainf').textContent = sAinf.value + '%';
 }
-[sPop, sZ0, sZspd, sInc, sArm, sPol, sPacc, sDog, sCat, sBear, sTiger, sAinf].forEach(s => s.addEventListener('input', syncLabels));
+[sPop, sZ0, sZspd, sArm, sPol, sDog, sCat, sBear, sTiger, sAinf].forEach(s => s.addEventListener('input', syncLabels));
 if ($('sel-mode')) {
   buildModeUI();
   $('sel-mode').onchange = buildModeUI;
