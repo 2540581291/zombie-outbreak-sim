@@ -606,6 +606,15 @@ function agentRules(i, p) {
       if (sim.chaos > 80) rows.push(['通缉', '<b style="color:#ff8a5c">混乱 > 80%：被当作丧尸</b>']);
     }
     if (st === ST.FLEE) rows.push(['体力', (sim.stam[i] * 100).toFixed(0) + '% · 恐慌 ' + sim.panic[i].toFixed(2)]);
+    // 逃跑（独立大类）：即时逃跑 / 有目标逃跑（回家·警局·出城）
+    if (sim.fleeMode && sim.fleeMode[i]) {
+      const GOALS = ['回家', '去警局', '逃离城区'];
+      const t = sim.fleeMode[i] === 1
+        ? '<b style="color:#ffd479">即时逃跑</b>（只想离开 40m 内的丧尸）'
+        : `<b style="color:#ff9b6a">有目标逃跑 → ${GOALS[sim.fleeGoal[i]] || '?'}</b>` +
+          (sim.stationLost[i] ? '<span style="color:#7d8b99">（警局已沦陷，改道）</span>' : '');
+      rows.push(['逃跑', t]);
+    }
     return '<div class="ac-sec">属性</div>' +
       rows.map(([k, v]) => `<div class="ac-row"><span>${k}</span><em>${v}</em></div>`).join('');
   }
@@ -1999,6 +2008,12 @@ function loop(t) {
     $('n-inf').textContent = sim.stats.infected.toLocaleString();
     $('n-zomb').textContent = sim.stats.zombie.toLocaleString();
     $('n-dead').textContent = sim.stats.dead.toLocaleString();
+    if ($('n-flee')) {
+      const st2 = sim.stats;
+      $('n-flee').textContent = ((st2.fleeTotal || 0) + (st2.fleeImm || 0)).toLocaleString();
+      $('n-flee').title = `即时逃跑 ${st2.fleeImm || 0} · 有目标逃跑 ${st2.fleeTotal || 0}`
+        + `（回家 ${st2.fleeHome || 0} / 警局 ${st2.fleePolice || 0} / 出城 ${st2.fleeEscape || 0}）`;
+    }
     // 三条状态条（混乱 → 感染 → 知情）
     const gauge = (id, v) => { const e = $(id); if (e) e.style.width = Math.max(0, Math.min(100, v)) + "%"; };
     gauge("bar-chaos", sim.chaos || 0);

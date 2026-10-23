@@ -265,6 +265,9 @@ export class Sim {
     this.freeT = new Float32Array(NMAX);         // 刚出门的"别再找门"保护期
     this.pathX = new Float32Array(NMAX * 16);    // 粗网格寻路的路点（最多 16 个）
     this.pathZ = new Float32Array(NMAX * 16);
+    this.fleeMode = new Uint8Array(NMAX); // 逃跑大类：0 无 / 1 即时（只为离开 40m）/ 2 有目标
+    this.fleeGoal = new Uint8Array(NMAX); // 有目标逃跑的目标：0 回家 / 1 警局 / 2 逃离城区
+    this.stationLost = new Uint8Array(NMAX); // 1 = 亲眼确认过警局沦陷，不再选"去警局"
     this.lockT = new Float32Array(NMAX);   // 下次锁敌时间（每 60s 一次）
     this.lockOn = new Uint8Array(NMAX);    // 目标来自锁敌（允许远距离追击）
     this.pathN = new Uint8Array(NMAX);
@@ -346,6 +349,7 @@ export class Sim {
     this.tracers.length = 0; this.booms.length = 0;
     this.nearZ.fill(-1); this.nearC.fill(-1); this.nearPoll.fill(-1); this.tgt.fill(-1);
     this.lockT.fill(0); this.lockOn.fill(0);
+    this.fleeMode.fill(0); this.fleeGoal.fill(0); this.stationLost.fill(0);
     // 关键：全部状态清零，否则上一局的残留会让结果不可复现
     this.cool.fill(0); this.timer.fill(0); this.panic.fill(0);
     this.wpn.fill(0); this.mag.fill(0); this.reserve.fill(0); this.skill.fill(0); this.rlUntil.fill(0);
@@ -1434,6 +1438,29 @@ export class Sim {
       else return;
     }
 
+    // ---- 逃跑（有目标）大类：一旦进入就粘住，直到到达或主动放弃 ----
+    if (this.fleeMode[i] === 2) {
+      this.applyFleeGoal(i);
+      return;
+    }
+    // 触发条件：① 亲眼看见（aware>=2）  ② 混乱度 >= 50
+    if (!this.armed[i] && (this.aware[i] >= 2 || this.chaos >= 50)) {
+      const A = this.attrOf(i);
+      const fam = this.familyAlive(i);
+      // 三种目标各打一个分，取最高的（性格决定）
+      const sHome = fam > 0 ? A.family * 1.10 + 0.15 : -1;
+      const sPolice = A.trust * 1.60 + (1 - A.courage) * 0.50;
+      const sEscape = (1 - A.family) * 0.35 + (1 - A.trust) * 0.35 + A.courage * 0.20 + (fam === 0 ? 0.35 : 0);
+      let fg = 2;
+      let bs = this.stationLost[i] ? -1 : sPolice;   // 确认过警局沦陷 → 警局项直接作废
+      if (sHome > bs) { fg = 0; bs = sHome; }
+      if (sEscape > bs) { fg = 2; bs = sEscape; }
+      this.fleeMode[i] = 2;
+      this.fleeGoal[i] = fg;
+      this.applyFleeGoal(i);
+      return;
+    }
+
     // 发病的人：不管知不知道外面出事了，都会往医院跑（零号病人的核心叙事）
     if (this.sick[i] && this.state[i] === ST.INFECTED) {
       const hp = this.nearestPoi('hospital', this.px[i], this.pz[i]);
@@ -1605,6 +1632,47 @@ export class Sim {
     const st = this.state[j];
     if (st === ST.ZOMBIE) return true;
     return this.chaos > 80 && st === ST.INFECTED;
+  }
+
+  /** 把"有目标逃跑"落到具体目标上；到警局发现沦陷就改道 */
+  applyFleeGoal(i) {
+    const fg = this.fleeGoal[i];
+    if (fg === 1) {
+      const poi = this.nearestPoi('police', this.px[i], this.pz[i]);
+      if (poi) {
+        const d = Math.hypot(poi.x - this.px[i], poi.z - this.pz[i]);
+        // 到了警局门口：如果这里已经被丧尸占满，就标记"沦陷"，改道回家/出城
+        if (d < 18 && this.zombiesNear(poi.x, poi.z, 30) >= 3) {
+          this.stationLost[i] = 1;
+          this.fleeGoal[i] = this.familyAlive(i) > 0 ? 0 : 2;
+          this.applyFleeGoal(i);
+          return;
+        }
+        if (this.goal[i] !== GOAL.SHELTER || d < 18) this.setGoal(i, GOAL.SHELTER, poi.x, poi.z);
+        return;
+      }
+      this.fleeGoal[i] = this.familyAlive(i) > 0 ? 0 : 2;
+      this.applyFleeGoal(i);
+      return;
+    }
+    if (fg === 0) {
+      if (this.goal[i] !== GOAL.HOME) this.setGoal(i, GOAL.HOME, this.homeX[i], this.homeZ[i]);
+      return;
+    }
+    const p = this.escapePoint(i);
+    this.setGoal(i, GOAL.FLEE, p[0], p[1]);
+  }
+
+  /** 某点半径 r 内有多少丧尸（给"警局是否沦陷"用，调用很少） */
+  zombiesNear(x, z, r) {
+    let n = 0;
+    const r2 = r * r;
+    for (let j = 0; j < this.n && n < 8; j++) {
+      if (this.state[j] !== ST.ZOMBIE) continue;
+      const dx = this.px[j] - x, dz = this.pz[j] - z;
+      if (dx * dx + dz * dz <= r2) n++;
+    }
+    return n;
   }
 
   /** 全城最近的"非丧尸单位"（平民/警察/士兵/动物）。带每帧预算，避免同时扫全城 */
@@ -2311,10 +2379,14 @@ export class Sim {
         }
         // ---------------- 逃跑 ----------------
         case ST.FLEE: {
+          // 逃跑大类：有目标逃跑（2）在受到威胁时进入逃跑状态，但模式不变
+          if (this.fleeMode[i] !== 2) this.fleeMode[i] = 1;
           // 结束条件只有一个：感知半径内（平民 40m）已经没有丧尸了。
           // 不是"跑够几秒就回去上班"—— 丧尸还在旁边就继续跑。
           const z = this.nearZ[i];
           if (z < 0) {
+            // 即时逃跑到此结束；有目标逃跑则回到"继续赶路"（接着去他的目标）
+            if (this.fleeMode[i] === 1) this.fleeMode[i] = 0;
             this.state[i] = ST.CIV;
             this.panic[i] = 0;
             this.fleeCd[i] = 2 + rng() * 2;   // 惊魂未定，短时间内不再触发逃跑
@@ -3549,17 +3621,28 @@ export class Sim {
   countStats() {
     const s = this.stats;
     s.civ = 0; s.infected = 0; s.zombie = 0; s.dead = 0; s.police = 0; s.saved = 0; s.sick = 0;
+    s.fleeImm = 0; s.fleeHome = 0; s.fleePolice = 0; s.fleeEscape = 0; s.fleeTotal = 0;
     s.vipAlive = 0; s.vipSaved = 0; s.vipLost = 0;
     const n = this.n;
     for (let i = 0; i < n; i++) {
       switch (this.state[i]) {
         case ST.CIV: case ST.FLEE: case ST.FIGHT: s.civ++; break;
+        // 逃跑统计（不分状态：逃跑状态下也保有 fleeMode 2 的目标）
         case ST.INFECTED: s.infected++; s.civ++; if (this.sick[i]) s.sick++; break;
         case ST.ZOMBIE: s.zombie++; break;
         case ST.CORPSE: s.dead++; break;
         case ST.POLICE: s.police++; break;
         case ST.SOLDIER: s.police++; break;
         case ST.SAVED: s.saved = (s.saved || 0) + 1; break;
+      }
+    }
+    for (let i = 0; i < n; i++) {
+      if (this.state[i] === ST.FLEE && this.fleeMode[i] === 1) s.fleeImm++;
+      if (this.fleeMode[i] === 2) {
+        s.fleeTotal++;
+        if (this.fleeGoal[i] === 0) s.fleeHome++;
+        else if (this.fleeGoal[i] === 1) s.fleePolice++;
+        else s.fleeEscape++;
       }
     }
     for (let k = 0; k < this.vips.length; k++) {
