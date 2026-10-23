@@ -1,0 +1,682 @@
+{
+ "scale": 8,
+ "types": {
+  "fat01": {
+   "die01_outline": {
+    "frames": 28,
+    "size": [
+     240,
+     240
+    ]
+   },
+   "die01_solid": {
+    "frames": 28,
+    "size": [
+     240,
+     240
+    ]
+   },
+   "run01_solid": {
+    "frames": 6,
+    "size": [
+     120,
+     176
+    ]
+   },
+   "shoot01_outline": {
+    "frames": 9,
+    "size": [
+     1200,
+     176
+    ]
+   },
+   "shoot01_solid": {
+    "frames": 9,
+    "size": [
+     1200,
+     176
+    ]
+   },
+   "turn01_outline": {
+    "frames": 22,
+    "size": [
+     224,
+     224
+    ]
+   },
+   "turn01_solid": {
+    "frames": 26,
+    "size": [
+     224,
+     224
+    ]
+   },
+   "walk_solid": {
+    "frames": 6,
+    "size": [
+     120,
+     160
+    ]
+   },
+   "zattack01_outline": {
+    "frames": 8,
+    "size": [
+     240,
+     240
+    ]
+   },
+   "zattack01_solid": {
+    "frames": 8,
+    "size": [
+     240,
+     240
+    ]
+   },
+   "zdie01_outline": {
+    "frames": 12,
+    "size": [
+     208,
+     352
+    ]
+   },
+   "zdie01_solid": {
+    "frames": 12,
+    "size": [
+     208,
+     352
+    ]
+   },
+   "zrise01_outline": {
+    "frames": 8,
+    "size": [
+     240,
+     240
+    ]
+   },
+   "zrise01_solid": {
+    "frames": 10,
+    "size": [
+     240,
+     240
+    ]
+   },
+   "zwalk01_outline": {
+    "frames": 8,
+    "size": [
+     208,
+     184
+    ]
+   },
+   "zwalk01_solid": {
+    "frames": 8,
+    "size": [
+     208,
+     184
+    ]
+   },
+   "zwalk02_outline": {
+    "frames": 8,
+    "size": [
+     264,
+     184
+    ]
+   },
+   "zwalk02_solid": {
+    "frames": 8,
+    "size": [
+     264,
+     184
+    ]
+   }
+  },
+  "girl01": {
+   "die01_solid": {
+    "frames": 9,
+    "size": [
+     144,
+     560
+    ]
+   },
+   "idle01_outline": {
+    "frames": 4,
+    "size": [
+     128,
+     112
+    ]
+   },
+   "idle01_solid": {
+    "frames": 9,
+    "size": [
+     128,
+     112
+    ]
+   },
+   "idle02_solid": {
+    "frames": 19,
+    "size": [
+     240,
+     128
+    ]
+   },
+   "run01_solid": {
+    "frames": 8,
+    "size": [
+     144,
+     112
+    ]
+   },
+   "shoot01_outline": {
+    "frames": 8,
+    "size": [
+     800,
+     112
+    ]
+   },
+   "shoot01_solid": {
+    "frames": 8,
+    "size": [
+     960,
+     112
+    ]
+   },
+   "turn01_outline": {
+    "frames": 21,
+    "size": [
+     160,
+     192
+    ]
+   },
+   "turn01_solid": {
+    "frames": 21,
+    "size": [
+     160,
+     192
+    ]
+   },
+   "walk_outline": {
+    "frames": 8,
+    "size": [
+     120,
+     112
+    ]
+   },
+   "walk_solid": {
+    "frames": 8,
+    "size": [
+     120,
+     112
+    ]
+   },
+   "zattack01_solid": {
+    "frames": 8,
+    "size": [
+     160,
+     224
+    ]
+   },
+   "zdie01_outline": {
+    "frames": 10,
+    "size": [
+     240,
+     240
+    ]
+   },
+   "zdie01_solid": {
+    "frames": 10,
+    "size": [
+     240,
+     240
+    ]
+   },
+   "zrise01_outline": {
+    "frames": 13,
+    "size": [
+     144,
+     560
+    ]
+   },
+   "zrise01_solid": {
+    "frames": 13,
+    "size": [
+     144,
+     560
+    ]
+   }
+  },
+  "girl02": {
+   "die01_solid": {
+    "frames": 9,
+    "size": [
+     144,
+     560
+    ]
+   },
+   "run01_solid": {
+    "frames": 8,
+    "size": [
+     144,
+     112
+    ]
+   },
+   "shoot01_solid": {
+    "frames": 8,
+    "size": [
+     960,
+     112
+    ]
+   },
+   "turn01_outline": {
+    "frames": 23,
+    "size": [
+     304,
+     208
+    ]
+   },
+   "turn01_solid": {
+    "frames": 25,
+    "size": [
+     304,
+     208
+    ]
+   },
+   "walk_solid": {
+    "frames": 8,
+    "size": [
+     120,
+     112
+    ]
+   },
+   "zattack01_solid": {
+    "frames": 8,
+    "size": [
+     160,
+     224
+    ]
+   },
+   "zdie01_outline": {
+    "frames": 11,
+    "size": [
+     160,
+     360
+    ]
+   },
+   "zdie01_solid": {
+    "frames": 14,
+    "size": [
+     160,
+     360
+    ]
+   },
+   "zrise01_outline": {
+    "frames": 12,
+    "size": [
+     144,
+     560
+    ]
+   },
+   "zrise01_solid": {
+    "frames": 13,
+    "size": [
+     144,
+     560
+    ]
+   }
+  },
+  "guy01": {
+   "die01_outline": {
+    "frames": 19,
+    "size": [
+     288,
+     160
+    ]
+   },
+   "die01_solid": {
+    "frames": 22,
+    "size": [
+     288,
+     160
+    ]
+   },
+   "idle01_outline": {
+    "frames": 5,
+    "size": [
+     120,
+     112
+    ]
+   },
+   "idle01_solid": {
+    "frames": 17,
+    "size": [
+     120,
+     136
+    ]
+   },
+   "idle02_outline": {
+    "frames": 9,
+    "size": [
+     88,
+     96
+    ]
+   },
+   "idle02_solid": {
+    "frames": 14,
+    "size": [
+     88,
+     96
+    ]
+   },
+   "run01_outline": {
+    "frames": 6,
+    "size": [
+     120,
+     112
+    ]
+   },
+   "run01_solid": {
+    "frames": 6,
+    "size": [
+     120,
+     112
+    ]
+   },
+   "shoot01_solid": {
+    "frames": 6,
+    "size": [
+     2400,
+     112
+    ]
+   },
+   "turn01_outline": {
+    "frames": 36,
+    "size": [
+     352,
+     176
+    ]
+   },
+   "turn01_solid": {
+    "frames": 37,
+    "size": [
+     352,
+     176
+    ]
+   },
+   "walk_solid": {
+    "frames": 8,
+    "size": [
+     120,
+     112
+    ]
+   },
+   "zattack01_outline": {
+    "frames": 8,
+    "size": [
+     144,
+     120
+    ]
+   },
+   "zattack01_solid": {
+    "frames": 8,
+    "size": [
+     144,
+     120
+    ]
+   },
+   "zdie01_outline": {
+    "frames": 12,
+    "size": [
+     480,
+     208
+    ]
+   },
+   "zdie01_solid": {
+    "frames": 12,
+    "size": [
+     480,
+     208
+    ]
+   },
+   "zrise01_outline": {
+    "frames": 27,
+    "size": [
+     288,
+     160
+    ]
+   },
+   "zrise01_solid": {
+    "frames": 37,
+    "size": [
+     288,
+     160
+    ]
+   }
+  },
+  "guy02": {
+   "die01_outline": {
+    "frames": 27,
+    "size": [
+     368,
+     144
+    ]
+   },
+   "die01_solid": {
+    "frames": 30,
+    "size": [
+     368,
+     144
+    ]
+   },
+   "run01_outline": {
+    "frames": 6,
+    "size": [
+     120,
+     144
+    ]
+   },
+   "run01_solid": {
+    "frames": 6,
+    "size": [
+     120,
+     144
+    ]
+   },
+   "shoot01_outline": {
+    "frames": 8,
+    "size": [
+     1200,
+     144
+    ]
+   },
+   "shoot01_solid": {
+    "frames": 8,
+    "size": [
+     1200,
+     144
+    ]
+   },
+   "turn01_outline": {
+    "frames": 8,
+    "size": [
+     144,
+     144
+    ]
+   },
+   "turn01_solid": {
+    "frames": 8,
+    "size": [
+     144,
+     144
+    ]
+   },
+   "walk_outline": {
+    "frames": 6,
+    "size": [
+     120,
+     144
+    ]
+   },
+   "walk_solid": {
+    "frames": 6,
+    "size": [
+     120,
+     144
+    ]
+   },
+   "zattack01_outline": {
+    "frames": 8,
+    "size": [
+     152,
+     144
+    ]
+   },
+   "zattack01_solid": {
+    "frames": 8,
+    "size": [
+     152,
+     144
+    ]
+   },
+   "zdie01_outline": {
+    "frames": 11,
+    "size": [
+     240,
+     384
+    ]
+   },
+   "zdie01_solid": {
+    "frames": 11,
+    "size": [
+     240,
+     384
+    ]
+   },
+   "zrise01_outline": {
+    "frames": 22,
+    "size": [
+     368,
+     240
+    ]
+   },
+   "zrise01_solid": {
+    "frames": 22,
+    "size": [
+     368,
+     240
+    ]
+   }
+  },
+  "police01": {
+   "die01_outline": {
+    "frames": 14,
+    "size": [
+     288,
+     256
+    ]
+   },
+   "die01_solid": {
+    "frames": 18,
+    "size": [
+     288,
+     256
+    ]
+   },
+   "idle01_outline": {
+    "frames": 6,
+    "size": [
+     184,
+     128
+    ]
+   },
+   "idle01_solid": {
+    "frames": 7,
+    "size": [
+     184,
+     128
+    ]
+   },
+   "idle02_outline": {
+    "frames": 52,
+    "size": [
+     208,
+     208
+    ]
+   },
+   "idle02_solid": {
+    "frames": 52,
+    "size": [
+     208,
+     208
+    ]
+   },
+   "run01_outline": {
+    "frames": 8,
+    "size": [
+     120,
+     128
+    ]
+   },
+   "run01_solid": {
+    "frames": 8,
+    "size": [
+     120,
+     128
+    ]
+   },
+   "shoot01_outline": {
+    "frames": 4,
+    "size": [
+     1120,
+     128
+    ]
+   },
+   "shoot01_solid": {
+    "frames": 4,
+    "size": [
+     1120,
+     128
+    ]
+   },
+   "turn01_outline": {
+    "frames": 26,
+    "size": [
+     144,
+     160
+    ]
+   },
+   "turn01_solid": {
+    "frames": 26,
+    "size": [
+     144,
+     160
+    ]
+   },
+   "walk_outline": {
+    "frames": 8,
+    "size": [
+     120,
+     128
+    ]
+   },
+   "walk_solid": {
+    "frames": 8,
+    "size": [
+     120,
+     128
+    ]
+   },
+   "zrise01_outline": {
+    "frames": 36,
+    "size": [
+     288,
+     256
+    ]
+   },
+   "zrise01_solid": {
+    "frames": 44,
+    "size": [
+     288,
+     256
+    ]
+   }
+  }
+ }
+}

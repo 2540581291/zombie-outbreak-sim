@@ -1,0 +1,44 @@
+/* ============ 左侧信息面板（角色 / 地点） ============ */
+#agentcard{position:fixed;left:14px;top:50%;bottom:auto;right:auto;transform:translateY(-50%);
+  width:318px;max-height:76vh;z-index:23;
+  background:rgba(12,15,19,.95);border:1px solid rgba(255,255,255,.11);border-radius:12px;
+  backdrop-filter:blur(14px);box-shadow:0 18px 50px rgba(0,0,0,.62);
+  display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden}
+#agentcard::-webkit-scrollbar{width:6px}
+#agentcard::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:3px}
+#agentcard.hidden{opacity:0;transform:translateY(-46%) scale(.98);pointer-events:none}
+.ac-head{display:flex;align-items:center;gap:6px;padding:10px 10px 4px;flex:0 0 auto;
+  position:sticky;top:0;background:rgba(12,15,19,.98);z-index:2;border-bottom:1px solid rgba(255,255,255,.05)}
+.ac-nav{width:20px;height:20px;line-height:1;border-radius:5px;border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.06);color:#9fb0c0;font-size:13px;cursor:pointer;padding:0}
+.ac-nav:hover{background:rgba(255,255,255,.14);color:#fff}
+.ac-name{font-size:15px;font-weight:800;color:#f2f5f8;letter-spacing:.04em;flex:1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ac-sub{font-size:11px;color:#8794a3;padding:0 12px 8px;flex:0 0 auto;
+  position:sticky;top:36px;background:rgba(12,15,19,.98);z-index:2}
+#ac-body{padding:0 10px 8px;flex:0 0 auto}
+#ac-body::-webkit-scrollbar{width:6px}
+#ac-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:3px}
+.ac-sec{margin:8px 0 2px;font-size:10px;font-weight:700;color:#5f6b79;letter-spacing:.16em}
+.ac-row{display:flex;gap:8px;align-items:baseline;padding:3px 2px;border-bottom:1px dashed rgba(255,255,255,.055);
+  font-size:11.5px;line-height:1.5}
+.ac-row:last-child{border-bottom:none}
+.ac-row>span{color:#7d8b99;flex:0 0 52px}
+.ac-row>em{color:#d6dee6;font-style:normal;flex:1;word-break:break-word}
+.ac-row>em.link{color:#6fb4ff;cursor:pointer;text-decoration:underline dotted}
+.ac-row>em.link:hover{color:#a5d2ff}
+.ac-bar{position:relative;height:5px;border-radius:3px;background:rgba(255,255,255,.09);
+  margin:4px 0 2px;overflow:hidden}
+.ac-bar>i{position:absolute;left:0;top:0;bottom:0;background:#4a5663;transition:width .3s}
+.ac-bar.on>i{background:linear-gradient(90deg,#e2542b,#ffb03a)}
+.ac-rule{padding:5px 2px;border-bottom:1px dashed rgba(255,255,255,.055)}
+.ac-rule.on .ar-t{color:#ffb03a}
+.ac-rule .ar-t{display:flex;justify-content:space-between;font-size:11.5px;color:#9fb0c0}
+.ac-rule .ar-t b{font-weight:700}
+.ac-rule .ar-d{font-size:10.5px;color:#66727f;margin-top:1px}
+.ac-rule.on .ar-d{color:#8d7a5c}
+.ac-foot{display:flex;gap:6px;padding:8px 10px;border-top:1px solid rgba(255,255,255,.07);flex:0 0 auto;
+  position:sticky;bottom:0;background:rgba(12,15,19,.98);z-index:2}
+.ac-foot button{flex:1;padding:5px 0;border-radius:6px;border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.06);color:#cfd6dd;font-size:11px;cursor:pointer}
+.ac-foot button:hover{background:rgba(255,255,255,.14)}

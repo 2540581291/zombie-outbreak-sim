@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>生化危机模拟器 · ZOS-R</title>
+<link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/panel.css" />
+<script>
+  // 把 console.error / 运行时错误写进 title，便于无头诊断
+  (function () {
+    const oe = console.error.bind(console);
+    console.error = function () {
+      const s = Array.prototype.map.call(arguments, a => (a && a.message) ? a.message : String(a)).join(' ');
+      document.title = 'CONSOLE_ERR ' + s.slice(0, 220);
+      oe.apply(null, arguments);
+    };
+    window.addEventListener('error', e => { document.title = 'WINERR ' + (e.message || '').slice(0, 220); });
+  })();
+</script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- 加载屏 -->
+<div id="loading">
+  <div class="ld-box">
+    <div class="ld-title">生化危机模拟器</div>
+    <div class="ld-sub">ZOMBIE OUTBREAK SIMULATOR — Remake</div>
+    <div class="ld-bar"><i id="ld-fill"></i></div>
+    <div class="ld-txt" id="ld-txt">初始化…</div>
+  </div>
+</div>
+
+<!-- 顶栏 -->
+<div id="topbar">
+  <div class="tb-left">
+    <span class="tb-city" id="tb-city">—</span>
+    <span class="tb-sep">·</span>
+    <span class="tb-clock" id="tb-clock">00:00:00</span>
+  </div>
+  <div class="tb-mid">
+    <button class="spd" data-spd="0">⏸</button>
+    <button class="spd on" data-spd="1">1×</button>
+    <button class="spd" data-spd="4">4×</button>
+    <button class="spd" data-spd="16">16×</button>
+  </div>
+  <div class="tb-right">
+    <span class="tb-stat"><i class="dot civ"></i><b id="n-civ">0</b><em>民</em></span>
+    <span class="tb-stat"><i class="dot inf"></i><b id="n-inf">0</b><em>潜</em></span>
+    <span class="tb-stat"><i class="dot zomb"></i><b id="n-zomb">0</b><em>尸</em></span>
+    <span class="tb-stat"><i class="dot dead"></i><b id="n-dead">0</b><em>亡</em></span>
+    <span class="tb-stat" title="知道出事了的人（电话 / 网络 / 亲眼看见）"><i class="dot info"></i><b id="n-aware">0</b><em>知情</em><span id="heat" title="网络热度"><i></i></span></span>
+    <span class="tb-stat" title="混乱度 = 知情值×1 + 感染值×2（上限 100）"><i class="dot chaos"></i><b id="n-chaos">0</b><em>混乱</em></span>
+    <span class="tb-stat" title="本局唯一的撤离口：平民跑到这条边就算逃出城"><i class="dot exit"></i><b id="n-exit">—</b><em>撤离口</em></span>
+    <button class="tb-btn" id="btn-sound" title="声音开关">🔊 声音</button>
+    <button class="tb-btn" id="btn-overview" title="全体人员总览（O）">📊 总览</button>
+    <button class="tb-btn" id="btn-report" title="结算本局">📋 战报</button>
+    <span class="tb-fps" id="fps">—</span>
+  </div>
+</div>
+
+<!-- 参数面板 -->
+<div id="panel">
+  <div class="p-head">
+    <span>爆发参数</span>
+    <button id="p-toggle">—</button>
+  </div>
+  <div class="p-body" id="p-body">
+    <label class="p-row"><span>平民人口</span><input type="range" id="s-pop" min="2000" max="45000" step="1000" value="20000"><b id="v-pop">20,000</b></label>
+    <label class="p-row"><span>初始丧尸</span><input type="range" id="s-z0" min="1" max="400" step="1" value="120"><b id="v-z0">120</b></label>
+    <label class="p-row"><span>丧尸速度</span><input type="range" id="s-zspd" min="0.4" max="5" step="0.1" value="2.0"><b id="v-zspd">2.0</b></label>
+    <label class="p-row"><span>感染时间</span><input type="range" id="s-inc" min="1" max="40" step="1" value="8"><b id="v-inc">8s</b></label>
+    <label class="p-row"><span>平民武装率</span><input type="range" id="s-arm" min="0" max="100" step="1" value="10"><b id="v-arm">10%</b></label>
+    <label class="p-row"><span>警察数量</span><input type="range" id="s-pol" min="0" max="600" step="10" value="60"><b id="v-pol">60</b></label>
+    <label class="p-row"><span>警察命中率</span><input type="range" id="s-pacc" min="5" max="90" step="5" value="30"><b id="v-pacc">30%</b></label>
+    <div class="p-row p-segrow">
+      <span>地图</span>
+      <div class="seg" id="seg-map">
+        <button data-map="sat" class="on">卫星</button>
+        <button data-map="vec">矢量</button>
+      </div>
+    </div>
+    <div class="p-row p-segrow">
+      <span>3D 建筑</span>
+      <div class="seg" id="seg-bld">
+        <button data-bld="1" class="on">显示</button>
+        <button data-bld="0">隐藏</button>
+      </div>
+    </div>
+    <div class="p-sec">信息传播</div>
+    <label class="p-row"><span>传播速度</span><input type="range" id="s-info" min="0.2" max="2" step="0.1" value="1"><b id="v-info">1.0×</b></label>
+    <div class="p-hint2">电话（家人优先）+ 网络。调大 → 城市更快知道、更早逃。</div>
+    <div class="p-sec">爆发模式</div>
+    <label class="p-row"><span>模式</span>
+      <select id="sel-mode" class="p-sel">
+        <option value="single">单点爆发</option>
+        <option value="invade">僵尸入侵（定向）</option>
+        <option value="multi">多点爆发</option>
+        <option value="stealth">零号病人（长潜伏 10–30 分）</option>
+        <option value="waves">连环爆发</option>
+        <option value="apocalypse">末日降临（全城）</option>
+      </select></label>
+    <div id="mode-opts"></div>
+    <div class="p-sec">生物</div>
+    <label class="p-row"><span>狗</span><input type="range" id="s-dog" min="0" max="1200" step="20" value="240"><b id="v-dog">240</b></label>
+    <label class="p-row"><span>猫</span><input type="range" id="s-cat" min="0" max="1200" step="20" value="160"><b id="v-cat">160</b></label>
+    <label class="p-row"><span>熊</span><input type="range" id="s-bear" min="0" max="40" step="1" value="3"><b id="v-bear">3</b></label>
+    <label class="p-row"><span>老虎</span><input type="range" id="s-tiger" min="0" max="40" step="1" value="2"><b id="v-tiger">2</b></label>
+    <label class="p-row"><span>动物感染率</span><input type="range" id="s-ainf" min="0" max="100" step="5" value="15"><b id="v-ainf">15%</b></label>
+    <div class="p-btns">
+      <button id="btn-restart" class="primary">重新爆发</button>
+      <button id="btn-seed">换种子</button>
+    </div>
+    <div class="p-hint">
+      右键拖拽平移 · 滚轮缩放 · 中键拖拽旋转/俯仰<br>
+      W A S D 平移 · Q E 旋转 · R F 俯仰 · M 卫星/矢量 · B 建筑<br>
+      底部工具栏选工具 → 点地面投放（快捷键 1-9 0 - =）
+    </div>
+  </div>
+</div>
+
+<!-- 个体档案卡 -->
+<div id="agentcard" class="hidden">
+  <div class="ac-head">
+    <button class="ac-nav" id="ac-prev" title="上一个">‹</button>
+    <span class="ac-name" id="ac-name">—</span>
+    <span class="ac-vip" id="ac-vip">★ 要员</span>
+    <button class="ac-nav" id="ac-next" title="下一个">›</button>
+    <button id="ac-close">✕</button>
+  </div>
+  <div class="ac-sub" id="ac-sub">—</div>
+  <div id="ac-body"></div>
+  <div class="ac-foot">
+    <button id="ac-follow">跟随镜头</button>
+    <button id="ac-back" class="hidden">← 返回角色</button>
+  </div>
+</div>
+
+<!-- 指挥工具栏 -->
+<div id="toolbar">
+  <div class="bud">
+    <b id="budget">100万</b>
+    <span>可用经费 ¥</span>
+    <i class="budbar"><u id="budfill"></u></i>
+  </div>
+  <div class="tools" id="tools"></div>
+</div>
+
+<!-- 结局横幅 -->
+<canvas id="compass" width="88" height="88" title="指北针（2D 模式强制正北朝上）"></canvas>
+<div id="banner" class="hidden"><span id="banner-txt"></span></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
+
+
+
+
+
+
+
+

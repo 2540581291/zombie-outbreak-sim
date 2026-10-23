@@ -1,0 +1,11 @@
+{
+  "name": "zos-r",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Zombie Outbreak Simulator - Remake (personal nostalgia project)",
+  "scripts": {
+    "test": "node tools/test_sim.mjs",
+    "serve": "python -m http.server 8777"
+  }
+}
