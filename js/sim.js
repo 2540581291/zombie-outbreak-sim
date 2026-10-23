@@ -2342,10 +2342,10 @@ export class Sim {
                 }
 
                 if (this.hp[c] <= 0) {
-                  // 咬死：先倒地（die01），死线照走 —— 到点从尸体上爬起来
-                  const wait = this.incubationFor(c, 1);
+                  // 咬死：先倒地（die01），**倒地动画一播完就立刻爬起来变丧尸**。
+                  // 被咬但没死的那条路（下面 else-if）才走 60~120 s 的潜伏计时。
                   this.killAgent(c, i);
-                  this.riseAt[c] = this.time + wait;
+                  this.riseAt[c] = this.time + 1e-3;   // 死线 = 现在（>0 才算"会复活"）
                   this.infectBy[i] = (this.infectBy[i] || 0) + 1;
                 } else if (cs !== ST.INFECTED && vsp.infectable !== false &&
                            this.rng() < (vsp.infectChance == null ? 1 : vsp.infectChance)) {

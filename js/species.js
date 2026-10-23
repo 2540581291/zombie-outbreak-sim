@@ -73,7 +73,7 @@ export const SPECIES = {
     infectable: false,
   },
   [SP.ZOMBIE]: {
-    name: '丧尸', team: TEAM.ZOMBIE, scale: 1.0, hp: 200, speed: 3.0,
+    name: '丧尸', team: TEAM.ZOMBIE, scale: 1.0, hp: 100, speed: 3.0,
     dmg: 20, rate: 2.0, range: 60, biteR: 1.8,
     color: [0.94, 0.28, 0.18], infectedColor: [0.94, 0.28, 0.18],
     infectable: false,
