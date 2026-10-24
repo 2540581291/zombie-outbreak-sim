@@ -96,9 +96,17 @@
 
 ```
 index.html              页面骨架（HUD / 参数面板 / 加载屏 / 工具栏）
-css/style.css
+css/style.css           基础样式
+css/topbar.css          顶栏（等比缩放，全部用 em）
+css/modal.css           各类弹窗的统一尺寸
+css/gov.css             政府行动面板
+css/news.css            新闻快讯条 + 历史列表
 js/main.js              装配、相机机架、主循环、UI、2D/3D 切换
 js/sim.js               模拟内核（纯 JS，零依赖，可在 Node 里跑）
+js/citymeta.js          城市名统一格式化（国家 → 城市 → 区，见「城市命名」）
+js/news.js              新闻快讯跑马灯（风味文案，跟局势联动）
+js/gov.js               政府行动面板（只读仪表盘）
+js/status.js            武力 / 卫生 / 混乱度这些"明细"面板
 js/species.js           物种表（人 / 特感 / 载具 / 动物的全部数值）
 js/collision.js         碰撞层解码 + 门场 BFS + 视线查询
 js/layerpatch.js        图层补丁：手绘修正的 op 应用（编辑器与游戏共用）
@@ -172,6 +180,73 @@ python tools\pick_size.py --w-m 3162 --h-m 2401 --res 0.0908 --citydir data\citi
 
 > ⚠ `bake_pbf.py` 的 `--out` **默认是老的 `data/city.json`**，前端只认
 > `data/cities/<id>/city.json` —— 手动烘焙时一定要显式给 `--out`（`build_city.py` 已经帮你带了）。
+>
+> 新城市烘焙完后，别忘了在 `js/citymeta.js` 里登记「国家 / 城市 / 区」，
+> 否则界面上只会显示 `city.json` 里的原始名字（见下一节「城市命名」）。
+
+---
+
+## 城市命名（统一格式）
+
+**约定：国家在前，城市在后，区最后。** 全项目只有一处定义 `js/citymeta.js`，
+UI、新闻、标题、下拉框都从它取名字，不要在别处再硬编码城市中文名。
+
+### 数据表
+
+```js
+// js/citymeta.js
+export const CITY_INFO = {
+  berlin:    { country: '德国', city: '柏林',   district: '米特' },
+  tokyo:     { country: '日本', city: '东京',   district: '千代田' },
+  zhengzhou: { country: '中国', city: '郑州',   district: '金水' },
+  nanyang:   { country: '中国', city: '南阳',   district: '卧龙' },
+  zhenping:  { country: '中国', city: '南阳',   district: '镇平' },
+  leicester: { country: '英国', city: '莱斯特', district: '' },   // 原版 2009 的那张图
+};
+```
+
+### 四个格式化函数
+
+| 函数 | 输出 | 用在哪 |
+|---|---|---|
+| `cityFull(id, fallback)` | `德国 · 柏林·米特` | 顶栏城市名、城市下拉、页面标题、载入提示 |
+| `cityShort(id, fallback)` | `柏林·米特` | 正文里提到城市、下拉的兜底 |
+| `cityCountry(id, fallback)` | `德国` | 需要单独显示国家时 |
+| `cityNewspaper(id, fallback)` | `柏林晨报` | 新闻跑马灯的报头 |
+
+```js
+import { cityFull, cityShort, cityNewspaper } from './citymeta.js';
+
+cityFull('berlin');      // 德国 · 柏林·米特
+cityFull('leicester');   // 英国 · 莱斯特      ← 原版 2009 的地图也是这个格式
+cityFull('tokyo');       // 日本 · 东京·千代田
+cityShort('berlin');     // 柏林·米特
+cityNewspaper('berlin'); // 柏林晨报
+```
+
+分隔符默认是 ` · `，可以传第三个参数换掉：`cityFull('berlin', null, ' / ')` → `德国 / 柏林·米特`。
+
+### 匹配规则
+
+- `id` 允许带后缀，按**包含**匹配：`berlin-v2` 也能命中 `berlin`。
+- 没登记过的城市走兜底：把 `city.json` 里的 `name` 当城市名，国家留空，
+  所以**永远不会出现空标题或 `undefined`**。
+
+### 加一座新城市时
+
+1. 在 `tools/cities.py` 里加 bbox（见上一节「换一个城市」）；
+2. 在 `js/citymeta.js` 的 `CITY_INFO` 里加一条 `{ country, city, district }`；
+3. 没了 —— 顶栏、下拉、新闻、标题会自动用新格式。
+
+> ⚠ 不要再去 `main.js` 里加 `CITY_CN` 这种硬编码表（2026-10 已经删掉），
+> 也不要直接写 `柏林`、`莱斯特` 这样的字符串 —— 一律走 `citymeta.js`。
+
+### 新闻报头为什么用 `cityNewspaper`
+
+报纸是城市级的，报头写「德国 · 柏林·米特晨报」太长，所以新闻用
+`cityNewspaper()` 只取城市名 → **柏林晨报**；跑马灯的其它文案里需要提到城市时也用短名。
+
+---
 
 ---
 
