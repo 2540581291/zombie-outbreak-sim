@@ -141,6 +141,8 @@ src/sprite/                     2D 精灵渲染器（atlas / anim / bodies / lay
 pipeline/bake_pbf.py    OSM PBF → city.json（主用，含碰撞层烘焙）
 pipeline/collision.py   碰撞层生成器（纯函数：OSM 几何 → 位域网格）
 pipeline/fetch_sat.py   卫星瓦片 → sat.jpg + sat.json
+pipeline/drone_to_city.py  航测正射 → sat.jpg + sat_mask.png（镂空）+ 碰撞遮罩
+pipeline/fetch_osm_blocks.py  按 bbox 拉两块航测区的 OSM
 pipeline/raw/           原始 OSM（柏林 95 MB + 东京/郑州/南阳/镇平切片）
 
 tools/apply_layer_patch.py  把补丁烘进 city.json（可选，给非浏览器路径用）
@@ -183,6 +185,64 @@ python tools\pick_size.py --w-m 3162 --h-m 2401 --res 0.0908 --citydir data\citi
 >
 > 新城市烘焙完后，别忘了在 `js/citymeta.js` 里登记「国家 / 城市 / 区」，
 > 否则界面上只会显示 `city.json` 里的原始名字（见下一节「城市命名」）。
+
+---
+
+## 无人机航测地图（镇平县 · 2026-10）
+
+项目里有三张用**无人机正射影像**烘出来的地图，都是 `China · 镇平` 一带：
+
+| id | 显示名 | 范围 | 面积 | 底图 |
+|---|---|---|---|---|
+| `zhenping` | 中国 · 南阳·镇平 | 3.36 × 3.21 km | 10.8 km² | Google 卫星 z19 |
+| `zhenping_town` | 中国 · 镇平·县城 | 7.82 × 3.82 km | 24.4 km²（镂空后） | **航测 0.48 m/px** |
+| `zhenping_tangying` | 中国 · 镇平·唐营村 | 1.93 × 1.72 km | 2.2 km²（镂空后） | **航测 0.30 m/px** |
+
+原始数据是 DJI Terra 的交付包（13.4 GB：TDOM 8.8 GB + DSM 2.8 GB + z12–z20 瓦片），
+里面其实是**两块互不相连的测区**（空三报告 `Connected Components = 2`）：
+县城主区 26.5 km²，西南角唐营村约 3 km²。
+
+### 底图镂空（不规则图像）
+
+航测图不是矩形，边界外是真透明。项目用 **`alphaMap` + `alphaTest`** 做镂空，
+不是双图混合：
+
+- `sat.json` 里多一个 `"mask": "sat_mask.png"`（灰度，1/2 分辨率）
+- `js/city.js` 的 `buildSatelliteGround(city, meta, tex, maskTex)` 把遮罩挂到
+  `material.alphaMap`，`alphaTest = 0.5` 直接丢弃范围外的像素
+- 遮罩外的地面露出 `buildCity` 那张深灰底板（`0x2c3034`）
+- 没有 `mask` 字段的城市（柏林等）行为完全不变
+
+同时 `pipeline/drone_to_city.py` 会把**碰撞层里没被航测覆盖的格子刷成墙**，
+所以人和丧尸走不进黑色区域 —— 视觉和可走范围是一致的。
+
+### 重新烘焙
+
+```bat
+:: 1. 从航测包拼出带 alpha 的大图（脚本在 F:\zpx_meta\，产物是 *_rgba.png + .pgw）
+:: 2. 拉 OSM（县城 7.8 km² 用官方 API 就够）
+python pipeline\fetch_osm_blocks.py
+
+:: 3. 烘城市骨架（建筑/道路/碰撞）
+python pipeline\bake_pbf.py --pbf pipeline\raw\zhenping_town.osm --name "镇平 县城" ^
+  --minlat 33.010967 --minlon 112.170410 --maxlat 33.045508 --maxlon 112.254181 ^
+  --out data\cities\zhenping_town\city.json
+
+:: 4. 把正射图裁进城市 bbox，生成 sat.jpg + sat_mask.png，并按遮罩刷碰撞层
+python pipeline\drone_to_city.py --city zhenping_town ^
+  --mosaic "F:\zpx\maps\县城_正射_z18_rgba.png" --width 16384
+```
+
+`drone_to_city.py` 会打印刷掉了多少格、`sat.jpg` / `sat_mask.png` 多大。
+底图宽度建议 ≤ 16384（和柏林一致），再大会顶到 GPU 纹理上限。
+
+### 已知限制
+
+- **OSM 在镇平非常稀疏**：县城 7.8 km² 只有 43 栋建筑、唐营村 0 栋。
+  地图看起来是"照片 + 路网"，建筑体块基本没有 —— 想要真正的城市体量，
+  得从 DSM 提建筑轮廓（下一步）。
+- 航测无 RTK，绝对定位约 30 m 量级，和 OSM 叠加可能有偏移。
+- `mission.json` 是加密的，Cesium 场景配置还原不出来（不影响影像）。
 
 ---
 
