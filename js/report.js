@@ -11,7 +11,7 @@ const fmtTime = (s) => {
 
 const TOOL_NAMES = {
   police: '警察小队', swat: '特警小队', soldier: '伞兵班',
-  heli: '直升机撤离', rally: '疏散广播', vaccine: '疫苗空投',
+rally: '疏散广播', vaccine: '疫苗空投',
   drone: '无人机打击', strike: '空袭 Mk82', napalm: '燃烧弹',
   barricade: '路障封锁', siren: '警报诱饵', ammo: '弹药补给',
 };

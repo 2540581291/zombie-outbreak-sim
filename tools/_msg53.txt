@@ -1,0 +1,14 @@
+彻底删除直升机；删除环境呻吟音效
+
+直升机（全链路移除）：
+· sim: helis 数组、helicopter()、updateHelis()、updateHelis 调用、reset 里清空
+· main: makeHeli()、heliPool、渲染循环、'heli' 特效分支
+· audio: rotorNode、_makeRotor()、旋翼常驻层
+· report: 工具名映射里的 'heli: 直升机撤离'
+· SAVED 的注释改成"已撤离（走出撤离线）"
+
+环境音效（本次删）：
+· audio.frame() 里的"环境呻吟"层（刚加的那套按密度补 groan 的逻辑）
+现在丧尸呻吟只在事件触发时出现：变丧尸 / 尸体起身 / 新爆发点 / 特感出现 / 被咬死。
+
+test_chain 5/5、determinism PASS。

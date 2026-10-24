@@ -15,7 +15,6 @@ export class AudioEngine {
     this.listener = { x: 0, z: 0, rx: 1, rz: 0 };
     this.lastCrackle = 0;
     this.sirenNode = null;
-    this.rotorNode = null;
   }
 
   init() {
@@ -61,8 +60,6 @@ export class AudioEngine {
     amb.connect(lp).connect(this.ambient).connect(this.bus);
     amb.start();
 
-    // 直升机旋翼（常驻，增益随距离变化）
-    this.rotorNode = this._makeRotor();
     // 警报（常驻，默认静音）
     this.sirenNode = this._makeSiren();
 
@@ -254,26 +251,6 @@ export class AudioEngine {
   }
 
   // ---------- 常驻音源 ----------
-  _makeRotor() {
-    const ctx = this.ctx;
-    const n = ctx.createBufferSource();
-    n.buffer = this.noiseBuf;
-    n.loop = true;
-    const lp = ctx.createBiquadFilter();
-    lp.type = 'lowpass'; lp.frequency.value = 420;
-    // 17Hz 的"突突突"幅度调制
-    const am = ctx.createGain();
-    am.gain.value = 0.5;
-    const lfo = ctx.createOscillator();
-    lfo.type = 'square'; lfo.frequency.value = 17;
-    const lg = ctx.createGain(); lg.gain.value = 0.5;
-    lfo.connect(lg).connect(am.gain);
-    const out = ctx.createGain();
-    out.gain.value = 0;
-    n.connect(lp).connect(am).connect(out).connect(this.bus);
-    n.start(); lfo.start();
-    return out;
-  }
 
   _makeSiren() {
     const ctx = this.ctx;
@@ -312,45 +289,6 @@ export class AudioEngine {
         this.play(ev[i].type, ev[i].x, ev[i].z, ev[i].g, ind);
       }
       ev.length = 0;
-    }
-
-    // ---- 环境呻吟：附近丧尸密度越高，补得越勤（原来只有"变丧尸/起身"才有一声）----
-    if (t >= (this.groanT || 0)) {
-      const L2 = this.listener;
-      let picked = -1, best = 0, cnt = 0;
-      for (let i = 0; i < sim.n; i++) {
-        if (sim.state[i] !== 4) continue;               // ST.ZOMBIE
-        const dx = sim.px[i] - L2.x, dz = sim.pz[i] - L2.z;
-        const d2 = dx * dx + dz * dz;
-        if (d2 > 90 * 90) continue;   // 90m：再远就是"看不见的地方在响"
-        cnt++;
-        if (Math.random() < 0.02) { picked = i; best = d2; }   // 随机挑一个
-      }
-      if (picked >= 0) {
-        this.play('groan', sim.px[picked], sim.pz[picked], 0.45 + Math.random() * 0.3);
-      }
-      // 密度映射：0 只 → 2.6 s 一次；50 只 → 约 0.35 s 一次
-      this.groanT = t + Math.max(0.35, 2.6 / (1 + cnt * 0.06));
-    }
-
-    // ---- 旋翼：跟随最近的一架 ----
-    if (this.rotorNode) {
-      let best = null, bd = Infinity;
-      for (const h of sim.helis) {
-        const dx = h.x - this.listener.x, dz = h.z - this.listener.z;
-        const d = dx * dx + dz * dz;
-        if (d < bd) { bd = d; best = h; }
-      }
-      if (best) {
-        const d = Math.sqrt(bd);
-        const k = Math.max(0, 1 - d / RANGE);
-        const sp = this._spatial(best.x, best.z);
-        this.rotorNode.gain.setTargetAtTime(0.55 * k * k, t, 0.08);
-        if (this.rotorNode.__pan === undefined) this.rotorNode.__pan = true;
-        // 旋翼不做左右声道跟随，避免频繁重连
-      } else {
-        this.rotorNode.gain.setTargetAtTime(0, t, 0.15);
-      }
     }
 
     // ---- 警报：有 siren 效果就响 ----

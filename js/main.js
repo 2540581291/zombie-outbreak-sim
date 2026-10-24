@@ -1330,7 +1330,7 @@ addEventListener('keydown', kickAudio, { once: true });
 
 // ---------- 指挥工具：UI + 特效 ----------
 let activeTool = 'select';
-const ringPool = [], discPool = [], heliPool = [], pingPool = [];
+const ringPool = [], discPool = [], pingPool = [];
 
 function makeRing() {
   const m = new THREE.Mesh(
@@ -1378,25 +1378,8 @@ function makeDisc() {
   scene.add(m);
   return m;
 }
-function makeHeli() {
-  const g = new THREE.Group();
-  const mat = new THREE.MeshLambertMaterial({ color: 0x39424c });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.1, 1.3), mat);
-  const rotor = new THREE.Mesh(
-    new THREE.BoxGeometry(8.5, 0.06, 0.45),
-    new THREE.MeshBasicMaterial({ color: 0x161a1f })
-  );
-  rotor.position.y = 0.95;
-  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 3.4), mat);
-  tail.position.z = 1.9;
-  g.add(body, rotor, tail);
-  g.visible = false;
-  scene.add(g);
-  return g;
-}
 for (let i = 0; i < 20; i++) ringPool.push(makeRing());
 for (let i = 0; i < 10; i++) discPool.push(makeDisc());
-for (let i = 0; i < 5; i++) heliPool.push(makeHeli());
 
 // 选中的工具 → 跟随鼠标的范围圈
 const previewRing = makeRing();
@@ -1510,14 +1493,6 @@ function updateFx(tms) {
       op = 0.30 + 0.45 * Math.abs(Math.sin(tms * 0.007));
     } else if (e.type === 'rally') {
       c = 0x5ee07a; op = 0.30 + 0.45 * k;
-    } else if (e.type === 'heli') {
-      c = 0x49e0c0; op = 0.65 * k;
-    } else if (e.type === 'cure') {
-      c = 0x62d7ff; sc = e.r * (1.15 - k); op = k;
-    } else if (e.type === 'supply') {
-      c = 0xf2d24a; sc = e.r * (1.15 - k); op = k;
-    } else if (e.type === 'wall') {
-      c = 0xc0c6cf; op = k * 0.9;
     }
     m.visible = true;
     m.position.set(e.x, 0.55, e.z);
@@ -1539,20 +1514,6 @@ function updateFx(tms) {
     if (p.life <= 0) p.mesh.visible = false;
   }
 
-  // 直升机
-  let hi = 0;
-  for (const h of sim.helis) {
-    const g = heliPool[hi]; if (!g) break; hi++;
-    g.visible = true;
-    let alt;
-    if (h.state === 0) alt = 140 - 131 * Math.min(1, h.t / 1.2);
-    else if (h.state === 1) alt = 9 + Math.sin(tms * 0.006) * 0.7;
-    else alt = 9 + 131 * Math.min(1, h.t / 1.4);
-    g.position.set(h.x, alt, h.z);
-    g.rotation.y += 0.03;
-    if (g.children[1]) g.children[1].rotation.y += 0.55;
-  }
-  for (let i = hi; i < heliPool.length; i++) heliPool[i].visible = false;
 }
 
 buildToolbar();

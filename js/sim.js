@@ -20,7 +20,7 @@ export const ST = {
   CORPSE: 5,   // 尸体（留在场上，会吸引丧尸）
   SOLDIER: 6,  // 士兵
   INFECTED: 7, // 潜伏期（还没变）
-  SAVED: 8,    // 已被直升机救走（不渲染、不计数）
+  SAVED: 8,    // 已撤离（走出撤离线，不渲染、不计数）
   WILD: 9,     // 野生动物：人尸双杀
 };
 
@@ -328,7 +328,6 @@ export class Sim {
     this.vipBonus = 260000;            // 救出一名要员追加 ¥260,000
     this.cd = {};               // 每个工具的冷却
     this.effects = [];          // 持续区域效果（火/警报/广播）
-    this.helis = [];            // 直升机
     this.saved = 0;             // 已救出人数
     this.cured = 0;             // 已治愈人数
     this.barricaded = [];       // 被路障改掉的栅格下标（重开时恢复）
@@ -477,7 +476,6 @@ export class Sim {
     this.vips.length = 0;   // 要员列表也要清，否则第二次 reset 就没要员了（非确定性）
     this.cd = {};
     this.effects.length = 0;
-    this.helis.length = 0;
     this.saved = 0;
     this.cured = 0;
     for (let i = 0; i < this.barricaded.length; i++) this.nav.grid[this.barricaded[i]] = this.barricadeVal[i];
@@ -3219,7 +3217,6 @@ export class Sim {
     }
 
     this.updateEffects(dt);
-    this.updateHelis(dt);
 
     this.countStats();
 
@@ -3403,11 +3400,6 @@ export class Sim {
     return out;
   }
 
-  // 直升机撤离
-  helicopter(x, z) {
-    this.helis.push({ x, z, t: 0, state: 0, loadT: 0, rescued: 0 });
-    this.effects.push({ type: 'heli', x, z, r: 48, life: 4.6, max: 4.6 });
-  }
 
   fire(x, z, r, dur) {
     this.effects.push({ type: 'fire', x, z, r, life: dur, max: dur });
@@ -3540,39 +3532,6 @@ export class Sim {
     }
   }
 
-  // ---------- 直升机 ----------
-  updateHelis(dt) {
-    for (let k = this.helis.length - 1; k >= 0; k--) {
-      const h = this.helis[k];
-      h.t += dt;
-      if (h.state === 0 && h.t >= 1.2) { h.state = 1; h.t = 0; h.loadT = 0; }
-      if (h.state === 1) {
-        h.loadT += dt;
-        if (h.loadT >= 0.2) {
-          h.loadT = 0;
-          let take = 0;
-          for (let i = 0; i < this.n && take < 5; i++) {
-            const s = this.state[i];
-            if (s !== ST.CIV && s !== ST.FLEE && s !== ST.FIGHT && s !== ST.INFECTED) continue;
-            const dx = this.px[i] - h.x, dz = this.pz[i] - h.z;
-            if (dx * dx + dz * dz < 48 * 48) {
-              this.state[i] = ST.SAVED;
-              if (this.vip[i]) {
-                this.savedVip++;
-                this.budget = Math.min(this.budgetMax, this.budget + this.vipBonus);
-                this.pushEvent('撤离要员成功，追加经费 ¥' + (this.vipBonus / 10000).toFixed(0) + ' 万', 'good');
-              }
-              take++;
-            }
-          }
-          h.rescued += take;
-          this.saved += take;
-        }
-        if (h.t >= 3.2) { h.state = 2; h.t = 0; }
-      }
-      if (h.state === 2 && h.t >= 1.4) this.helis.splice(k, 1);
-    }
-  }
 
 
   // ---------- 事件与响应（M7） ----------
