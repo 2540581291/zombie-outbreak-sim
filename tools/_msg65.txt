@@ -1,0 +1,23 @@
+卡片看不到下面、一滚就跳回顶部：两个原因都修了
+
+原因 1：正文根本没有滚动容器
+  #agentcard 是 overflow:hidden（圆角要裁），而 #ac-body 没有任何 max-height/overflow 样式
+  → 内容超出后不是"能滚"，而是被裁掉；用户实际滚的是整页。
+
+原因 2：滚动位置被 innerHTML 重置
+  renderAgentCard() 里 bodyEl.innerHTML = bodyHtml 会把滚动容器重置到 0，
+  而卡片每 200ms 就刷新一次（血量、倒计时、距离都在变）→ 一拉就弹回顶部。
+
+改法：
+· CSS 新增 #ac-body{max-height:46vh;overflow-y:auto;overscroll-behavior:contain}
+  + 细滚动条样式（6px，半透明白）
+· renderAgentCard 里保存/恢复 scrollTop：
+    const keepTop = bodyEl.scrollTop;
+    bodyEl.innerHTML = bodyHtml;
+    bodyEl.scrollTop = keepTop;
+
+这样正文能滚了，而且刷新时保持在你拉到的那一段。
+
+后续可选（更彻底，改动更大）：
+  把易变字段（血量/倒计时/距离）改成单独的 textContent 局部更新，
+  让 innerHTML 只在"切换选中的人"时重建一次 —— 那样滚动和性能都最省。

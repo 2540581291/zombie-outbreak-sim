@@ -912,8 +912,10 @@ function renderAgentCard() {
     attrBlock(selected) + explainBlock(selected);
   const bodyEl = document.getElementById('ac-body');
   if (bodyEl && bodyHtml !== lastCardHtml) {
+    const keepTop = bodyEl.scrollTop;          // 记住滚到哪，替换 DOM 后还原
     bodyEl.innerHTML = bodyHtml;
     lastCardHtml = bodyHtml;
+    bodyEl.scrollTop = keepTop;
   }
 }
 

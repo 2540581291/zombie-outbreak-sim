@@ -364,3 +364,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
 .ac-spec.inf{color:#ffd27a;background:rgba(255,200,80,.16)}
 .ac-spec.dead{color:#9aa2a8;background:rgba(160,170,180,.14)}
 .ac-spec.warn{color:#ffc07a;background:rgba(255,170,80,.16)}
+
+/* 卡片正文：自己滚，别让整块被裁 */
+#ac-body{max-height:46vh;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+#ac-body::-webkit-scrollbar{width:6px}
+#ac-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:3px}
