@@ -76,9 +76,10 @@ export function makeStationStock(area) {
   addAmmo(s, 1, Math.min(420, 90 + Math.round(a / 6)));   // 90–420 发
   addWeapon(s, 4, 2 + big);                               // 霰弹枪 2–4 把
   addAmmo(s, 4, 18 + big * 18);                           // 18–54 发
-  if (big > 0) {                                          // 大所才有步枪
-    addWeapon(s, 6, big * 2);                             // 2–4 把
-    addAmmo(s, 6, big * 60);
+  // 步枪弹：每个所都有一些（军队/特警路过时能补），大所更多
+  addAmmo(s, 6, 40 + big * 80);                           // 40–200 发
+  if (big > 0) {
+    addWeapon(s, 6, big * 2);                             // 大所才有步枪 2–4 把
   }
   // 扩充武库：小所也有弩（无声、适合巡逻），大所才有突击步枪 / 轻机枪 / 双管
   addWeapon(s, 13, 1 + big);                              // 十字弩 1–3 把

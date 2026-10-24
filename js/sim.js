@@ -457,6 +457,8 @@ export class Sim {
       p.store = makeStationStock(p.a || 200);
       p.initAmmo = ammoCount(p.store);
       p.initGuns = weaponCount(p.store);
+      p.initA = Array.from(p.store.a);   // 按枪种的初始弹量（弹药分开记，面板要能对比）
+      p.initW = Array.from(p.store.w);
     }
     this.pop0 = Math.max(1, (P.population | 0));
     // 游戏时钟：默认 07:30 开局
@@ -3062,8 +3064,7 @@ export class Sim {
           //   以前要弹匣+备弹全打光才回，等于四条弹匣打满才想起来补给）
           //   优先级：有目标逃跑（fleeMode 2）> 补给 > 原地待命
           if (this.needsAmmo(i) && this.fleeMode[i] !== 2) {
-            const siR = this.stationOf[i] - 1;
-            const stR = siR >= 0 ? (this.poiByKind.police || [])[siR] : null;
+            const stR = this.resupplyStation(i);
             if (stR) {
               const dxR = stR.x - this.px[i], dzR = stR.z - this.pz[i];
               const ddR = Math.hypot(dxR, dzR);
@@ -3163,8 +3164,7 @@ export class Sim {
               if (this.needsAmmo(i)) {
                 // 打不动了：先回警局补给（弹药是共用的），但"有目标逃跑"优先级更高
                 if (this.fleeMode[i] !== 2) {
-                  const si2 = this.stationOf[i] - 1;
-                  const st2 = si2 >= 0 ? (this.poiByKind.police || [])[si2] : null;
+                  const st2 = this.resupplyStation(i);
                   if (st2) {
                     const dx2 = st2.x - this.px[i], dz2 = st2.z - this.pz[i];
                     const dd = Math.hypot(dx2, dz2);
@@ -3782,10 +3782,32 @@ export class Sim {
     return this.mag[i] <= 0 && this.reserve[i] < w.mag;
   }
 
+  /**
+   * 该去哪个警局补给：
+   *   有归属所、且所里有这种弹 → 本所；
+   *   否则（空降兵/政府派出的士兵没有归属所，或本所打空了）→ 最近的、有这种弹的所。
+   * 注意：弹药按枪种分开算，手枪弹补不了步枪。
+   */
+  resupplyStation(i) {
+    const wid = this.wpn[i];
+    const list = this.poiByKind.police || [];
+    const own = this.stationOf[i] - 1;
+    if (own >= 0 && own < list.length) {
+      const p = list[own];
+      if (p.store && (p.store.a[wid] || 0) > 0) return p;
+    }
+    let best = null, bd = Infinity;
+    for (const p of list) {
+      if (!p.store || (p.store.a[wid] || 0) <= 0) continue;
+      const d = (p.x - this.px[i]) ** 2 + (p.z - this.pz[i]) ** 2;
+      if (d < bd) { bd = d; best = p; }
+    }
+    return best;
+  }
+
   /** 在局里补一次：补到 mag×4 为止，先装满弹匣、剩下进备弹 */
   tryRefill(i) {
-    const si = this.stationOf[i] - 1;
-    const st = si >= 0 ? (this.poiByKind.police || [])[si] : null;
+    const st = this.resupplyStation(i);
     if (!st || !st.store) return false;
     const wid = this.wpn[i], w = weaponOf(wid);
     if (!w || !w.id) return false;
@@ -4603,7 +4625,11 @@ export class Sim {
     }
     const weaponRows = [...armed.entries()]
       .sort((a, b) => b[1].n - a[1].n)
-      .map(([id, a]) => ({ name: weaponOf(id).name, n: a.n, ammo: a.ammo }));
+      .map(([id, a]) => ({
+        id, name: weaponOf(id).name, n: a.n, ammo: a.ammo,
+        per: a.ammo / Math.max(1, a.n),
+        cap: weaponOf(id).mag + weaponOf(id).reserve,
+      }));
 
     let police = 0, soldiers = 0, idle = 0, patrol = 0, onDuty = 0, escort = 0, policeDead = 0;
     for (let i = 0; i < this.n; i++) {
@@ -4700,7 +4726,11 @@ export class Sim {
       if (st) {
         for (let id = 1; id < st.w.length; id++) {
           if (!st.w[id] && !st.a[id]) continue;
-          rows.push({ name: weaponOf(id).name, n: st.w[id] || 0, ammo: st.a[id] || 0 });
+          rows.push({
+            id, name: weaponOf(id).name, n: st.w[id] || 0, ammo: st.a[id] || 0,
+            initAmmo: (p.initA && p.initA[id]) || 0,
+            initN: (p.initW && p.initW[id]) || 0,
+          });
           guns += st.w[id] || 0;
           ammo += st.a[id] || 0;
         }

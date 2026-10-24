@@ -2071,17 +2071,11 @@ async function boot() {
     const i = (sim.vips && sim.vips.length) ? sim.vips[0] : 0;
     selectAgent(i);
   }, 700);
-  // 演示：一次性丢几个工具，便于截图/排查
+  // 演示：现在只剩三个工具（查看 / 调度 / 空降兵），?demo 只丢这两种
   if (Q.get('demo')) {
     const fireDemo = () => {
       const ox = sim.origin[0], oz = sim.origin[1];
       sim.budget = 200;
-      TOOL_BY_ID.heli.apply(sim, ox, oz, { angle: 0 });
-      TOOL_BY_ID.napalm.apply(sim, ox + 90, oz + 20, { angle: 0 });
-      TOOL_BY_ID.siren.apply(sim, ox - 70, oz + 70, { angle: 0 });
-      TOOL_BY_ID.strike.apply(sim, ox + 40, oz - 80, { angle: 0 });
-      TOOL_BY_ID.barricade.apply(sim, ox, oz + 110, { angle: 0 });
-      TOOL_BY_ID.rally.apply(sim, ox - 90, oz - 40, { angle: 0 });
       TOOL_BY_ID.police.apply(sim, ox + 20, oz - 20, { angle: 0 });
       TOOL_BY_ID.soldier.apply(sim, ox - 30, oz + 10, { angle: 0 });
     };

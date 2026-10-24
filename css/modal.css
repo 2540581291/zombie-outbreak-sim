@@ -175,3 +175,16 @@
 .st-curve .fw-spark{height:28px;margin-top:0}
 
 .st-dry{color:#ff7b62;font-style:normal;font-weight:700}
+
+/* ---- 按枪种的弹药行 ---- */
+.fw-type{display:flex;align-items:baseline;gap:8px;font-size:11.5px;color:#8b98a8;
+  padding:4px 0;border-bottom:1px solid rgba(255,255,255,.035)}
+.fw-type span{flex:0 0 7em;color:#cfd8e3}
+.fw-type b{font-weight:600;color:#dfe7f0;font-variant-numeric:tabular-nums}
+.fw-type em{margin-left:auto;font-style:normal;color:#e6edf5;font-variant-numeric:tabular-nums}
+.fw-type i{font-style:normal;color:#6f7c8a;font-variant-numeric:tabular-nums;min-width:7em;text-align:right}
+
+.st-row{position:relative;flex-wrap:wrap}
+.st-typebar{flex:1 0 100%;height:3px;border-radius:2px;background:rgba(255,255,255,.07);
+  overflow:hidden;margin-top:3px}
+.st-typebar>i{display:block;height:100%;border-radius:2px}

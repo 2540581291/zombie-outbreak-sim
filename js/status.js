@@ -46,8 +46,13 @@ function spark(series, color) {
 function stationCard(s) {
   const col = s.ammoLeft >= 0.6 ? '#7ed07e' : s.ammoLeft >= 0.25 ? '#e0b23c' : '#e8503a';
   const rows = s.rows.length
-    ? s.rows.map((r) => `<div class="st-row"><span>${r.name}</span>`
-        + `<b>${r.n} 支</b><em>${fmt(r.ammo)} 发</em></div>`).join('')
+    ? s.rows.map((r) => {
+      const pctA = r.initAmmo ? Math.round((r.ammo / r.initAmmo) * 100) : 100;
+      const colA = pctA >= 60 ? '#7ed07e' : pctA >= 25 ? '#e0b23c' : '#e8503a';
+      return `<div class="st-row"><span>${r.name}</span>`
+        + `<b>${r.n} 支</b><em>${fmt(r.ammo)}${r.initAmmo && r.initAmmo !== r.ammo ? ' / ' + fmt(r.initAmmo) : ''} 发</em>`
+        + `<div class="st-typebar"><i style="width:${pctA}%;background:${colA}"></i></div></div>`;
+    }).join('')
     : '<div class="st-row"><span>仓库已空</span></div>';
   const takenRow = s.taken && s.taken.ammo > 0
     ? `<div class="st-meta"><span class="st-taken">被取走 ${fmt(s.taken.ammo)} 发（警员 ${fmt(s.taken.cop)} · 平民 ${fmt(s.taken.civ)}）</span><span>枪 ${s.taken.guns} 支</span></div>`
@@ -139,22 +144,21 @@ function forceView(sim) {
     </div>
 
     <div class="fw-card">
-      <div class="fw-sub">弹药</div>
-      <div class="fw-kv"><span>总弹药</span><b>${fmt(d.ammoN)} 发</b></div>
-      <div class="fw-kv"><span>人均</span><b>${d.ammoPer.toFixed(1)} 发</b></div>
+      <div class="fw-sub">弹药（按枪种分开记，不通用）</div>
+      <div class="fw-kv"><span>合计</span><b>${fmt(d.ammoN)} 发</b></div>
+      ${d.weaponRows.length
+        ? d.weaponRows.map((w) => `<div class="fw-type">
+            <span>${w.name}</span>
+            <b>${w.n} 支</b>
+            <em>${fmt(w.ammo)} 发</em>
+            <i>人均 ${w.per.toFixed(0)} / ${w.cap}</i>
+          </div>`).join('')
+        : '<div class="fw-note">没有武装人员</div>'}
       <div class="fw-kv"><span>每分钟消耗</span><b>${t ? d.burnPerMin.toFixed(1) + ' 发' : '—'}</b></div>
       <div class="fw-kv"><span>还能撑</span><b>${Number.isFinite(d.ammoMinutes) ? d.ammoMinutes > 999 ? '很久' : d.ammoMinutes.toFixed(0) + ' 分钟' : '—'}</b></div>
       <div class="fw-kv"><span>命中率</span><b>${d.accuracy === null ? '还没开过枪' : (d.accuracy * 100).toFixed(0) + '%（实算 ' + fmt(d.hits) + '/' + fmt(d.shots) + '）'}</b></div>
       <div class="fw-kv"><span>无弹警员</span><b class="${d.dryNoStock ? 'down' : ''}">${fmt(d.dryOfficers)} 人${d.dryNoStock ? '（其中 ' + d.dryNoStock + ' 人回所也补不到：库房已空）' : ''}</b></div>
-      <div class="fw-kv"><span>单人携带上限</span><b>手枪 60 发 · 步枪 120 发 · 轻机枪 300 发（弹匣 + 备弹）</b></div>
-      <div class="fw-note">弹匣打空、且备弹凑不满一匣 → 回本所补给；补给上限就是这一列的数。</div>
-    </div>
-
-    <div class="fw-card">
-      <div class="fw-sub">武器构成</div>
-      ${d.weaponRows.length
-        ? d.weaponRows.map((w) => `<div class="fw-kv"><span>${w.name}</span><b>${w.n} 支 · ${fmt(w.ammo)} 发</b></div>`).join('')
-        : '<div class="fw-note">没有武装人员</div>'}
+      <div class="fw-note">手枪弹补不了步枪、弩箭补不了火箭弹——每种枪只吃自己的弹。</div>
     </div>
 
     <div class="fw-card">
