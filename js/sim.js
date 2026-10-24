@@ -29,6 +29,9 @@ const NMAX = 160000;
 // 潜伏期两套常量（决策 3）：默认 8 秒；零号病人模式 10–30 分钟
 // 潜伏时长区间（秒）。实际值 = 区间 × (面板「咬伤潜伏」/ 90)，再按年龄体质加权。
 // bite = 被咬；contact = 间接接触（自爆喷溅等）
+/** 快速二维距离（Math.hypot 有防溢出处理，热路径里慢 10~30 倍） */
+const __H = (a, b) => Math.sqrt(a * a + b * b);
+
 export const INCFG = { bite: [60, 120], contact: [360, 1440] };
 
 // 一天 24 分钟：1 模拟秒 = 1 游戏分钟，1440 秒 = 24 小时（整数关系，不用换算）
@@ -425,7 +428,7 @@ export class Sim {
     // 撞塌的墙会改 nav.grid —— 开新局必须先还原，否则第二次跑的地图和第一次不同
     if (!this.navBase) this.navBase = this.nav && this.nav.grid ? this.nav.grid.slice() : null;
     else if (this.navBase) this.nav.grid.set(this.navBase);
-    this.wallHit = new Map();       // 每格被撞次数（撞满 10 次塌掉）
+    this.wallHitArr = new Uint8Array(this.nav && this.nav.grid ? this.nav.grid.length : 0);
     this.wallDownQueue = [];        // 本帧新塌的格子 [{x,z,c,r}]，UI 每帧取走
     this.wallsDown = 0;            // 本局撞塌的墙格数
     this.wallHitT.fill(0);
@@ -938,7 +941,7 @@ export class Sim {
   /** 两点之间是否全程可走（每 ~2m 采样）。用于视线拉直 / 闲逛选点 / 判断要不要寻路 */
   losClear(x0, z0, x1, z1) {
     const dx = x1 - x0, dz = z1 - z0;
-    const d = Math.hypot(dx, dz);
+    const d = __H(dx, dz);
     if (d < 0.001) return true;
     // 采样间隔 2m → 0.6m：格子是 1m，2m 采样会"穿透"1m 厚的薄墙，
     // 于是人以为直线可达、从不寻路，直接顶着墙走（实测卡在墙前 40 秒）。
@@ -972,7 +975,7 @@ export class Sim {
     const gp = this.goalPoint(i, this.goal[i]);
     if (gp) {
       const last = out[out.length - 1];
-      if (Math.hypot(gp[0] - last[0], gp[1] - last[1]) > 1.5) out.push(gp);
+      if (__H(gp[0] - last[0], gp[1] - last[1]) > 1.5) out.push(gp);
     }
     return out;
   }
@@ -1093,7 +1096,7 @@ export class Sim {
   statusOf(i) {
     const st = this.state[i];
     const kind = this.kind[i] || 0;
-    const D = (x, z) => Math.hypot(x - this.px[i], z - this.pz[i]);
+    const D = (x, z) => __H(x - this.px[i], z - this.pz[i]);
     const sp = SPECIES[kind] || {};
     // ---- 丧尸 / 野兽 ----
     if (st === ST.ZOMBIE || st === ST.WILD) {
@@ -1189,7 +1192,7 @@ export class Sim {
       const si = (this.stationOf[i] || 0) - 1;
       const stn = si >= 0 ? (this.poiByKind.police || [])[si] : null;
       const bits = [];
-      if (stn) bits.push(`驻地 ${stn.n || '警局'}（${Math.round(Math.hypot(stn.x - this.px[i], stn.z - this.pz[i]))}m）`);
+      if (stn) bits.push(`驻地 ${stn.n || '警局'}（${Math.round(__H(stn.x - this.px[i], stn.z - this.pz[i]))}m）`);
       if (this.goal[i] === GOAL.MOVE_TO) {
         const gp = this.goalPoint(i, GOAL.MOVE_TO);
         if (gp) bits.push(`前往 (${gp[0].toFixed(0)}, ${gp[1].toFixed(0)})`);
@@ -1200,7 +1203,7 @@ export class Sim {
     const g = this.goal[i];
     const gp = g !== GOAL.NONE ? this.goalPoint(i, g) : null;
     if (!gp) return this.idle[i] ? '原地停留' : '无固定行程';
-    const d = Math.hypot(gp[0] - this.px[i], gp[1] - this.pz[i]);
+    const d = __H(gp[0] - this.px[i], gp[1] - this.pz[i]);
     return `(${gp[0].toFixed(0)}, ${gp[1].toFixed(0)}) · 还有 ${Math.round(d)}m · ${this.pathN[i]} 个路点`;
   }
 
@@ -1304,7 +1307,7 @@ export class Sim {
     const z = this.nearZ[i];
     if (z >= 0) { dx = this.px[i] - this.px[z]; dz = this.pz[i] - this.pz[z]; }
     else if (this.origin) { dx = this.px[i] - this.origin[0]; dz = this.pz[i] - this.origin[1]; }
-    const d = Math.hypot(dx, dz) || 1;
+    const d = __H(dx, dz) || 1;
     dx /= d; dz /= d;
     // 往这个方向一直走到地图边缘（**从当前位置算**，不是从原点 —— 之前算错，目标点跑到地图外了）
     const halfW = nav.halfW, halfH = nav.halfH, M = 60;
@@ -1389,7 +1392,7 @@ export class Sim {
     const aware = this.aware[i];
     const near = this.zDanger(i);            // 0..1，越近越危险
     const fam = this.familyAlive(i);
-    const homeD = Math.hypot(this.homeX[i] - this.px[i], this.homeZ[i] - this.pz[i]);
+    const homeD = __H(this.homeX[i] - this.px[i], this.homeZ[i] - this.pz[i]);
     const gun = this.homeHasGun(i) && !this.armed[i];
     const friend = this.nearFriends(i);
     const chaos = this.chaos || 0;
@@ -1460,7 +1463,7 @@ export class Sim {
     if (chaos >= 50) {
       const pp = this.nearestPoi('police', this.px[i], this.pz[i]);
       if (pp) {
-        const d = Math.hypot(pp.x - this.px[i], pp.z - this.pz[i]);
+        const d = __H(pp.x - this.px[i], pp.z - this.pz[i]);
         add(GOAL.SHELTER, '混乱度 ≥ 50%', 0.95 - Math.min(0.45, d / 4000));
       }
     }
@@ -1518,7 +1521,7 @@ export class Sim {
     // 玩家/系统下达的移动命令（右键点地、出警）优先：没走到之前不被社会决策覆盖
     if (this.goal[i] === GOAL.MOVE_TO) {
       const gp = this.goalPoint(i, GOAL.MOVE_TO);
-      if (gp && Math.hypot(gp[0] - this.px[i], gp[1] - this.pz[i]) < 6) {
+      if (gp && __H(gp[0] - this.px[i], gp[1] - this.pz[i]) < 6) {
         this.setGoal(i, GOAL.NONE);
       } else {
         // 命令目标看不见时才寻路（以前这里直接 return，导致"右键点地"永远没有路径）
@@ -1741,7 +1744,7 @@ export class Sim {
   zDanger(i) {
     const z = this.nearZ[i];
     if (z < 0) return 0;
-    const d = Math.hypot(this.px[i] - this.px[z], this.pz[i] - this.pz[z]);
+    const d = __H(this.px[i] - this.px[z], this.pz[i] - this.pz[z]);
     return Math.max(0, Math.min(1, 1 - d / 40));
   }
 
@@ -1835,7 +1838,7 @@ export class Sim {
           let clash = false;
           if (relaxD > 0) {
             for (const t of taken) {
-              if (Math.hypot(t.x - c.x, t.z - c.z) < relaxD) { clash = true; break; }
+              if (__H(t.x - c.x, t.z - c.z) < relaxD) { clash = true; break; }
             }
           }
           if (clash) continue;
@@ -1854,7 +1857,7 @@ export class Sim {
     if (fg === 1) {
       const poi = this.nearestPoi('police', this.px[i], this.pz[i]);
       if (poi) {
-        const d = Math.hypot(poi.x - this.px[i], poi.z - this.pz[i]);
+        const d = __H(poi.x - this.px[i], poi.z - this.pz[i]);
         // 到了警局门口：如果这里已经被丧尸占满，就标记"沦陷"，改道回家/出城
         if (d < 18 && this.policeNear(poi.x, poi.z, 50) === 0) {
           this.stationLost[i] = 1;
@@ -1984,7 +1987,7 @@ export class Sim {
         if (g === GOAL.NONE || g === GOAL.HOLD) continue;
         const gp = this.goalPoint(i, g);
         if (!gp) continue;
-        const d = Math.hypot(gp[0] - this.px[i], gp[1] - this.pz[i]);
+        const d = __H(gp[0] - this.px[i], gp[1] - this.pz[i]);
         if (d < 8) { this.stuckT[i] = 0; continue; }
         // 目标在楼里、已经站在楼外十几米处：算"到了"（不然会在一堵墙上蹭一整天）
         if (d < 14 && nav.indoor && nav.indoor(gp[0], gp[1])) {
@@ -1992,7 +1995,7 @@ export class Sim {
           this.arrive(i);
           continue;
         }
-        const moved = Math.hypot(this.px[i] - this.lastX[i], this.pz[i] - this.lastZ[i]);
+        const moved = __H(this.px[i] - this.lastX[i], this.pz[i] - this.lastZ[i]);
         this.lastX[i] = this.px[i]; this.lastZ[i] = this.pz[i];
         if (moved < 2) {
           this.stuckT[i] += 1;
@@ -2042,7 +2045,7 @@ export class Sim {
         if (e.ids && e.ids.length) {
           for (const id of e.ids) {
             if (this.state[id] === ST.POLICE || this.state[id] === ST.SOLDIER) {
-              if (Math.hypot(this.px[id] - e.x, this.pz[id] - e.z) < 50) { e.ack = true; break; }
+              if (__H(this.px[id] - e.x, this.pz[id] - e.z) < 50) { e.ack = true; break; }
             }
           }
         }
@@ -2364,7 +2367,7 @@ export class Sim {
     // 出口打分：室内走到门口的距离 + 出门后到目标的直线距离（朝目标那一侧优先）
     let best = ex[0], bestScore = Infinity;
     for (const e of ex) {
-      const dOut = Math.hypot(e.outdoor[0] - gx, e.outdoor[1] - gz);
+      const dOut = __H(e.outdoor[0] - gx, e.outdoor[1] - gz);
       const sc = e.cost + dOut * 0.5;
       if (sc < bestScore) { bestScore = sc; best = e; }
     }
@@ -2403,7 +2406,7 @@ export class Sim {
         const a = NW.doorAnchor(this.px[i], this.pz[i]);
         if (a) {
           const ax2 = a[0] - this.px[i], az2 = a[1] - this.pz[i];
-          const d2 = Math.hypot(ax2, az2);
+          const d2 = __H(ax2, az2);
           if (d2 < 8 && (d2 < 1.2 || ng.losClear(this.px[i], this.pz[i], a[0], a[1], 0.3))) {
             if (!inNow && d2 < 1.5) {
               // 已经站在门外了：结束"出门"状态，别再围着门口那一点打转
@@ -2420,7 +2423,7 @@ export class Sim {
       }
       // ② 刚出门：期望方向如果会把我们送回楼里，就沿墙侧向绕
       if (this.time < this.freeT[i]) {
-        const d = Math.hypot(dx, dz);
+        const d = __H(dx, dz);
         if (d > 1e-6) {
           const ux = dx / d, uz = dz / d;
           if (ng.indoor(this.px[i] + ux * 2.2, this.pz[i] + uz * 2.2)) {
@@ -2433,7 +2436,7 @@ export class Sim {
             else if (k1 && k2) {
               const tdx = (gx === undefined ? this.px[i] + dx : gx) - this.px[i];
               const tdz = (gz === undefined ? this.pz[i] + dz : gz) - this.pz[i];
-              const tl = Math.hypot(tdx, tdz) || 1;
+              const tl = __H(tdx, tdz) || 1;
               const d1 = c1x * tdx / tl + c1z * tdz / tl;
               const d2 = c2x * tdx / tl + c2z * tdz / tl;
               px2 = d1 >= d2 ? c1x : c2x;
@@ -2464,7 +2467,7 @@ export class Sim {
       // ---- 撞墙累积：正前方那格不可走 → 记一次"撞墙"，同一格撞满 10 次塌掉 ----
       //   不限 moved：打转的人也算在撞（他一直在往墙里挤）；每 0.4 秒最多记一次。
       if (speed > 0.2 && this.time >= this.wallHitT[i]) {
-        const dl = Math.hypot(dx, dz);
+        const dl = __H(dx, dz);
         if (dl > 1e-6) {
           const bx = this.px[i] + (dx / dl) * 0.9, bz = this.pz[i] + (dz / dl) * 0.9;
           const nv = this.nav;
@@ -2477,10 +2480,10 @@ export class Sim {
           const g = ci >= 0 ? this.nav.grid[ci] : 0;
           if (ci >= 0 && (g & 1) === 0) {
             this.wallHitT[i] = this.time + 0.4;
-            const nk = (this.wallHit.get(ci) || 0) + 1;
+            const nk = (this.wallHitArr[ci] || 0) + 1;
             if (nk >= 10) {
               this.nav.grid[ci] = 0x03;        // 塌了：变成可走空地
-              this.wallHit.delete(ci);
+              this.wallHitArr[ci] = 0;
               this.wallsDown = (this.wallsDown || 0) + 1;
               // 墙没了 → 规划器的路径缓存也失效（缓存键是"起点格→终点格"，
               // 里面存的是绕这堵墙的路线），顺手清掉
@@ -2505,7 +2508,7 @@ export class Sim {
               }
               this.booms.push({ x: bx, z: bz, r: 1.6, life: 0.35 });
             } else {
-              this.wallHit.set(ci, nk);
+              this.wallHitArr[ci] = nk;
             }
           }
         }
@@ -2524,7 +2527,7 @@ export class Sim {
 
   /** 极端兜底（NavCore 起不来时）：只保证"朝目标走一步、不撞墙"，没有绕障能力 */
   moveFallback(i, dx, dz, speed, dt) {
-    const d = Math.hypot(dx, dz);
+    const d = __H(dx, dz);
     if (d < 1e-6) return false;
     const step = Math.min(speed * dt, this.nav.cell * 0.8);
     const nx = this.px[i] + (dx / d) * step;
@@ -2736,7 +2739,7 @@ export class Sim {
               let ax = gp[0], az = gp[1];
               // 有绕路点就先走绕路点
               if (this.wpT[i] > this.time) {
-                const wd = Math.hypot(this.wpX[i] - this.px[i], this.wpZ[i] - this.pz[i]);
+                const wd = __H(this.wpX[i] - this.px[i], this.wpZ[i] - this.pz[i]);
                 if (wd > 6) { ax = this.wpX[i]; az = this.wpZ[i]; }
                 else this.wpT[i] = 0;
               }
@@ -2757,7 +2760,7 @@ export class Sim {
                   this.stuckT[i] += cdt;
                   if (this.stuckT[i] > 6) {
                     this.stuckT[i] = 0;
-                    const hd = Math.hypot(this.homeX[i] - this.px[i], this.homeZ[i] - this.pz[i]);
+                    const hd = __H(this.homeX[i] - this.px[i], this.homeZ[i] - this.pz[i]);
                     if (hd < 90) {
                       // 真的就在自家附近：固守是合理的
                       this.setGoal(i, GOAL.HOLD, this.px[i], this.pz[i]);
@@ -2846,7 +2849,7 @@ export class Sim {
           if (sumW === 0) {                     // 兜底：用最近那只
             rx = this.px[i] - this.px[z]; rz = this.pz[i] - this.pz[z]; sumW = 1;
           }
-          const rlen = Math.hypot(rx, rz);
+          const rlen = __H(rx, rz);
           if (rlen > sumW * 0.0012) {
             // 合力够明确：就用它，并记住这个方向
             this.fleeDir[i] = Math.atan2(rz, rx);
@@ -3019,7 +3022,7 @@ export class Sim {
               const js = this.state[j];
               if (!(js === ST.CIV || js === ST.FLEE || js === ST.FIGHT || js === ST.INFECTED)) return;
               const cnt = this.tgtCount[j];
-              const d = Math.hypot(this.px[j] - this.px[i], this.pz[j] - this.pz[i]);
+              const d = __H(this.px[j] - this.px[i], this.pz[j] - this.pz[i]);
               if (cnt < bestN || (cnt === bestN && d < bestD)) { bestN = cnt; bestD = d; best = j; }
             });
             if (best >= 0 && best !== c && bestN <= this.tgtCount[c]) c = best;
@@ -3027,8 +3030,8 @@ export class Sim {
           if (c >= 0) this.tgtCount[c]++;
           if (c >= 0 && !this.lockOn[i] && this.nearC[i] >= 0 && this.nearC[i] !== c) {
             const nc = this.nearC[i];
-            const dCur = Math.hypot(this.px[c] - this.px[i], this.pz[c] - this.pz[i]);
-            const dNew = Math.hypot(this.px[nc] - this.px[i], this.pz[nc] - this.pz[i]);
+            const dCur = __H(this.px[c] - this.px[i], this.pz[c] - this.pz[i]);
+            const dNew = __H(this.px[nc] - this.px[i], this.pz[nc] - this.pz[i]);
             if (dNew < 15 && dNew < dCur * 0.6) c = nc;
           }
           // 锁敌：**注意力范围（60m）里真的一个活人都没有**时，每 60 秒抓一个"全城最近的人"。
@@ -3089,7 +3092,7 @@ export class Sim {
                 // 坦克的拍击会把人打飞
                 if (sp.special === 'tank') {
                   const kx = this.px[c] - this.px[i], kz = this.pz[c] - this.pz[i];
-                  const kl = Math.hypot(kx, kz) || 1;
+                  const kl = __H(kx, kz) || 1;
                   this.px[c] += (kx / kl) * 3.5;
                   this.pz[c] += (kz / kl) * 3.5;
                   if (!this.walkable(this.px[c], this.pz[c])) {
@@ -3152,7 +3155,7 @@ export class Sim {
             const stR = this.resupplyStation(i);
             if (stR) {
               const dxR = stR.x - this.px[i], dzR = stR.z - this.pz[i];
-              const ddR = Math.hypot(dxR, dzR);
+              const ddR = __H(dxR, dzR);
               if (ddR > 16) {
                 this.setGoal(i, GOAL.SHELTER, stR.x, stR.z);
                 this.move(i, dxR, dzR, this.spd[i] * 1.05, cdt);
@@ -3185,7 +3188,7 @@ export class Sim {
           const si = this.stationOf[i] - 1;
           if (si >= 0) {
             const st = this.poiByKind.police[si];
-            const dHome = Math.hypot(st.x - this.px[i], st.z - this.pz[i]);
+            const dHome = __H(st.x - this.px[i], st.z - this.pz[i]);
             const mustReturn = this.chaos >= 50 || (this.chaos >= 20 && this.patrol[i]);
             if (mustReturn && this.goal[i] !== GOAL.MOVE_TO) {
               // 回局：直接设目标点（不占用"被调度"的 MOVE_TO 语义会在下一帧被覆盖，所以用 HOLD）
@@ -3252,7 +3255,7 @@ export class Sim {
                   const st2 = this.resupplyStation(i);
                   if (st2) {
                     const dx2 = st2.x - this.px[i], dz2 = st2.z - this.pz[i];
-                    const dd = Math.hypot(dx2, dz2);
+                    const dd = __H(dx2, dz2);
                     if (dd > 16) {
                       this.setGoal(i, GOAL.SHELTER, st2.x, st2.z);
                       this.move(i, dx2, dz2, this.spd[i] * 1.05, cdt);
@@ -3620,7 +3623,7 @@ export class Sim {
   reportEvent(x, z, sev) {
     const now = this.time;
     for (const e of this.alarms) {
-      if (now - e.t < 60 && Math.hypot(e.x - x, e.z - z) < 80) return null;
+      if (now - e.t < 60 && __H(e.x - x, e.z - z) < 80) return null;
     }
     const ev = { id: ++this.eventSeq, x, z, t: now, sev: sev || 1, ack: false, responders: 0 };
     this.alarms.push(ev);
@@ -3685,7 +3688,7 @@ export class Sim {
         const stn = this.nearestPoi('police', this.px[v], this.pz[v]);
         if (!stn) continue;
         dx = stn.x; dz = stn.z;
-        arrived = Math.hypot(dx - this.px[v], dz - this.pz[v]) < 30;
+        arrived = __H(dx - this.px[v], dz - this.pz[v]) < 30;
       } else {
         const p = this.escapePoint(v);
         dx = p[0]; dz = p[1];
@@ -3756,7 +3759,7 @@ export class Sim {
   reportDeath(x, z) {
     if (this.chaos >= 50) return null;
     for (const a of this.deathAlarms) {
-      if (this.time - a.t < 180 && Math.hypot(a.x - x, a.z - z) < 500) return null;
+      if (this.time - a.t < 180 && __H(a.x - x, a.z - z) < 500) return null;
     }
     this.deathAlarms.push({ x, z, t: this.time });
     if (this.deathAlarms.length > 32) this.deathAlarms.shift();
@@ -3795,7 +3798,7 @@ export class Sim {
       if (this.stationOf[i] !== si + 1) continue;
       if (this.goal[i] === GOAL.MOVE_TO) continue;
       if (this.escortOf[i]) continue;        // 正在护送要员的，不能被别的任务抢走
-      pool.push([i, Math.hypot(this.px[i] - x, this.pz[i] - z)]);
+      pool.push([i, __H(this.px[i] - x, this.pz[i] - z)]);
     }
     pool.sort((a, b) => a[1] - b[1]);
     const made = [];
@@ -4042,7 +4045,7 @@ export class Sim {
       const s = this.state[i];
       if (s !== ST.POLICE && s !== ST.SOLDIER) { this.duties.delete(i); continue; }
       if (this.goal[i] !== GOAL.MOVE_TO) { this.duties.delete(i); continue; }
-      if (Math.hypot(this.px[i] - d.x, this.pz[i] - d.z) < 12) this.duties.delete(i);
+      if (__H(this.px[i] - d.x, this.pz[i] - d.z) < 12) this.duties.delete(i);
     }
   }
   /**
@@ -4213,7 +4216,7 @@ export class Sim {
         if (s !== ST.POLICE && s !== ST.SOLDIER) continue;
         out.duties.push({
           i, soldier: s === ST.SOLDIER, what: d.what, dest: d.dest, why: d.why, t: d.t,
-          dist: Math.hypot(this.px[i] - d.x, this.pz[i] - d.z),
+          dist: __H(this.px[i] - d.x, this.pz[i] - d.z),
         });
       }
       out.duties.sort((a, b) => a.dist - b.dist);
@@ -4985,7 +4988,7 @@ export class Sim {
       for (let i = 0; i < this.n; i++) {
         if (this.state[i] !== ST.CIV && this.state[i] !== ST.INFECTED) continue;
         if (this.goal[i] !== GOAL.HELP) continue;
-        if (Math.hypot(this.px[i] - p.x, this.pz[i] - p.z) < 400) near++;
+        if (__H(this.px[i] - p.x, this.pz[i] - p.z) < 400) near++;
       }
       hospitals.push({ name: p.n || '医院', near });
     }

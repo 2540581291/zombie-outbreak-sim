@@ -260,6 +260,8 @@ def main():
     ap.add_argument("--maxlon", type=float, required=True)
     ap.add_argument("--out", default=None)
     ap.add_argument("--overpass", action="store_true")
+    ap.add_argument("--buildings", default=None,
+                    help="用外部建筑 JSON 取代 OSM 建筑（[{\"p\":[[lon,lat]...],\"h\":米}]）")
     ap.add_argument("--cell", type=float, default=1.0, help="碰撞格边长（米）；自建城市默认 1m，原版地图按资源自带 cell")
     args = ap.parse_args()
 
@@ -475,6 +477,22 @@ def main():
     if len(trees) > 22000:
         step = len(trees) // 22000 + 1
         trees = trees[::step]
+
+    # ---------- 外部建筑（从 DSM 提的轮廓）----------
+    # 航测区 OSM 几乎没有建筑，用 DSM 提的轮廓代替；坐标是经纬度，这里转成本地米。
+    if getattr(args, "buildings", None):
+        import json as _json
+        with open(args.buildings, encoding="utf-8") as f:
+            ext = _json.load(f)
+        conv = []
+        for b in ext:
+            pts = [((p[0] - lon0) * kx, -((p[1] - lat0) * ky)) for p in b["p"] if len(p) >= 2]
+            if len(pts) < 3:
+                continue
+            conv.append({"p": [[round(x, 1), round(y, 1)] for x, y in pts],
+                         "h": max(3.5, min(float(b.get("h", 6.0)), 320.0))})
+        print(f"      外部建筑 {len(ext):,} 个 → 有效 {len(conv):,} 个（取代 OSM 的 {len(buildings):,} 个）", flush=True)
+        buildings = conv
 
     out = {
         "name": args.name,

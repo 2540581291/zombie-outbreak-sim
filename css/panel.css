@@ -70,3 +70,9 @@
 #topbar .tb-mid{margin-left:auto}
 
 /* 原本在顶栏的 5 个按钮（政府/武力/卫生/总览/战报）挪到面板里 */
+
+/* 面板正文：够高就自己滚，不要把整个 UI 缩小来迁就它 */
+#panel{max-height:calc(100vh - 2.5rem);display:flex;flex-direction:column}
+#p-body{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+#p-body::-webkit-scrollbar{width:0.375rem}
+#p-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:0.1875rem}

@@ -598,6 +598,38 @@ function updateLink() {
   linkLine.visible = true;
 }
 
+/**
+ * UI 自适应缩放：先按视口给基准根字号，再按"内容是否装得下"整体缩放。
+ * 顶栏是单行不换行布局，内容宽度随根字号线性变化，所以量一次 scrollWidth
+ * 就能算出需要的比例；面板高度同理。
+ */
+let uiFitTimer = 0;
+function fitUiScale() {
+  const root = document.documentElement;
+  const bar = document.getElementById('topbar');
+  const panel = document.getElementById('panel');
+  // 基准：顶栏内容宽 ≈ 145 × 根字号（实测），所以用 宽/150 起步，
+  // 再按实际 scrollWidth 微调，保证单行顶栏的所有按钮都可见。
+  const base = Math.max(9, Math.min(24, window.innerWidth / 150));
+  root.style.fontSize = base.toFixed(2) + 'px';
+  // 量一次（布局已按 base 生效）
+  let k = 1;
+  if (bar) {
+    const need = bar.scrollWidth, have = bar.clientWidth;
+    if (need > 0 && have > 0) k = Math.min(k, (have - 2) / need);
+  }
+  k = Math.max(0.5, Math.min(1.6, k));
+  root.style.fontSize = (base * k).toFixed(2) + 'px';
+  root.dataset.uiscale = k.toFixed(3);
+  if (bar) root.dataset.barFit = (bar.scrollWidth <= bar.clientWidth + 1) ? '1' : '0';
+}
+function scheduleFitUi() {
+  if (uiFitTimer) return;
+  uiFitTimer = setTimeout(() => { uiFitTimer = 0; fitUiScale(); }, 120);
+}
+addEventListener('resize', scheduleFitUi);
+addEventListener('orientationchange', scheduleFitUi);
+
 function setFollow(on) {
   followSelected = !!on;
   const f = document.getElementById('ac-follow');
@@ -2141,6 +2173,8 @@ async function boot() {
   } else {
     renderer.render(scene, camera);
   }
+  fitUiScale();
+  setTimeout(fitUiScale, 300);
   document.title = '生化危机模拟器 · ' + cityFull(CID, city.name);
   startLoop();
 }
