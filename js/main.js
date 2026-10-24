@@ -194,6 +194,9 @@ addEventListener('keydown', (e) => {
 addEventListener('keyup', (e) => keys.delete(e.code));
 
 let drag = null;
+// 右键拖拽的位移先攒在 panPending 里，每帧按指数衰减地消化掉 ——
+// 直接 add 到 target 上会跟着鼠标事件一跳一跳（尤其高刷新率鼠标），加了这个就变成顺滑滑动+收尾减速
+const panPending = new THREE.Vector3();
 const el = renderer.domElement;
 el.addEventListener('contextmenu', (e) => e.preventDefault());
 
@@ -213,9 +216,10 @@ el.addEventListener('pointermove', (e) => {
   const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
 
   if (drag.btn === 2) {
-    // 右键 = 平移（灵敏度 0.0016 → 0.00085 → 0.00062：再降一档，拖起来更跟手）
+    // 右键 = 平移（灵敏度 0.0016 → 0.00085 → 0.00062）
+    // 位移先进 panPending，由主循环平滑消化（见 loop 里 panPending 那段）
     const k = rig.dist * 0.00062;
-    rig.target.addScaledVector(fwd, dy * k).addScaledVector(right, -dx * k);
+    panPending.addScaledVector(fwd, dy * k).addScaledVector(right, -dx * k);
   } else if (drag.btn === 1 && !retroMode) {
     // 中键 = 旋转 / 俯仰（2D 禁止旋转，正北朝上）
     rig.yaw -= dx * 0.005;
@@ -2059,6 +2063,15 @@ function loop(t) {
   if (keys.has('KeyR')) rig.pitch = Math.min(1.52, rig.pitch + dtReal * 0.7);
   if (keys.has('KeyF')) rig.pitch = Math.max(0.18, rig.pitch - dtReal * 0.7);
   clampTarget();
+  // 右键平移的平滑消化：每帧吃掉一部分（指数衰减），拖完会有一点顺滑的收尾
+  if (panPending.x !== 0 || panPending.z !== 0) {
+    const f = 1 - Math.exp(-Math.max(0.001, dtReal) * 16);
+    rig.target.x += panPending.x * f;
+    rig.target.z += panPending.z * f;
+    panPending.multiplyScalar(1 - f);
+    if (Math.abs(panPending.x) < 0.01 && Math.abs(panPending.z) < 0.01) panPending.set(0, 0, 0);
+    clampTarget();
+  }
   updatePathLine();
   if (!FIXCAM) applyCamera();
 
