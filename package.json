@@ -14,6 +14,7 @@
     "serve": "python -m http.server 8777",
     "test:navflow": "node tools/test_navflow.mjs",
     "test:navdyn": "node tools/test_navdyn.mjs",
-    "test:navflick": "node tools/test_navflick.mjs"
+    "test:navflick": "node tools/test_navflick.mjs",
+    "test:gov": "node tools/test_gov.mjs"
   }
 }

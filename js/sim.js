@@ -3297,10 +3297,14 @@ export class Sim {
       this.state[i] = ST.SOLDIER;
       this.hp[i] = SPECIES[SP.SOLDIER].hp;
       this.spd[i] = SPECIES[SP.SOLDIER].speed;
+      // 以前这里只写了 ammo=60，**没有发枪**（wpn 还是 0 = 徒手），
+      // 所以伞兵/政府派出的士兵从头到尾一枪打不出来。补上发枪。
+      this.giveWeapon(i, ROLE_WEAPON.soldier, skillFor('soldier'));
       this.ammo[i] = 60;
     } else if (kind === 'elite') {
       this.kind[i] = SP.ELITE;
       this.state[i] = ST.SOLDIER;
+      this.giveWeapon(i, ROLE_WEAPON.elite, skillFor('elite'));
       this.hp[i] = SPECIES[SP.ELITE].hp;
       this.spd[i] = SPECIES[SP.ELITE].speed;
       this.ammo[i] = 240;
@@ -3738,6 +3742,165 @@ export class Sim {
     return { ok: made.length > 0, n: made.length, station: st.poi, dist: st.dist, ids: made, idle: pool.length };
   }
 
+  // ================= 政府行动（面板）=================
+  // 设计：所有"派人"的动作都走 dispatchTo 这一条路——
+  //   警察：从最近的警局抽调现有警员（不凭空生成）
+  //   士兵：从政府大楼门口刷出来，然后走过去
+  // 这样"派军队去医院"和"派警察去医院"除了出发点不同，行为链路完全一致。
+
+  /**
+   * 统一派遣。
+   * @param {'police'|'soldier'} kind 派谁
+   * @param {number} x,z 目标点
+   * @param {number} n   人数
+   * @param {object} [opt] { purge: 秒 } —— 清剿任务：期间对"人"也开火
+   */
+  dispatchTo(kind, x, z, n, opt) {
+    const want = Math.max(1, n | 0 || 1);
+    if (kind === 'police') {
+      const r = this.dispatchPolice(x, z, want);
+      if (opt && opt.purge && r.ids) {
+        for (const i of r.ids) this.purgeT[i] = this.time + (opt.purge | 0 || 180);
+      }
+      return { ok: r.ok, n: r.n, from: r.station ? (r.station.n || '警察局') : '—', ids: r.ids, reason: r.reason };
+    }
+    // ---- 士兵：从政府大楼门口刷（没有政府就用最近的警局）----
+    const base = (this.poiByKind.gov || [])[0] || this.nearestPoi('police', x, z);
+    if (!base) return { ok: false, n: 0, reason: 'no-base' };
+    const made = [];
+    for (let k = 0; k < want; k++) {
+      const a = this.rng() * 6.2832, r = 5 + this.rng() * 9;
+      let sx = base.x + Math.cos(a) * r, sz = base.z + Math.sin(a) * r;
+      if (!this.walkable(sx, sz)) { sx = base.x; sz = base.z; }
+      const i = this.addUnit(sx, sz, 'soldier');
+      if (i < 0) break;
+      this.orderMove(i, x + (this.rng() - 0.5) * 12, z + (this.rng() - 0.5) * 12);
+      this.boostT[i] = this.time + 60;
+      if (opt && opt.purge) this.purgeT[i] = this.time + (opt.purge | 0 || 180);
+      made.push(i);
+    }
+    return { ok: made.length > 0, n: made.length, from: base.n || '政府', ids: made };
+  }
+
+  /** 警力收拢：所有人回最近的警局待命（巡逻也停） */
+  orderPoliceHome() {
+    let n = 0;
+    for (let i = 0; i < this.n; i++) {
+      if (this.state[i] !== ST.POLICE) continue;
+      if (this.escortOf[i]) continue;
+      const si = this.stationOf[i] - 1;
+      const st = si >= 0 ? (this.poiByKind.police || [])[si] : null;
+      if (!st) continue;
+      this.patrol[i] = 0;
+      this.setGoal(i, GOAL.HOLD, st.x, st.z);
+      n++;
+    }
+    this.pushEvent(`政府命令：${n} 名警员回局待命`, 'start');
+    return { ok: n > 0, n };
+  }
+
+  /** 清剿：派人去某点，"见人就打"持续一段时间（默认 4 分钟） */
+  orderPurge(x, z, n, usePolice) {
+    const r = this.dispatchTo(usePolice ? 'police' : 'soldier', x, z, n || 10, { purge: 240 });
+    this.pushEvent(
+      r.ok ? `清剿令：${r.n} 名${usePolice ? '警察' : '士兵'}前往目标，人格杀勿论（4 分钟）`
+        : '清剿令：没有可用兵力',
+      r.ok ? 'start' : '');
+    return r;
+  }
+
+  /** 疏散：所有正在前往医院的人改为回家 */
+  clearPatients() {
+    let n = 0;
+    for (let i = 0; i < this.n; i++) {
+      if (this.goal[i] !== GOAL.HELP) continue;
+      if (this.state[i] === ST.CORPSE || this.state[i] === ST.SAVED) continue;
+      this.setGoal(i, GOAL.HOME, this.homeX[i], this.homeZ[i]);
+      n++;
+    }
+    this.pushEvent(`疏散：${n} 名病患改回家`, 'start');
+    return n;
+  }
+  /** 停课 / 复课（学校） */
+  setSchoolClosed(on) {
+    this.govOrders.schoolClosed = !!on;
+    this.pushEvent(on ? '政府命令：全城学校停课，学生回家' : '政府命令：学校复课', 'start');
+    return this.govOrders.schoolClosed;
+  }
+
+  /** 医院停止收治 / 恢复收治 */
+  setHospitalClosed(on) {
+    this.govOrders.hospitalClosed = !!on;
+    this.pushEvent(on ? '政府命令：医院停止收治，病患不再前往' : '政府命令：医院恢复收治', 'start');
+    return this.govOrders.hospitalClosed;
+  }
+
+  /** 机构总览（给政府行动面板用） */
+  govDetail() {
+    const P = this.poiByKind;
+    const mk = (name, pois) => ({
+      name, pois: pois.length,
+      total: 0, alive: 0, dead: 0, infected: 0, saved: 0, atPost: 0, street: 0,
+    });
+    const out = {
+      gov: mk('政府', P.gov || []),
+      police: mk('警察', P.police || []),
+      hosp: mk('医院', P.hospital || []),
+      school: mk('学校', P.school || []),
+      patients: 0,        // 正在前往医院的人（全国）
+      purge: 0,           // 当前处于清剿状态的兵力
+      orders: this.govOrders,
+    };
+    const slot = [null, out.gov, out.hosp, out.school];   // jobKind → 机构（INST: 1 政府 / 2 医院 / 3 学校）
+    for (let i = 0; i < this.n; i++) {
+      const s = this.state[i];
+      if (this.goal[i] === GOAL.HELP && s !== ST.CORPSE && s !== ST.SAVED) out.patients++;
+      const rec = slot[this.jobKind[i]];
+      if (!rec) continue;
+      rec.total++;
+      if (s === ST.CORPSE) rec.dead++;
+      else if (s === ST.SAVED) rec.saved++;
+      else {
+        rec.alive++;
+        if (s === ST.INFECTED) rec.infected++;
+        else if (s === ST.ZOMBIE) rec.infected++;
+        if (this.goal[i] === GOAL.WORK) rec.atPost++;
+        else if (this.goal[i] === GOAL.NONE || this.goal[i] === GOAL.FOLLOW) rec.street++;
+      }
+    }
+    // 警力单独统计（警察不是 jobKind，而是真实单位）
+    for (let i = 0; i < this.n; i++) {
+      const s = this.state[i];
+      const isP = s === ST.POLICE || s === ST.SOLDIER;
+      if (s === ST.CORPSE && this.stationOf[i]) { out.police.dead++; out.police.total++; continue; }
+      if (!isP) continue;
+      out.police.total++; out.police.alive++;
+      if (this.escortOf[i]) out.police.street++;
+      else if (this.patrol[i]) out.police.street++;
+      else if (this.goal[i] === GOAL.MOVE_TO) out.police.street++;
+      else out.police.atPost++;
+      if (this.purgeT[i] > this.time) out.purge++;
+    }
+    // 院内病人：已经走到医院 40m 内的病患（"正在前往"之外的那个数）
+    const hs = P.hospital || [];
+    let inside = 0;
+    if (hs.length) {
+      for (let i = 0; i < this.n; i++) {
+        const s = this.state[i];
+        if (s === ST.CORPSE || s === ST.SAVED) continue;
+        if (this.goal[i] !== GOAL.HELP) continue;
+        for (let k = 0; k < hs.length; k++) {
+          const p = hs[k];
+          const dx = this.px[i] - p.x, dz = this.pz[i] - p.z;
+          if (dx * dx + dz * dz < 1600) { inside++; break; }
+        }
+      }
+    }
+    out.patientsInside = inside;
+    out.police.stations = (P.police || []).length;
+    out.gov.pois = (P.gov || []).length;
+    return out;
+  }
   /** 命令士兵移动到某点（只有士兵接受命令，警察不行） */
   orderMove(i, x, z) {
     if (this.state[i] !== ST.SOLDIER) return false;

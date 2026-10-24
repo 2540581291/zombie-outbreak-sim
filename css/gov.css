@@ -1,0 +1,48 @@
+/* ===== 政府行动面板（四个大栏） ===== */
+#govpanel{position:fixed;inset:0;z-index:41;background:rgba(0,0,0,.55);
+  display:flex;align-items:center;justify-content:center;padding:2.5vh 2vw}
+#govpanel.hidden{display:none}
+
+.gv-card{width:min(1180px,96vw);max-height:94vh;display:flex;flex-direction:column;
+  background:#0e1218;border:1px solid rgba(255,255,255,.12);border-radius:14px;
+  box-shadow:0 22px 64px rgba(0,0,0,.68);overflow:hidden}
+
+.gv-head{display:flex;align-items:center;gap:10px;padding:13px 16px;
+  border-bottom:1px solid rgba(255,255,255,.08)}
+.gv-head b{font-size:15px;letter-spacing:.04em}
+.gv-sub{margin-left:auto;font-size:12px;color:#7f8b99;font-variant-numeric:tabular-nums}
+.gv-head button{width:26px;height:26px;border:0;border-radius:7px;background:rgba(255,255,255,.06);
+  color:#c8d2de;cursor:pointer;font-size:13px}
+.gv-head button:hover{background:rgba(255,255,255,.12)}
+
+.gv-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px 16px;
+  overflow-y:auto;min-height:0}
+@media (max-width:980px){ .gv-grid{grid-template-columns:1fr} }
+
+.gv-sec{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
+  border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.gv-title{display:flex;align-items:center;gap:7px;font-size:14px;font-weight:700;color:#eef3f9}
+.gv-title em{margin-left:auto;font-size:11px;font-weight:400;color:#66727f;font-style:normal}
+
+.gv-stats{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+.gv-row{display:flex;align-items:baseline;gap:6px;font-size:12px;color:#8b98a8;
+  padding:3px 0;border-bottom:1px solid rgba(255,255,255,.035)}
+.gv-row span{flex:0 0 auto}
+.gv-row b{margin-left:auto;color:#e6edf5;font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+.gv-row.bad b{color:#ff7b62}
+.gv-row.warn b{color:#e8bd53}
+.gv-row.ok b{color:#57d98a}
+
+.gv-acts{display:flex;flex-wrap:wrap;gap:7px;margin-top:auto}
+.gv-act{flex:0 0 auto;padding:7px 11px;border-radius:7px;border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.05);color:#cfd8e3;font-size:11.5px;cursor:pointer;
+  font-family:inherit;line-height:1.1;white-space:nowrap}
+.gv-act:hover{background:rgba(255,255,255,.10)}
+.gv-act:active{transform:translateY(1px)}
+.gv-act.go{border-color:rgba(87,217,138,.35);background:rgba(87,217,138,.10);color:#9ff0be}
+.gv-act.go:hover{background:rgba(87,217,138,.18)}
+.gv-act.danger{border-color:rgba(255,90,70,.42);background:rgba(255,80,60,.10);color:#ff9a86}
+.gv-act.danger:hover{background:rgba(255,80,60,.20)}
+
+.gv-foot{padding:9px 16px 11px;font-size:11px;color:#5f6b78;
+  border-top:1px solid rgba(255,255,255,.06)}

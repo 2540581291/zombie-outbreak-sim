@@ -17,6 +17,7 @@ import { stockText } from './storage.js';
 import { AudioEngine } from './audio.js';
 import { openReport, closeReport, isReportOpen } from './report.js';
 import { openForce, openSanit, openChaosInfo, openInfectInfo, openAwareInfo } from './status.js';
+import { openGov, closeGov, isGovOpen } from './gov.js';
 import { openOverview, close as closeOverview, toggle as toggleOverview, isOpen as overviewIsOpen } from './overview.js';
 import { SpriteView } from '../src/sprite/index.js';
 import { TerrainOverlay } from './overlay.js';
@@ -142,6 +143,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyL' && layerEdit) { e.preventDefault(); layerEdit.toggle(); }
   if (e.code === 'KeyO' && sim) toggleOverview(sim);
   if (e.code === 'Escape' && overviewIsOpen()) closeOverview();
+  else if (e.code === 'Escape' && isGovOpen()) closeGov();
   if (HOTKEYS[e.code]) selectTool(HOTKEYS[e.code]);
 });
 addEventListener('keyup', (e) => keys.delete(e.code));
@@ -1534,6 +1536,8 @@ selectTool('select');
   bindGauge("g-chaos", openChaosInfo);
   bindGauge("g-infect", openInfectInfo);
   bindGauge("g-aware", openAwareInfo);
+  const bg = document.getElementById('btn-gov');
+  if (bg) bg.onclick = () => { if (sim) openGov(sim); };
   const bf = document.getElementById('btn-force');
   if (bf) bf.onclick = () => { if (sim) openForce(sim); };
   const bs = document.getElementById('btn-sanit');
