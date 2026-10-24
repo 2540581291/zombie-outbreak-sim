@@ -103,6 +103,52 @@ export class NavGrid {
     return i >= 0 && (this.grid[i] & 0x18) === 0x18;
   }
 
+  /**
+   * 半径 r 的"走廊"是否通。
+   *
+   * 用 Amanatides-Woo 网格遍历（DDA）逐格判定，**不是**按步长采样：
+   * 采样会漏掉"只擦过一角"的墙格（弦长可能只有几厘米），
+   * 于是平面上看着通、实际穿墙 —— 这是之前 82 条非法路径的根因。
+   *
+   * 判定规则 = Minkowski 膨胀后的可走性：格子的 clearance 不够放下半径 r
+   * 的个体，就算"这一格对 r 来说不可走"。
+   */
+  losClear(x0, z0, x1, z1, r = 0) {
+    const cell = this.cell, halfW = this.halfW, halfH = this.halfH;
+    const cols = this.cols, rows = this.rows, grid = this.grid, cl = this.clearance;
+    const need = r > 0 ? r + 0.5 * cell - 1e-9 : 0;
+    const check = (ic, ir) => {
+      if (ic < 0 || ir < 0 || ic >= cols || ir >= rows) return false;
+      const k = ir * cols + ic;
+      if ((grid[k] & 1) === 0) return false;
+      return !(cl && cl[k] < need);
+    };
+
+    const c0 = (x0 + halfW) / cell, r0 = (halfH - z0) / cell;
+    const c1 = (x1 + halfW) / cell, r1 = (halfH - z1) / cell;
+    let ic = Math.floor(c0), ir = Math.floor(r0);
+    const ic1 = Math.floor(c1), ir1 = Math.floor(r1);
+    if (!check(ic, ir)) return false;
+    if (ic === ic1 && ir === ir1) return true;
+
+    const dc = c1 - c0, dr = r1 - r0;
+    const stepC = dc > 0 ? 1 : -1, stepR = dr > 0 ? 1 : -1;
+    const tDeltaC = dc === 0 ? Infinity : Math.abs(1 / dc);
+    const tDeltaR = dr === 0 ? Infinity : Math.abs(1 / dr);
+    let tMaxC = dc === 0 ? Infinity
+      : (dc > 0 ? (ic + 1 - c0) : (c0 - ic)) / Math.abs(dc);
+    let tMaxR = dr === 0 ? Infinity
+      : (dr > 0 ? (ir + 1 - r0) : (r0 - ir)) / Math.abs(dr);
+
+    let guard = 0;
+    while ((ic !== ic1 || ir !== ir1) && guard++ < 200000) {
+      if (tMaxC < tMaxR) { ic += stepC; tMaxC += tDeltaC; }
+      else { ir += stepR; tMaxR += tDeltaR; }
+      if (!check(ic, ir)) return false;
+    }
+    return true;
+  }
+
   // ------------------------------------------------------------
   //  clearance
   // ------------------------------------------------------------
