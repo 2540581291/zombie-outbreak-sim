@@ -82,11 +82,18 @@ export class AudioEngine {
     return g;
   }
 
+  /** 按地图大小定听距：小图（莱斯特 507m）听不到半个城，大图最多 500m */
+  setRangeFromNav(nav) {
+    if (!nav) return;
+    const span = Math.max(nav.halfW, nav.halfH) * 2;
+    this.range = Math.min(RANGE, Math.max(120, span * 0.5));
+  }
+
   _spatial(x, z) {
     const L = this.listener;
     const dx = x - L.x, dz = z - L.z;
     const d = Math.hypot(dx, dz);
-    const k = Math.max(0, 1 - d / RANGE);
+    const k = Math.max(0, 1 - d / (this.range || RANGE));
     return {
       d,
       gain: k * k,
