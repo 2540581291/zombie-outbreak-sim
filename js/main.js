@@ -2276,6 +2276,7 @@ function loop(t) {
   if (audio.ok) {
     const rx = Math.cos(rig.yaw), rz = -Math.sin(rig.yaw);
     audio.setView(camera.position.x, camera.position.z, rx, rz);
+    if (sim) { sim.playerX = camera.position.x; sim.playerZ = camera.position.z; }
     audio.frame(sim);
   }
   if (ground) {

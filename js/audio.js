@@ -119,14 +119,29 @@ export class AudioEngine {
   }
 
   // ---------- 单次音效 ----------
-  play(type, x, z, vol = 1) {
+  play(type, x, z, vol = 1, indoor = false) {
     if (!this.ok || this.muted) return;
     const ctx = this.ctx, t = ctx.currentTime;
     const sp = this._spatial(x, z);
+    if (indoor) { sp.gain *= 0.45; sp.cut = Math.min(sp.cut, 2200); }   // 隔着墙/在屋里：闷且小
     if (sp.gain < 0.004) return;
     const g = Math.min(1.6, sp.gain * vol);
     const out = this._chain(g, sp.pan, sp.cut);
 
+    if (type === 'reload') {
+      // 机械咔嗒：两下短促的高频噪声
+      for (let k = 0; k < 2; k++) {
+        const n = this._noise(0.05);
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass'; bp.frequency.value = 2600 + k * 900; bp.Q.value = 2.2;
+        const gg = ctx.createGain();
+        gg.gain.setValueAtTime(0.55, t + k * 0.11);
+        gg.gain.exponentialRampToValueAtTime(0.001, t + k * 0.11 + 0.05);
+        n.connect(bp).connect(gg).connect(out);
+        n.start(t + k * 0.11); n.stop(t + k * 0.11 + 0.06);
+      }
+      return;
+    }
     if (type === 'shot') {
       const n = this._noise(0.12);
       const bp = ctx.createBiquadFilter();
@@ -291,7 +306,11 @@ export class AudioEngine {
       }
       ev.sort((a, b) => a.__d - b.__d);
       const n = Math.min(MAX_VOICE, ev.length);
-      for (let i = 0; i < n; i++) this.play(ev[i].type, ev[i].x, ev[i].z, ev[i].g);
+      const nav = sim.nav;
+      for (let i = 0; i < n; i++) {
+        const ind = !!(nav && nav.indoor && nav.indoor(ev[i].x, ev[i].z));
+        this.play(ev[i].type, ev[i].x, ev[i].z, ev[i].g, ind);
+      }
       ev.length = 0;
     }
 
@@ -303,7 +322,7 @@ export class AudioEngine {
         if (sim.state[i] !== 4) continue;               // ST.ZOMBIE
         const dx = sim.px[i] - L2.x, dz = sim.pz[i] - L2.z;
         const d2 = dx * dx + dz * dz;
-        if (d2 > 160 * 160) continue;
+        if (d2 > 90 * 90) continue;   // 90m：再远就是"看不见的地方在响"
         cnt++;
         if (Math.random() < 0.02) { picked = i; best = d2; }   // 随机挑一个
       }

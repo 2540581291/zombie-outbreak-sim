@@ -3235,7 +3235,20 @@ export class Sim {
   //  指挥工具
   // ============================================================
   pushAudio(type, x, z, g) {
-    if (this.audio.length < 40) this.audio.push({ type, x, z, g: g || 1 });
+    const ev = this.audio;
+    const e = { type, x, z, g: g || 1 };
+    if (ev.length < 40) { ev.push(e); return; }
+    // 队列满了：丢掉"离玩家（或地图中心）最远"的那条，而不是丢掉刚发生的事件
+    const cx = this.playerX != null ? this.playerX : 0;
+    const cz = this.playerZ != null ? this.playerZ : 0;
+    let worst = -1, wd = -1;
+    for (let i = 0; i < ev.length; i++) {
+      const dx = ev[i].x - cx, dz = ev[i].z - cz;
+      const d = dx * dx + dz * dz;
+      if (d > wd) { wd = d; worst = i; }
+    }
+    const nd = (x - cx) * (x - cx) + (z - cz) * (z - cz);
+    if (worst >= 0 && nd < wd) ev[worst] = e;
   }
 
   pushEvent(text, kind) {
