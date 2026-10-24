@@ -231,6 +231,8 @@ export class Sim {
     this.expStart = new Float32Array(NMAX);      // 这段连续接触是什么时候开始的
     this.escortOf = new Uint8Array(NMAX);        // 该警员在护送哪位要员（0 = 不在护送）
     this.boostT = new Float32Array(NMAX);        // 加速到期时间（护送 / 出警 30 秒内 ×2）
+    this.wallT = new Float32Array(NMAX);         // 连续被卡住的累计秒数
+    this.ghostT = new Float32Array(NMAX);        // 穿墙到期时间（卡 5 秒 → 3 秒无视碰撞）
     this.vipStage = new Uint8Array(NMAX);        // 要员护送阶段：0 无 / 1 四人小队去警局 / 2 八人小队出城
     this.vipGoal = new Uint8Array(NMAX);         // 1 = 去警局，2 = 逃出城
     this.vipDone = new Uint8Array(NMAX);         // 1 = 已经安置好（撤离）
@@ -382,6 +384,8 @@ export class Sim {
     this.homeStocks.clear();
     this.stationOf.fill(0); this.patrol.fill(0);
     this.boostT.fill(0);
+    this.wallT.fill(0);
+    this.ghostT.fill(0);
     this.escortOf.fill(0); this.vipStage.fill(0); this.vipGoal.fill(0); this.vipDone.fill(0); this.vipStation.fill(0);
     this.trust.fill(0); this.familyDuty.fill(0); this.willpower.fill(0); this.courage.fill(0);
     this.infRoute.fill(0); this.exposedAt.fill(0); this.expStart.fill(0);
@@ -2318,9 +2322,39 @@ export class Sim {
   move(i, dx, dz, speed, dt) {
     // 护送要员 / 出警执行任务：30 秒内速度翻倍（在 move 里统一加，所有路径都覆盖）
     if (this.boostT[i] > this.time) speed *= 2;
+
+    // ---- 穿墙脱困：连续 5 秒走不动 → 给 3 秒"幽灵"窗口，期间无视碰撞直线穿过 ----
+    if (this.ghostT[i] > this.time) {
+      const d = Math.hypot(dx, dz);
+      if (d > 1e-6) {
+        const nav0 = this.nav;
+        let nx = this.px[i] + (dx / d) * speed * dt;
+        let nz = this.pz[i] + (dz / d) * speed * dt;
+        nx = Math.max(-nav0.halfW + 3, Math.min(nav0.halfW - 3, nx));
+        nz = Math.max(-nav0.halfH + 3, Math.min(nav0.halfH - 3, nz));
+        this.px[i] = nx; this.pz[i] = nz;
+        this.heading[i] = Math.atan2(dz, dx);
+        const sp0 = SPECIES[this.kind[i]] || SPECIES[SP.CIV1];
+        const stride = 1.45 * (sp0.scale || 1);
+        this.phase[i] = (this.phase[i] + (speed / stride) * dt) % 1;
+        this.stuck[i] = 0;
+        return true;
+      }
+      return false;
+    }
+
     if (this.ensureNav()) {
       this.steer.time = this.time;
       const moved = this.steer.step(i, dx, dz, speed, dt);
+      // 卡住计时：走得动就清零，连续 5 秒走不动 → 开 3 秒穿墙
+      if (moved) this.wallT[i] = 0;
+      else {
+        this.wallT[i] += dt;
+        if (this.wallT[i] > 5) {
+          this.ghostT[i] = this.time + 3;
+          this.wallT[i] = 0;
+        }
+      }
       if (!moved && this.stuck[i] > 0.6) {
         this.stuck[i] = 0;
         this.pathN[i] = 0;
