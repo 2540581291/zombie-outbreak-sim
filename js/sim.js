@@ -2694,7 +2694,7 @@ export class Sim {
           const d2 = dx * dx + dz * dz;
           if (d2 > 30 * 30) { this.state[i] = ST.FLEE; break; }
           this.heading[i] = Math.atan2(dz, dx);
-          this.cool[i] -= dt;
+          this.cool[i] -= cdt;   // 用 cdt：远处个体 5Hz 更新时 dt 已放大 4 倍
           if (this.cool[i] <= 0) {
             const w = weaponOf(this.wpn[i]);
             if (!this.armed[i] || (this.mag[i] <= 0 && this.reserve[i] <= 0)) {
@@ -2790,7 +2790,7 @@ export class Sim {
             }
           }
           const isWild = st === ST.WILD;
-          if (this.cool[i] > 0) this.cool[i] -= dt;   // 咬合冷却（原版是 2 s；我们 1 s）
+          if (this.cool[i] > 0) this.cool[i] -= cdt;   // 用 cdt：远处个体 5Hz 更新时 dt 已放大 4 倍   // 咬合冷却（原版是 2 s；我们 1 s）
           // 目标记忆：一旦盯上就追到 90m 或目标不再是健康人
           let c = this.tgt[i];
           if (c >= 0) {
@@ -2911,7 +2911,7 @@ export class Sim {
               }
             } else if (sp.special === 'spit' && d2 < 26 * 26) {
               // 喷吐者：保持距离，远程喷酸
-              this.cool[i] -= dt;
+              this.cool[i] -= cdt;   // 用 cdt：远处个体 5Hz 更新时 dt 已放大 4 倍
               if (this.cool[i] <= 0) {
                 this.cool[i] = 2.4;
                 this.fireWeapon(i, c);
