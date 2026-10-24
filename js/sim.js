@@ -2796,7 +2796,8 @@ export class Sim {
           if (c >= 0) {
             const cs = this.state[c];
             if (!(cs === ST.CIV || cs === ST.FLEE || cs === ST.FIGHT || cs === ST.INFECTED ||
-                  (isWild && (cs === ST.ZOMBIE || cs === ST.POLICE || cs === ST.SOLDIER)))) {
+                  cs === ST.POLICE || cs === ST.SOLDIER ||
+                  (isWild && cs === ST.ZOMBIE))) {
               c = -1; this.lockOn[i] = 0;
             }
             else {
@@ -2867,7 +2868,9 @@ export class Sim {
                 break;
               }
               // ST.INFECTED 也算：被咬过但还没发作的人，原版里仍然会被继续咬
-              if (cs === ST.CIV || cs === ST.FLEE || cs === ST.FIGHT || cs === ST.INFECTED) {
+              // 警察(3) / 士兵(6) 也必须能被打：之前漏了，等于给他们锁血
+              if (cs === ST.CIV || cs === ST.FLEE || cs === ST.FIGHT || cs === ST.INFECTED ||
+                  cs === ST.POLICE || cs === ST.SOLDIER) {
                 // 正在转身/倒地的人不该再被咬（原版：状态 6/7 没有 LiveHuman 位）
                 if (this.aStage[c]) { this.tgt[i] = -1; break; }
                 const vsp = SPECIES[this.kind[c]] || SPECIES[SP.CIV1];
