@@ -1659,7 +1659,7 @@ async function boot() {
       console.warn('[ZOS-R] 碰撞层加载失败，回退到布尔栅格：', e);
     }
   }
-  if (!nav) nav = buildNav(city, 0.4); // 兜底也统一到 0.4m/格
+  if (!nav) nav = buildNav(city, 1);   // 兜底 1m/格
 
   // 手工图层补丁：修正自动烘焙的错误（把不是房子的当房子、河宽、桥没接上……）
   // 必须在 new Sim(nav) 之前应用 —— 门场 BFS 要用修补后的门位置。
