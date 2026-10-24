@@ -1249,6 +1249,7 @@ $('btn-restart').onclick = () => {
   closeReport();
   closeOverview();
   deselectAgent();
+  restoreNavBase();          // 墙壁/门窗的运行时改动在这里丢掉，回到开局的碰撞层
   sim.reset(readParams());
   hideBanner();
 };
@@ -1282,8 +1283,18 @@ if (new URLSearchParams(location.search).has('pick')) {
 window.addEventListener('error', (e) => {
   window.__err = (e.message || 'err') + ' @' + String(e.filename || '').split('/').pop() + ':' + e.lineno;
 });
-window.__zosRestart = () => { clearLink(); sim.reset(readParams()); buildEscapeMarker(); buildPoiLabels(); hideBanner(); };
-$('btn-seed').onclick = () => { clearLink(); seed = (Math.random() * 1e9) | 0; sim.reset(readParams()); buildEscapeMarker(); buildPoiLabels(); hideBanner(); };
+/** 把碰撞层恢复到"游戏开始时"的样子（编辑器改动全部丢弃，门场重建） */
+function restoreNavBase() {
+  const base = layerEdit && layerEdit.ctx && layerEdit.ctx.baseGrid;
+  if (!base || !nav) return false;
+  nav.grid.set(base);
+  if (layerEdit.ops) layerEdit.ops.length = 0;
+  try { if (layerEdit.storageKey) localStorage.removeItem(layerEdit.storageKey); } catch (e) {}
+  if (nav.buildDoorField) nav.buildDoorField();
+  return true;
+}
+window.__zosRestart = () => { clearLink(); restoreNavBase(); sim.reset(readParams()); buildEscapeMarker(); buildPoiLabels(); hideBanner(); };
+$('btn-seed').onclick = () => { clearLink(); restoreNavBase(); seed = (Math.random() * 1e9) | 0; sim.reset(readParams()); buildEscapeMarker(); buildPoiLabels(); hideBanner(); };
 $('p-toggle').onclick = () => {
   const b = $('p-body');
   b.classList.toggle('hide');
