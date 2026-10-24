@@ -82,14 +82,23 @@ export class TerrainOverlay {
   }
 
   /** 把 nav.grid 的某块重新灌进贴图（编辑模式每涂一笔调用一次） */
+  // 被撞塌的墙：单独记一份，画成灰褐色的瓦砾（否则变成"空地"就几乎看不见了）
+  markRubble(c, r) {
+    if (!this.rubble) this.rubble = new Set();
+    if (c >= 0 && r >= 0 && c < this.cols && r < this.rows) this.rubble.add(r * this.cols + c);
+  }
+  clearRubble() { this.rubble = new Set(); }
+
   repaintRect(c0, r0, c1, r1) {
     const { cols, rows, nav, data } = this;
     const a = Math.max(0, Math.min(c0, c1)), b = Math.min(cols - 1, Math.max(c0, c1));
     const c = Math.max(0, Math.min(r0, r1)), d = Math.min(rows - 1, Math.max(r0, r1));
     for (let r = c; r <= d; r++) {
       for (let col = a; col <= b; col++) {
-        const v = nav.grid[r * cols + col];
-        const col4 = COLORS[v] || [1, 0, 1, 0.6];
+        const gi = r * cols + col;
+        const v = nav.grid[gi];
+        let col4 = COLORS[v] || [1, 0, 1, 0.6];
+        if (this.rubble && this.rubble.has(gi)) col4 = [0.62, 0.56, 0.48, 0.85];   // 瓦砾：灰褐
         const j = (r * cols + col) * 4;
         data[j] = col4[0] * 255;
         data[j + 1] = col4[1] * 255;

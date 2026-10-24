@@ -1285,6 +1285,7 @@ window.addEventListener('error', (e) => {
 });
 /** 把碰撞层恢复到"游戏开始时"的样子（编辑器改动全部丢弃，门场重建） */
 function restoreNavBase() {
+  if (overlay && overlay.clearRubble) overlay.clearRubble();
   const base = layerEdit && layerEdit.ctx && layerEdit.ctx.baseGrid;
   if (!base || !nav) return false;
   nav.grid.set(base);
@@ -2262,7 +2263,10 @@ function loop(t) {
   if (sim && sim.wallDownQueue && sim.wallDownQueue.length) {
     for (const c of sim.wallDownQueue) {
       ping(new THREE.Vector3(c.x, 0.4, c.z), 0xbfa77a, 1.4);
-      if (overlay && overlay.repaintRect) overlay.repaintRect(c.c - 1, c.r - 1, c.c + 1, c.r + 1);
+      if (overlay) {
+        if (overlay.markRubble) overlay.markRubble(c.c, c.r);
+        if (overlay.repaintRect) overlay.repaintRect(c.c - 1, c.r - 1, c.c + 1, c.r + 1);
+      }
     }
     sim.wallDownQueue.length = 0;
     const el = document.getElementById('n-wall');
