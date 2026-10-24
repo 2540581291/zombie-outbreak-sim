@@ -101,34 +101,51 @@ export class Steering {
       const lx = A.lastVX[i], lz = A.lastVZ[i];
       if (lx * bx + lz * bz > 0.26 && this.canGoV(ox, oz, lx, lz, stepLen)) {
         this.stats.fast++;
-        this.commitV(i, lx, lz, this.pickLen(ox, oz, lx, lz, bx, bz, stepLen), speed, dt);
+        this.commitLimited(i, lx, lz, this.pickLen(ox, oz, lx, lz, bx, bz, stepLen), speed, dt);
         return true;
       }
     }
     // 2) 期望方向（两步都通才直走；窄缝交给扇形扫描 + 步长补偿）
     if (this.canGoV(ox, oz, bx, bz, stepLen)) {
       this.stats.fast++;
-      this.commitV(i, bx, bz, stepLen, speed, dt);
+      this.commitLimited(i, bx, bz, stepLen, speed, dt);
       return true;
     }
     // 3) 扇形扫描（先小后大）：每个个体固定一侧先试（side 一致，避免左右横跳绕圈）
+    //
+    //    这里多了一条"尽量别掉头"：先按老规矩取第一个能走的候选；如果它和
+    //    上一帧方向几乎相反（>100°），就继续扫完，挑一个能走且转得最少的。
+    //    室内窄巷里人贴着墙反复左右翻，视觉上就是"原地闪"，这条能把大部分按住。
     const side = A.side ? (A.side[i] || 1) : 1;
+    const lx0 = A.lastVX[i], lz0 = A.lastVZ[i];
+    let firstX = 0, firstZ = 0, firstDot = 2, hasFirst = false;
+    let altX = 0, altZ = 0, altDot = -2, hasAlt = false;
     for (let k = 0; k < FAN.length; k++) {
       const c = FAN_C[k], s = FAN_S[k];
       const s1 = side;
-      // 先试 side 那一侧，再试另一侧
-      let ux = bx * c - bz * s * s1, uz = bx * s * s1 + bz * c;
-      if (this.canGoV(ox, oz, ux, uz, stepLen)) {
-        this.stats.fan++;
-        this.commitV(i, ux, uz, this.pickLen(ox, oz, ux, uz, bx, bz, stepLen), speed, dt);
-        return true;
+      for (let half = 0; half < 2; half++) {
+        const ux = half === 0 ? bx * c - bz * s * s1 : bx * c + bz * s * s1;
+        const uz = half === 0 ? bx * s * s1 + bz * c : -bx * s * s1 + bz * c;
+        if (!this.canGoV(ox, oz, ux, uz, stepLen)) continue;
+        const d0 = ux * lx0 + uz * lz0;
+        if (!hasFirst) {
+          hasFirst = true; firstX = ux; firstZ = uz; firstDot = d0;
+          if (d0 >= -0.2) {                       // 不是掉头 → 立刻采用（快路径）
+            this.stats.fan++;
+            this.commitLimited(i, ux, uz, this.pickLen(ox, oz, ux, uz, bx, bz, stepLen), speed, dt);
+            return true;
+          }
+        } else if (d0 > altDot) {
+          altDot = d0; altX = ux; altZ = uz; hasAlt = true;
+        }
       }
-      ux = bx * c + bz * s * s1; uz = -bx * s * s1 + bz * c;
-      if (this.canGoV(ox, oz, ux, uz, stepLen)) {
-        this.stats.fan++;
-        this.commitV(i, ux, uz, this.pickLen(ox, oz, ux, uz, bx, bz, stepLen), speed, dt);
-        return true;
-      }
+    }
+    if (hasFirst) {
+      const useAlt = hasAlt && altDot > firstDot;
+      const ux = useAlt ? altX : firstX, uz = useAlt ? altZ : firstZ;
+      this.stats.fan++;
+      this.commitLimited(i, ux, uz, this.pickLen(ox, oz, ux, uz, bx, bz, stepLen), speed, dt);
+      return true;
     }
     // 4) 兜底：宁可慢慢挪也别钉死 —— 退到"只查一步"再扫一遍
     for (let k = 0; k < FAN.length; k++) {
@@ -136,7 +153,7 @@ export class Steering {
       const ux = bx * c - bz * s * side, uz = bx * s * side + bz * c;
       if (this.canGo1(ox, oz, ux, uz, stepLen)) {
         this.stats.fan++;
-        this.commitV(i, ux, uz, stepLen, speed, dt);
+        this.commitLimited(i, ux, uz, stepLen, speed, dt);
         return true;
       }
     }
@@ -167,6 +184,31 @@ export class Steering {
     const b = this.boost(ux, uz, bx, bz, stepLen);
     if (b > stepLen && !this.free(ox + ux * b, oz + uz * b)) return stepLen;
     return b;
+  }
+
+  /**
+   * 带"转身限速"的提交：0.45 秒内不允许连续两次 >100° 的掉头。
+   *
+   * 这是给"原地闪烁"兜底的一条：不管上层为什么一会儿要向东、一会儿要向西
+   * （室内标记翻转、目标切换、引导点更新……），个体都不会**每帧掉一次头**，
+   * 看上去是"犹豫一下再走"，而不是原地高频闪。
+   */
+  commitLimited(i, ux, uz, len, speed, dt) {
+    const A = this.a;
+    const lx = A.lastVX[i], lz = A.lastVZ[i];
+    const flipT = A.flipT;
+    const dot = lx * ux + lz * uz;
+    if (dot < -0.2 && flipT && this.time - flipT[i] < 0.7) {
+      const ox = A.px[i], oz = A.pz[i];
+      const len2 = Math.min(len, this.cell * 0.9);
+      if (this.canGo1(ox, oz, lx, lz, len2)) {
+        this.stats.hold = (this.stats.hold || 0) + 1;
+        this.commitV(i, lx, lz, len2, speed, dt);
+        return;
+      }
+    }
+    if (dot < -0.2 && flipT) flipT[i] = this.time;
+    this.commitV(i, ux, uz, len, speed, dt);
   }
 
   commitV(i, ux, uz, stepLen, speed, dt) {

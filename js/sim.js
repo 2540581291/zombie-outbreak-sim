@@ -269,6 +269,9 @@ export class Sim {
     this.guideZ = new Float32Array(NMAX);
     this.guideT = new Float32Array(NMAX);
     this.guideOK = new Uint8Array(NMAX);
+    this.exitT = new Float32Array(NMAX);   // "出门中"（含跨门槛那一格）的截止时刻
+    this.wasIn = new Uint8Array(NMAX);     // 上一帧是否在室内（用来判"刚出门"）
+    this.flipT = new Float32Array(NMAX);   // 上一次 180° 掉头的时刻（转身限速用）
     this.nudgeT = new Float32Array(NMAX);   // 原有代码只写过没分配（旧路径走不到，S5 后走到了）
     this._navTried = false;
     this.navWorld = null;
@@ -367,6 +370,7 @@ export class Sim {
     this.lastDir.fill(0); this.lastDirT.fill(0); this.lastVX.fill(0); this.lastVZ.fill(0);
     this.pathBlock.fill(0);
     this.guideX.fill(0); this.guideZ.fill(0); this.guideT.fill(0); this.guideOK.fill(0);
+    this.exitT.fill(0); this.wasIn.fill(0); this.flipT.fill(0);
     this.nudgeT.fill(0);
     // 关键：全部状态清零，否则上一局的残留会让结果不可复现
     this.cool.fill(0); this.timer.fill(0); this.panic.fill(0);
@@ -2171,7 +2175,7 @@ export class Sim {
         px: this.px, pz: this.pz, heading: this.heading,
         phase: this.phase, stuck: this.stuck,
         lastDir: this.lastDir, lastDirT: this.lastDirT,
-        lastVX: this.lastVX, lastVZ: this.lastVZ, side: this.side,
+        lastVX: this.lastVX, lastVZ: this.lastVZ, flipT: this.flipT, side: this.side,
         stride: null,
       });
     } catch (e) {
@@ -2182,32 +2186,122 @@ export class Sim {
     return this.steer;
   }
 
-  /** 室内出门引导：最近出口路径上的第 4 个点（每 3 秒刷新，带每帧预算） */
+  /**
+   * 室内出门引导（S7.1 重写）：
+   *
+   * 以前的三个毛病，直接造成了"在门口来回前后闪"：
+   *  1. 只取"最近的那个门"——如果那扇门朝向建筑物的背面，人出门后
+   *     目标方向正好反向，于是又被拉回楼里，来回一步一个来回；
+   *  2. 引导点是"路径上第 4 个点"——人走到那个点后没有推进逻辑，
+   *     方向每帧反转，看起来就是原地闪烁；
+   *  3. 每 3 秒才刷新一次，中间全靠硬撑。
+   *
+   * 现在：出口按"室内距离 + 出口到目标的直线距离"挑（朝目标那一侧的门优先），
+   * 引导点取**至少 3 m 之外**的第一个路点，走到 1.5 m 内立刻重算。
+   */
   indoorWaypoint(i) {
     const t = this.time;
-    if (t < this.guideT[i]) {
-      return this.guideOK[i] ? [this.guideX[i], this.guideZ[i]] : null;
+    const wdx = this.guideX[i] - this.px[i], wdz = this.guideZ[i] - this.pz[i];
+    const near = (wdx * wdx + wdz * wdz) < 2.25;          // 1.5 m
+    if (this.guideOK[i] && t < this.guideT[i] && !near) {
+      return [this.guideX[i], this.guideZ[i]];
     }
+    // 预算必须**先判后扣**：否则 guideOK=0 的个体会绕过预算，每 tick 都做一次 BFS
     if (this.guideBudget <= 0) return this.guideOK[i] ? [this.guideX[i], this.guideZ[i]] : null;
     this.guideBudget--;
-    this.guideT[i] = t + 3 + this.rng() * 1.5;
+    this.guideT[i] = t + 2.5 + this.rng() * 1.5;
+
+    // 目标点只在这里算（每次重算一次，不是每 tick 每人都算）
+    const gp2 = this.goalPoint(i, this.goal[i]);
+    const gx = gp2 ? gp2[0] : this.px[i];
+    const gz = gp2 ? gp2[1] : this.pz[i];
+
     const P = this.navWorld.portals;
-    const ex = P.exitsFrom(this.px[i], this.pz[i], 1, 900);
+    const ex = P.exitsFrom(this.px[i], this.pz[i], 2, 400);
     if (!ex.length) { this.guideOK[i] = 0; return null; }
-    const pts = ex[0].points;
-    const k = Math.min(pts.length - 1, 4);
+
+    // 出口打分：室内走到门口的距离 + 出门后到目标的直线距离（朝目标那一侧优先）
+    let best = ex[0], bestScore = Infinity;
+    for (const e of ex) {
+      const dOut = Math.hypot(e.outdoor[0] - gx, e.outdoor[1] - gz);
+      const sc = e.cost + dOut * 0.5;
+      if (sc < bestScore) { bestScore = sc; best = e; }
+    }
+    const pts = best.points;
+    if (!pts.length) return null;                          // 已经站在门上了，交给直走
+    // 取"离我至少 3 m"的第一个路点；没有就取最后一个
+    let k = pts.length - 1;
+    for (let j = 0; j < pts.length; j++) {
+      const d2 = (pts[j][0] - this.px[i]) ** 2 + (pts[j][1] - this.pz[i]) ** 2;
+      if (d2 >= 9) { k = j; break; }
+    }
     this.guideX[i] = pts[k][0];
     this.guideZ[i] = pts[k][1];
     this.guideOK[i] = 1;
     return [this.guideX[i], this.guideZ[i]];
   }
 
-  moveSmart(i, dx, dz, speed, dt) {
-    if (this.ensureNav()) {
-      const ng = this.navWorld.ng;
-      if (ng.indoor(this.px[i], this.pz[i])) {
+  moveSmart(i, dx, dz, speed, dt, gx, gz) {
+    const NW = this.ensureNav() ? this.navWorld : null;
+    if (NW) {
+      const ng = NW.ng;
+      const inNow = ng.indoor(this.px[i], this.pz[i]);
+      if (inNow) {
+        this.exitT[i] = this.time + 1.5;                   // 记住"还在出门路上"
+      } else if (this.wasIn[i]) {
+        this.freeT[i] = this.time + 2.5;                   // 刚跨出门
+      }
+      this.wasIn[i] = inNow ? 1 : 0;
+
+      // ① 在楼里 / 刚跨到门槛那一格（那一格不算室内）→ 先想办法出去
+      if (inNow || this.time < this.exitT[i]) {
+        // ①a 已经贴到门口（8 m 内）：直接朝"门外那一格"走。
+        //     关键是这一格**与室内/室外标记无关**——人一脚踩在门槛上时
+        //     室内标记会来回翻转，如果两套目标分别指向"门里"和"门外"，
+        //     就会变成每帧掉头一次（实测 74% 的行走个体在闪，大多在门里）。
+        const a = NW.doorAnchor(this.px[i], this.pz[i]);
+        if (a) {
+          const ax2 = a[0] - this.px[i], az2 = a[1] - this.pz[i];
+          const d2 = Math.hypot(ax2, az2);
+          if (d2 < 8 && (d2 < 1.2 || ng.losClear(this.px[i], this.pz[i], a[0], a[1], 0.3))) {
+            if (!inNow && d2 < 1.5) {
+              // 已经站在门外了：结束"出门"状态，别再围着门口那一点打转
+              this.exitT[i] = 0;
+              this.guideOK[i] = 0;
+            } else {
+              return this.move(i, ax2, az2, speed, dt);
+            }
+          }
+        }
+        // ①b 还在楼里深处：沿出口路径走
         const wp = this.indoorWaypoint(i);
         if (wp) return this.move(i, wp[0] - this.px[i], wp[1] - this.pz[i], speed, dt);
+      }
+      // ② 刚出门：期望方向如果会把我们送回楼里，就沿墙侧向绕
+      if (this.time < this.freeT[i]) {
+        const d = Math.hypot(dx, dz);
+        if (d > 1e-6) {
+          const ux = dx / d, uz = dz / d;
+          if (ng.indoor(this.px[i] + ux * 2.2, this.pz[i] + uz * 2.2)) {
+            const c1x = -uz, c1z = ux, c2x = uz, c2z = -ux;
+            const k1 = ng.walkableR(this.px[i] + c1x * 2.2, this.pz[i] + c1z * 2.2, NW.radius);
+            const k2 = ng.walkableR(this.px[i] + c2x * 2.2, this.pz[i] + c2z * 2.2, NW.radius);
+            let px2 = 0, pz2 = 0, found = false;
+            if (k1 && !k2) { px2 = c1x; pz2 = c1z; found = true; }
+            else if (k2 && !k1) { px2 = c2x; pz2 = c2z; found = true; }
+            else if (k1 && k2) {
+              const tdx = (gx === undefined ? this.px[i] + dx : gx) - this.px[i];
+              const tdz = (gz === undefined ? this.pz[i] + dz : gz) - this.pz[i];
+              const tl = Math.hypot(tdx, tdz) || 1;
+              const d1 = c1x * tdx / tl + c1z * tdz / tl;
+              const d2 = c2x * tdx / tl + c2z * tdz / tl;
+              px2 = d1 >= d2 ? c1x : c2x;
+              pz2 = d1 >= d2 ? c1z : c2z;
+              found = true;
+            }
+            if (found) { dx = px2; dz = pz2; }
+          }
+        }
       }
       return this.move(i, dx, dz, speed, dt);
     }
@@ -2457,19 +2551,10 @@ export class Sim {
               const atGoal = (gdx * gdx + gdz * gdz) < 144;
               if (!atGoal && adx * adx + adz * adz > 30) {     // 还没到 → 往目标走
                 this.idle[i] = 0;
-                // 室内出门：S7 起由 moveSmart 里的 portal 引导负责（旧的 1 m 门场已删除），
-                // 这里只需要记住"刚出门的 3 秒别再被门口吸回去"。
-                {
-                  const ng2 = this.navWorld ? this.navWorld.ng : null;
-                  if (ng2) {
-                    if (ng2.indoor(this.px[i], this.pz[i])) this.freeT[i] = 0;
-                    else if (this.freeT[i] === 0) this.freeT[i] = this.time + 3;
-                  }
-                }
                 // 逃命是跑，不是散步
                 const mul = this.goal[i] === GOAL.FLEE ? 1.6 : 1.0;
                 const ox = this.px[i], oz = this.pz[i];
-                this.moveSmart(i, adx, adz, this.spd[i] * mul, cdt);
+                this.moveSmart(i, adx, adz, this.spd[i] * mul, cdt, gp[0], gp[1]);
                 // 卡住（被关在没门的屋里）：别一直原地跑，认命固守
                 if (Math.abs(this.px[i] - ox) < 1e-3 && Math.abs(this.pz[i] - oz) < 1e-3) {
                   this.stuckT[i] += cdt;

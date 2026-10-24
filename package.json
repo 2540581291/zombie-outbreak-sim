@@ -13,6 +13,7 @@
     "bench": "node tools/bench_nav.mjs",
     "serve": "python -m http.server 8777",
     "test:navflow": "node tools/test_navflow.mjs",
-    "test:navdyn": "node tools/test_navdyn.mjs"
+    "test:navdyn": "node tools/test_navdyn.mjs",
+    "test:navflick": "node tools/test_navflick.mjs"
   }
 }
