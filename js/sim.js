@@ -39,7 +39,23 @@ export const TIME_SEGS = [
 ];
 
 // 混乱度权重（0-100 上限）：知情值 1% → 1 点，感染值 1% → 2 点
-export const CHAOS_W = { aware: 0.5, infect: 2, cap: 100 };   // 知情值算半个混乱
+export const CHAOS_W = {
+  aware: 0.5,        // 知情值权重（每 1% 知情 = 0.5 点混乱）
+  infect: 2,         // 感染值权重（每 1% 感染 = 2 点混乱）
+  cap: 100,
+  // ---- 事件热度（独立第三项，会自己衰减；击杀会让它直接下降）----
+  heatCap: 40,       // 热度上限，防止淹没其它项
+  heatTau: 90,       // 热度自然衰减时间常数（游戏秒）：90 秒 ≈ 1.5 分钟减半
+  gunHeat: 0.02,     // 每一枪
+  deathHeat: 0.5,    // 每死一个平民
+  infectHeat: 0.15,  // 每新增一个感染者
+  vipHeat: 8,        // 要员死亡
+  stationHeat: 6,    // 一处警局沦陷（每处每局只算一次）
+  killK: 0.6,        // 击杀削减系数：每杀 1 只 = killK / (平民人口/1000)
+  // ---- 自然平静（独立项，与知情/感染无关）----
+  calmPerHour: 1,    // 每游戏小时降 1 点（一天 24 点）
+  calmCap: 50,       // 自然平静总共最多削掉 50 点
+};
 
 // 个体的「社会目标」：和身体状态（state）正交
 export const GOAL = {
@@ -300,6 +316,9 @@ export class Sim {
     this.infectRate = 0;                         // 感染率（尸 + 潜伏）/ 总人口
     this.awareRate = 0;                          // 知情率（全城知道出事的人的比例）
     this.chaos = 0;                              // **混乱度 0-100**：很多规则的开关都看它
+    this.chaosHeat = 0;                          // 事件热度（枪声/死亡/沦陷…），独立项，会衰减
+    this.chaosCalm = 0;                          // 自然平静的累积削减（每游戏小时 +1，封顶 50）
+    this.stationFallen = null;                   // 每处警局是否已判定"沦陷"（全局，不按个体）
     this.martialLaw = false;                     // 感染率 > 阈值 → 平民敢去警局抢枪
     // ---- 家庭（M2）：家庭 = 平民索引上的连续区间 ----
     this.hh = new Uint16Array(NMAX);             // 家庭 id
@@ -435,6 +454,7 @@ export class Sim {
     this.preyBudget = 8;
     this.tgtCount = new Int16Array(NMAX);   // 每个目标被多少丧尸同时盯着（本 tick）       // 锁敌扫描预算也要重置，否则第二次 reset 起手值不同 → 非确定性
     this.infectRate = 0; this.awareRate = 0; this.chaos = 0;
+    this.chaosHeat = 0; this.chaosCalm = 0; this.stationFallen = null;
     this.martialLaw = false; this.rateT = 0;
     this.chaosAt = 50;          // 混乱度到这个数 = 秩序崩溃（警戒线）
     this.nAware = 0; this.heat = 0; this.netT = 0;
@@ -2061,10 +2081,33 @@ export class Sim {
                             - Math.min(45, this.infectRate * 100 * 4);
       this.sanit = Math.max(0, Math.round(sanitRaw));
 
-      // 混乱度 = 知情值×0.5 + 感染值×2，上限 100
+      // ---- 混乱度 = 知情项 + 感染项 + 事件热度 − 自然平静 ----
+      //   三个加项彼此**独立**，不做互相乘的系数；
+      //   自然平静是第四个独立项：每游戏小时降 1 点（一天 24 点），最多降到 50。
       const was = this.martialLaw;
-      this.chaos = Math.min(CHAOS_W.cap,
-        this.awareRate * 100 * CHAOS_W.aware + this.infectRate * 100 * CHAOS_W.infect);
+      const awarePart = this.awareRate * 100 * CHAOS_W.aware;
+      const infectPart = this.infectRate * 100 * CHAOS_W.infect;
+      const raw = awarePart + infectPart + this.chaosHeat;
+
+      //   自然平静：每游戏秒 +1/60 点「削减量」，累计封顶 50 点（= 一天 24 点，最多削 50）
+      this.chaosCalm = Math.min(CHAOS_W.calmCap, (this.chaosCalm || 0) + CHAOS_W.calmPerHour / 60);
+      this.chaos = Math.max(0, Math.min(CHAOS_W.cap, raw - this.chaosCalm));
+
+      // 事件热度自然衰减（独立于混乱度本身）
+      this.chaosHeat *= (1 - 1 / CHAOS_W.heatTau);
+
+      // 警局沦陷（全局判定：50m 内没有警察就算沦陷，每处每局只触发一次）
+      const polList = this.poiByKind.police || [];
+      if (!this.stationFallen) this.stationFallen = new Uint8Array(polList.length);
+      for (let k = 0; k < polList.length; k++) {
+        if (this.stationFallen[k]) continue;
+        const p = polList[k];
+        if (this.policeNear(p.x, p.z, 50) === 0) {
+          this.stationFallen[k] = 1;
+          this.chaosHeat = Math.min(CHAOS_W.heatCap, this.chaosHeat + CHAOS_W.stationHeat);
+          this.pushEvent('警局沦陷：' + (p.n || '警察局') + ' 周边 50m 已无警力', 'danger');
+        }
+      }
       // 50% 是"秩序崩溃"的分水岭（原来的 20% 感染率阈值改成它）
       this.martialLaw = this.chaos >= this.chaosAt;
       if (this.martialLaw && !was) this.pushEvent('秩序崩溃：混乱度达到 50%', 'start');
@@ -4383,6 +4426,8 @@ export class Sim {
       });
     }
     this.stats.shots++;
+    // 混乱度：枪声是独立的事件热度来源（密集交火会推高）
+    this.chaosHeat = Math.min(CHAOS_W.heatCap, (this.chaosHeat || 0) + CHAOS_W.gunHeat);
     this.pushAudio('shot', this.px[from], this.pz[from], 0.55 + acc);
     if (!hit) return;
     this.stats.hits++;
@@ -4404,6 +4449,8 @@ export class Sim {
    */
   setInfected(i, seconds, route) {
     this.state[i] = ST.INFECTED;
+    // 混乱度：新增感染者（独立的事件热度，权重比死亡小）
+    this.chaosHeat = Math.min(CHAOS_W.heatCap, (this.chaosHeat || 0) + CHAOS_W.infectHeat);
     this.infRoute[i] = route || 1;
     this.incTot[i] = seconds;
     this.timer[i] = seconds;
@@ -4493,8 +4540,18 @@ export class Sim {
     if (wasZombie) {
       this.kills++;
       if (by >= 0) this.killsBy[by] = (this.killsBy[by] || 0) + 1;
+      // 混乱度：打死丧尸会削掉事件热度，削减量按**总平民人口**缩放
+      const per = CHAOS_W.killK / Math.max(1, (this.pop0 || this.n) / 1000);
+      this.chaosHeat = Math.max(0, (this.chaosHeat || 0) - per);
     } else if (this.stats) {
       this.stats.civKilled = (this.stats.civKilled || 0) + 1;
+      // 混乱度：平民死亡是事件热度来源
+      this.chaosHeat = Math.min(CHAOS_W.heatCap, (this.chaosHeat || 0) + CHAOS_W.deathHeat);
+      // 要员死亡：剧情级事件
+      if (this.vips && this.vips.indexOf(i) >= 0) {
+        this.chaosHeat = Math.min(CHAOS_W.heatCap, this.chaosHeat + CHAOS_W.vipHeat);
+        this.pushEvent('要员死亡：全城恐慌加剧', 'danger');
+      }
       this.reportDeath(this.px[i], this.pz[i]);
     }
   }

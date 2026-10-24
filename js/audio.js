@@ -13,7 +13,6 @@ export class AudioEngine {
     this.rr = 0;             // 累计随机
     this.listener = { x: 0, z: 0, rx: 1, rz: 0 };
     this.lastCrackle = 0;
-    this.sirenNode = null;
   }
 
   init() {
@@ -60,7 +59,6 @@ export class AudioEngine {
     amb.start();
 
     // 警报（常驻，默认静音）
-    this.sirenNode = this._makeSiren();
 
     this.ok = true;
     return true;
@@ -251,21 +249,6 @@ export class AudioEngine {
 
   // ---------- 常驻音源 ----------
 
-  _makeSiren() {
-    const ctx = this.ctx;
-    const o = ctx.createOscillator();
-    o.type = 'sine';
-    o.frequency.value = 700;
-    const lfo = ctx.createOscillator();
-    lfo.type = 'triangle'; lfo.frequency.value = 1.6;
-    const lg = ctx.createGain(); lg.gain.value = 220;
-    lfo.connect(lg).connect(o.frequency);
-    const out = ctx.createGain();
-    out.gain.value = 0;
-    o.connect(out).connect(this.bus);
-    o.start(); lfo.start();
-    return out;
-  }
 
   // 每帧：处理事件 + 更新常驻音源
   frame(sim) {
@@ -283,33 +266,6 @@ export class AudioEngine {
         this.play(e.type, e.x, e.z, e.g, ind);
       }
       ev.length = 0;          // 超出的直接丢，不做延迟补偿
-    }
-
-    // ---- 警笛：有 siren 效果时响；否则"附近有警察/士兵"时也响（警察在场感）----
-    if (this.sirenNode) {
-      let s = null;
-      for (const e of sim.effects) if (e.type === 'siren') { s = e; break; }
-      let gain = 0;
-      if (s) {
-        const sp = this._spatial(s.x, s.z);
-        gain = 0.30 * sp.gain;
-      } else {
-        // 找最近的警察 / 士兵（120m 内），越近越响
-        const L3 = this.listener;
-        let bd = 120 * 120, bi = -1;
-        for (let i = 0; i < sim.n; i++) {
-          const st = sim.state[i];
-          if (st !== 3 && st !== 6) continue;          // POLICE / SOLDIER
-          const dx = sim.px[i] - L3.x, dz = sim.pz[i] - L3.z;
-          const d2 = dx * dx + dz * dz;
-          if (d2 < bd) { bd = d2; bi = i; }
-        }
-        if (bi >= 0) {
-          const sp = this._spatial(sim.px[bi], sim.pz[bi]);
-          gain = 0.26 * sp.gain;                        // 比真·警报轻一档，避免吵
-        }
-      }
-      this.sirenNode.gain.setTargetAtTime(gain, t, gain > 0 ? 0.12 : 0.25);
     }
 
     // ---- 火区噼啪声 ----
