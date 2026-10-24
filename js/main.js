@@ -238,7 +238,12 @@ function updateSelRings() {
   for (let k = 0; k < selRings.length; k++) {
     const m = selRings[k];
     const i = list[k];
-    if (i === undefined || sim.state[i] === ST.CORPSE || sim.state[i] === ST.SAVED) { m.visible = false; continue; }
+    // 无效/已死/已撤离 → 隐藏并跳过（之前少了 continue：visible=false 之后立刻又被 true，
+    // 还把位置设成 undefined → NaN，圈会残留在上次的位置上）
+    if (i === undefined || sim.state[i] === ST.CORPSE || sim.state[i] === ST.SAVED) {
+      m.visible = false;
+      continue;
+    }
     m.visible = true;
     m.position.set(sim.px[i], 0.08, sim.pz[i]);
     const sc = multiSel.size ? 1 : 1.15;      // 单选的圈略大一点，更醒目
@@ -401,6 +406,7 @@ el.addEventListener('pointerup', (e) => {
 
 // ---------- 个体选择 ----------
 let selected = -1;
+let cardShownFor = -1;      // 卡片当前画的是谁（和 selected 不一致就重画）
 let followSelected = false;
 
 function pickAgents(clientX, clientY, radius = 22) {
@@ -852,6 +858,7 @@ function renderAgentCard() {
   if (!el) return;
   if (placeView) { renderPlace(); return; }
 
+  cardShownFor = selected;
   const p = profileFor(sim, selected);
   document.getElementById('ac-name').textContent = p.name;
   document.getElementById('ac-sub').textContent = p.isAnimal
@@ -2317,6 +2324,8 @@ function loop(t) {
   if (sim) {
     if (followSelected && selected >= 0) rig.target.set(sim.px[selected], 0, sim.pz[selected]);
     updateLink();
+    // 卡片强一致：选中的是谁就画谁（每帧校验一次，防止某条路径漏了 renderAgentCard）
+    if (selected >= 0 && cardShownFor !== selected) renderAgentCard();
   }
 
   if (retroMode && retro && retro.ready) {
