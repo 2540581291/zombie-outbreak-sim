@@ -213,6 +213,39 @@ function updateGroupBadge() {
   b.textContent = '编组 ' + multiSel.size + ' · 右键移动';
 }
 
+// 选中单位的脚下光圈（框选/单选的士兵都有，一眼能看出选中了谁）
+const selRings = [];          // 复用的 ring mesh 池
+function ensureSelRings(n) {
+  const need = Math.min(80, n);
+  while (selRings.length < need) {
+    const geo = new THREE.RingGeometry(1.15, 1.7, 24);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x7fe0ff, transparent: true, opacity: 0.9, depthTest: false, side: THREE.DoubleSide,
+    });
+    const m = new THREE.Mesh(geo, mat);
+    m.rotation.x = -Math.PI / 2;
+    m.renderOrder = 8;
+    m.visible = false;
+    scene.add(m);
+    selRings.push(m);
+  }
+  for (let k = need; k < selRings.length; k++) selRings[k].visible = false;
+}
+function updateSelRings() {
+  if (!sim) return;
+  const list = multiSel.size ? [...multiSel] : (selected >= 0 ? [selected] : []);
+  ensureSelRings(list.length);
+  for (let k = 0; k < selRings.length; k++) {
+    const m = selRings[k];
+    const i = list[k];
+    if (i === undefined || sim.state[i] === ST.CORPSE || sim.state[i] === ST.SAVED) { m.visible = false; continue; }
+    m.visible = true;
+    m.position.set(sim.px[i], 0.08, sim.pz[i]);
+    const sc = multiSel.size ? 1 : 1.15;      // 单选的圈略大一点，更醒目
+    m.scale.set(sc, sc, sc);
+  }
+}
+
 let boxStart = null;                 // { x, y } 屏幕坐标
 let boxEl = null;                    // 选框 DOM
 const multiSel = new Set();          // 被框选的单位下标（不含 clicked 单个选中的那个）
@@ -1014,7 +1047,9 @@ el.addEventListener('wheel', (e) => {
   const f = Math.exp(e.deltaY * (retroMode ? 0.0017 : 0.0011));
   // 2D 最近视距按地图大小自适应：小图（莱斯特 507m）能拉到 90，视高约 8.5m
   //   大图（柏林 2401m）仍是 300（视高 28m）
-  const zoomLoMap = Math.max(90, Math.min(300, ((nav && nav.H) || 900) / 6));
+  // 注意：nav 是 boot() 里的局部变量，模块作用域里没有它 —— 这里必须用 CITY_HALF
+  const mapH = CITY_HALF ? CITY_HALF[1] * 2 : 900;
+  const zoomLoMap = Math.max(90, Math.min(300, mapH / 6));
   const lo = retroMode ? zoomLoMap : 26;
   const hi = retroMode ? maxDist2d : MAX_DIST;
   rig.dist = Math.max(lo, Math.min(hi, rig.dist * f));
@@ -2211,6 +2246,7 @@ function loop(t) {
     clampTarget();
   }
   updatePathLine();
+  updateSelRings();
   if (!FIXCAM) applyCamera();
 
   // 模拟
