@@ -1741,8 +1741,8 @@ async function boot() {
     const k = km2 / 7.594;                       // 面积比
     const cl = (v, el, st) => Math.max(+el.min, Math.min(+el.max, Math.round(v / st) * st));
     sPop.value = cl(50000 * k, sPop, 100);
-    sZ0.value  = cl(1000 * k, sZ0, 50);
-    sPol.value = cl(1000 * k, sPol, 50);
+    sZ0.value  = cl(1000 * k, sZ0, 1);      // 丧尸要精确整数
+    sPol.value = cl(1000 * k, sPol, 10);
     if (typeof syncLabels === 'function') syncLabels();
     console.log('[ZOS-R] 面积 ' + km2.toFixed(2) + ' km²（柏林的 ' + (k * 100).toFixed(1) + '%）：人口 ' +
       (+sPop.value).toLocaleString() + ' · 丧尸 ' + sZ0.value + ' · 警察 ' + sPol.value);
