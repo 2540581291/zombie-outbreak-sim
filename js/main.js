@@ -469,6 +469,15 @@ function ensurePathGfx() {
 function updatePathLine() {
   ensurePathGfx();
   if (!sim || selected < 0) { pathLine.visible = false; pathRing.visible = false; return; }
+  // 死了 / 已撤离 / 已尸变的人没有"正在走的路"——否则会从尸体上拉出一条线到旧目标
+  {
+    const st = sim.state[selected];
+    if (st === ST.CORPSE || st === ST.SAVED || st === ST.ZOMBIE) {
+      pathLine.visible = false;
+      pathRing.visible = false;
+      return;
+    }
+  }
   const g = sim.goal[selected];
   let tp = sim.goalPoint(selected, g);
   if (!tp && g === GOAL.FLEE) tp = sim.escapePoint(selected);

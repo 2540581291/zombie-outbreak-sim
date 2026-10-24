@@ -1,0 +1,25 @@
+修「选中的人死了/尸变后 UI 还按活人显示」的一组问题
+
+节点实测确认了两个真问题：
+
+1) 路径线画到尸体上（js/main.js updatePathLine）
+   实测：选中的人 goal=WORK，killAgent() 之后 state=5(CORPSE)，
+         但 sim.goal[] 仍是 2，goalPoint() 照样返回 [-1350.75, -612.8]
+   → 原来会在尸体上拉出一条线 + 目标圈。
+   修法：updatePathLine 开头判断 state，CORPSE / SAVED / ZOMBIE 直接隐藏线与圈。
+
+2) 卡片「社会目标」行显示生前目标（js/people.js goalText）
+   实测：死后 stateTxt 已经是"已死亡"，但 goalText 仍返回"在单位"；
+         尸变后 stateTxt "已丧尸化"，goalText 仍不是 null。
+   修法：goalText 开头判断 state，尸体/已撤离/丧尸一律返回 null。
+
+验证（同一个体走完 活人 → 死亡 → 尸变 全流程）：
+   活着   goalText: 在单位   stateTxt: —
+   死了   goalText: null     stateTxt: 已死亡
+   尸变后 goalText: null     stateTxt: 已丧尸化    job: 学生（保留生前身份，符合卡片设计）
+
+顺带确认状态机本身是对的：
+   killAgent → state=5 → riseAt 到期 → RISE 动画播完 → state=4(ZOMBIE)
+   hp 恢复为新丧尸的 100，speed 换成丧尸速度 3.27
+
+test_chain 5/5。

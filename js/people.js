@@ -63,6 +63,9 @@ const STATE_TXT = {
 
 /** 当前"社会目标"的文字：回家 / 上班 / 到了没有 */
 export function goalText(sim, i) {
+  const st = sim.state[i];
+  // 尸体 / 已撤离 / 已尸变：goal 数组里还留着生前那个目标，不能拿来显示
+  if (st === ST.CORPSE || st === ST.SAVED || st === ST.ZOMBIE) return null;
   const g = sim.goal ? sim.goal[i] : GOAL.NONE;
   if (g === GOAL.NONE) return null;
   const dist = (x, z) => Math.hypot(x - sim.px[i], z - sim.pz[i]);
