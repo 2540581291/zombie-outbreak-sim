@@ -175,7 +175,7 @@ export class Sim {
     this.rng = mulberry32(1);
     this.tracers = [];   // {x1,z1,x2,z2,life}
     this.booms = [];     // {x,z,r,life}
-    this.stats = { civ: 0, infected: 0, zombie: 0, dead: 0, police: 0, shots: 0 };
+    this.stats = { civ: 0, infected: 0, zombie: 0, dead: 0, police: 0, shots: 0, hits: 0 };
 
     // ---- SoA ----
     this.px = new Float32Array(NMAX);
@@ -463,7 +463,7 @@ export class Sim {
     this.waveLeft = 0; this.waveNext = 0; this.waveCount = 0;
     if (this.origins) this.origins.length = 0;
     this.killsBy.fill(0); this.infectBy.fill(0);
-    this.stats.shots = 0;
+    this.stats.shots = 0; this.stats.hits = 0;
 
     // 指挥系统复位
     this.budget = 1000000;
@@ -3815,9 +3815,19 @@ export class Sim {
     this.govHistT += 2;
     if (this.govHistT >= 10) {
       this.govHistT = 0;
+      // 顺带把武力相关的也采样：击杀 / 开枪 / 持枪 / 弹药（武力面板的趋势用）
+      let aN = 0, aAmmo = 0;
+      for (let k = 0; k < this.n; k++) {
+        const s2 = this.state[k];
+        if (!this.armed[k] || s2 === ST.CORPSE || s2 === ST.ZOMBIE || s2 === ST.SAVED) continue;
+        aN++;
+        aAmmo += (this.mag[k] || 0) + (this.reserve[k] || 0);
+      }
       this.govHist.push({
         t, chaos, inf, patients,
         sick: sickN, zombies: this.stats.zombie || 0, dead: this.stats.dead || 0,
+        kills: this.kills || 0, shots: this.stats.shots || 0,
+        armed: aN, ammo: aAmmo,
       });
       if (this.govHist.length > 90) this.govHist.shift();
     }
@@ -4336,6 +4346,7 @@ export class Sim {
     this.stats.shots++;
     this.pushAudio('shot', this.px[from], this.pz[from], 0.55 + acc);
     if (!hit) return;
+    this.stats.hits++;
 
     // 伤害制：不同枪械威力不同，特感要打好几枪
     const dmg = dmgIn != null ? dmgIn : ((SPECIES[this.kind[from]] || SPECIES[SP.CIV1]).dmg || 5);
@@ -4527,35 +4538,92 @@ export class Sim {
 
   /** 武力状态明细（给面板用） */
   forceDetail() {
+    // ---- 一次扫描把武力相关的东西全算出来（口径统一，别在 UI 里再算一遍）----
+    let armedN = 0, ammoN = 0, zeroAmmo = 0;
+    let armedCiv = 0, armedPolice = 0, armedSoldier = 0;
+    let potential = 0;              // 家里有枪、还没去取的人
     const armed = new Map();
-    let armedN = 0, ammoN = 0;
+    const hs = this.homeStocks;
     for (let i = 0; i < this.n; i++) {
       const st = this.state[i];
-      if (st === ST.CORPSE || st === ST.ZOMBIE) continue;
-      if (!this.armed[i]) continue;
-      armedN++;
-      const id = this.wpn[i];
-      const a = armed.get(id) || { n: 0, ammo: 0 };
-      a.n++; a.ammo += (this.mag[i] || 0) + (this.reserve[i] || 0);
-      armed.set(id, a);
-      ammoN += (this.mag[i] || 0) + (this.reserve[i] || 0);
+      if (st === ST.CORPSE || st === ST.ZOMBIE || st === ST.SAVED) continue;
+      if (this.armed[i]) {
+        armedN++;
+        const mag = (this.mag[i] || 0) + (this.reserve[i] || 0);
+        ammoN += mag;
+        if (mag <= 0) zeroAmmo++;
+        if (st === ST.POLICE) armedPolice++;
+        else if (st === ST.SOLDIER) armedSoldier++;
+        else armedCiv++;
+        const id = this.wpn[i];
+        const a = armed.get(id) || { n: 0, ammo: 0 };
+        a.n++; a.ammo += mag;
+        armed.set(id, a);
+      } else if (hs && this.hh && hs.get(this.hh[i]) && hasWeapon(hs.get(this.hh[i]))) {
+        potential++;
+      }
     }
     const weaponRows = [...armed.entries()]
       .sort((a, b) => b[1].n - a[1].n)
       .map(([id, a]) => ({ name: weaponOf(id).name, n: a.n, ammo: a.ammo }));
 
-    let police = 0, idle = 0, patrol = 0, onDuty = 0, escort = 0, policeDead = 0;
+    let police = 0, soldiers = 0, idle = 0, patrol = 0, onDuty = 0, escort = 0, policeDead = 0;
     for (let i = 0; i < this.n; i++) {
       const st = this.state[i];
-      const isP = st === ST.POLICE || st === ST.SOLDIER;
+      if (st === ST.SOLDIER) { soldiers++; if (st !== ST.CORPSE) police++; continue; }
       if (st === ST.CORPSE && this.stationOf[i]) { policeDead++; continue; }
-      if (!isP) continue;
+      if (st !== ST.POLICE) continue;
       police++;
       if (this.escortOf[i]) escort++;
       else if (this.patrol[i]) patrol++;
       else if (this.goal[i] === GOAL.MOVE_TO) onDuty++;
       else idle++;
     }
+
+    // ---- 分数拆解：和 force 的公式一一对应，面板要能看出短板 ----
+    const popAlive = Math.max(1, this.stats.civ + this.stats.police);
+    const needArmed = Math.max(1, popAlive * 0.15);
+    const needPolice = Math.max(1, (this.params && this.params.police) || 60);
+    const needAmmo = Math.max(1, popAlive * 8);
+    const pArmed = Math.min(1, armedN / needArmed);
+    const pPolice = Math.min(1, police / needPolice);
+    const pAmmo = Math.min(1, ammoN / needAmmo);
+    const force = Math.min(100, Math.round(pArmed * 40 + pPolice * 40 + pAmmo * 20));
+    const parts = [
+      { key: 'armed', name: '武装率', score: pArmed * 40, max: 40,
+        detail: `${armedN} 人 / 需 ${Math.round(needArmed).toLocaleString()} 人`, hint: '家里有枪的人回家取枪能补上来' },
+      { key: 'police', name: '警力', score: pPolice * 40, max: 40,
+        detail: `${police} 人 / 编制 ${Math.round(needPolice).toLocaleString()} 人`, hint: '警察阵亡越多这项越低' },
+      { key: 'ammo', name: '弹药', score: pAmmo * 20, max: 20,
+        detail: `${ammoN.toLocaleString()} 发 / 需 ${Math.round(needAmmo).toLocaleString()} 发`, hint: '打光就没火力了' },
+    ];
+
+    // ---- 趋势：用 govHist 最近 60 秒的采样 ----
+    const h = this.govHist || [];
+    let trend = null;
+    if (h.length >= 2) {
+      const last = h[h.length - 1];
+      let base = h[0];
+      for (let k = h.length - 1; k >= 0; k--) { if (last.t - h[k].t >= 60) { base = h[k]; break; } }
+      const dt = Math.max(1, last.t - base.t);
+      const perMin = (v) => v * (60 / dt);
+      trend = {
+        dt,
+        kills: (last.kills || 0) - (base.kills || 0),
+        killsPerMin: perMin((last.kills || 0) - (base.kills || 0)),
+        newZombies: (last.zombies || 0) - (base.zombies || 0),
+        newZombiesPerMin: perMin((last.zombies || 0) - (base.zombies || 0)),
+        shots: (last.shots || 0) - (base.shots || 0),
+        shotsPerMin: perMin((last.shots || 0) - (base.shots || 0)),
+        armed: (last.armed || 0) - (base.armed || 0),
+        ammo: (last.ammo || 0) - (base.ammo || 0),
+      };
+      trend.net = trend.kills - trend.newZombies;
+    }
+    const shots = this.stats.shots || 0;
+    const hits = this.stats.hits || 0;
+    const burnPerMin = trend ? trend.shotsPerMin : 0;
+    const ammoMinutes = burnPerMin > 0.5 ? ammoN / burnPerMin : Infinity;
 
     const stations = [];
     for (let k = 0; k < (this.poiByKind.police || []).length; k++) {
@@ -4567,21 +4635,23 @@ export class Sim {
       });
     }
 
-    const alive = Math.max(1, this.stats.civ + this.stats.police);
-    const force = this.force || 0;
     const level = force >= 75 ? '强大' : force >= 55 ? '充足' : force >= 35 ? '尚可' : force >= 15 ? '勉强' : '虚弱';
     return {
-      force, level, armedN, ammoN,
-      armedRate: armedN / alive,
+      force, level, parts,
+      armedN, armedCiv, armedPolice, armedSoldier, potential, zeroAmmo,
+      ammoN,
+      armedRate: armedN / popAlive,
       ammoPer: ammoN / Math.max(1, armedN),
-      weaponRows, police, idle, patrol, onDuty, escort, policeDead,
+      weaponRows, police, soldiers, idle, patrol, onDuty, escort, policeDead,
       stations,
       kills: this.kills || 0,
       civKilled: this.civDeaths || 0,
-      accuracy: 0.30,                       // 警察命中率（写死）
+      shots, hits,
+      accuracy: shots > 0 ? hits / shots : null,   // 真实命中率（没开过枪就是 null）
+      trend, burnPerMin, ammoMinutes,
+      hist: h.slice(-40),
     };
   }
-
   /** 卫生状态明细（给面板用） */
   sanitDetail() {
     const dead = this.stats.dead || 0;

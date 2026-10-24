@@ -100,3 +100,53 @@
 
 /* 政府行动：2×2 栅格已经自适应，这里只保证不被高度卡住 */
 #govpanel .gv-grid{ flex: 1 1 auto; min-height: 0; }
+
+/* ===== 武力面板：两栏铺开 ===== */
+#statuspanel .sp-body-force{
+  column-count: auto !important;
+  padding: 0 !important;
+  overflow-y: auto;
+}
+.fw-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:16px 20px 22px;align-items:start}
+.fw-col{display:flex;flex-direction:column;gap:12px;min-width:0}
+
+.fw-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
+  border-radius:10px;padding:12px 14px}
+.fw-title{display:flex;align-items:baseline;gap:8px;font-size:13px;color:#cfd8e3;font-weight:700}
+.fw-title em{font-style:normal;font-size:11px;color:#7d8b99;font-weight:400}
+.fw-sub{font-size:11px;letter-spacing:.1em;color:#7d8b99;margin-bottom:2px}
+.fw-sub2{font-size:11px;letter-spacing:.1em;color:#66727f;margin-top:8px}
+.fw-score{display:flex;align-items:baseline;gap:4px;line-height:1;margin-top:2px}
+.fw-score b{font-size:42px;font-weight:800;color:#eaf1f8;font-variant-numeric:tabular-nums}
+.fw-score small{font-size:13px;color:#6f7c8a}
+.fw-bar{height:8px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden}
+.fw-bar>i{display:block;height:100%;border-radius:4px;transition:width .3s}
+.fw-parts{display:flex;flex-direction:column;gap:8px;margin-top:2px}
+.fw-part-top{display:flex;align-items:baseline;font-size:12px;color:#9aa8b8}
+.fw-part-top b{margin-left:auto;color:#dfe7f0;font-variant-numeric:tabular-nums}
+.fw-part-top b i{font-style:normal;color:#6f7c8a;font-size:10.5px}
+.fw-part-bar{height:5px;border-radius:3px;background:rgba(255,255,255,.07);overflow:hidden;margin:3px 0}
+.fw-part-bar>i{display:block;height:100%;border-radius:3px}
+.fw-part-detail{font-size:10.5px;color:#6f7c8a}
+.fw-part-detail em{color:#e0b23c;font-style:normal}
+
+.fw-kv{display:flex;align-items:baseline;gap:10px;font-size:12px;color:#8b98a8;
+  padding:3px 0;border-bottom:1px solid rgba(255,255,255,.035)}
+.fw-kv b{margin-left:auto;color:#e6edf5;font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+.fw-kv b.up{color:#ff9a86}
+.fw-kv b.down{color:#ff7b62}
+.fw-note{font-size:10.5px;color:#5f6b78;line-height:1.45;margin-top:4px}
+
+.fw-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:4px 0 2px}
+.fw-metrics>div{background:rgba(255,255,255,.035);border-radius:8px;padding:8px 10px;display:flex;
+  flex-direction:column;gap:4px}
+.fw-metrics span{font-size:10.5px;color:#7d8b99}
+.fw-metrics b{font-size:17px;font-weight:700;color:#eaf1f8;font-variant-numeric:tabular-nums}
+.fw-metrics b.up{color:#57d98a}
+.fw-metrics b.down{color:#ff7b62}
+
+.fw-spark{display:flex;align-items:flex-end;gap:1px;height:40px;padding:3px 4px;
+  background:rgba(0,0,0,.25);border-radius:6px;overflow:hidden;margin-top:4px}
+.fw-spark i{flex:1 1 auto;min-width:1px;border-radius:1px 1px 0 0;opacity:.9}
+.fw-spark-empty{display:flex;align-items:center;justify-content:center;
+  font-size:10.5px;color:#5f6b78;height:40px}

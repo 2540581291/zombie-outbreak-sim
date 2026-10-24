@@ -28,64 +28,116 @@ const bar = (v, max, color) =>
   `<div class="sp-bar"><i style="width:${Math.max(0, Math.min(100, (v / max) * 100)).toFixed(0)}%;background:${color}"></i></div>`;
 const big = (v, unit) => `<div class="sp-big"><b>${v}</b><small>${unit || ''}</small></div>`;
 
-// ---------------- 武力（5 个分栏）----------------
-function forceTabs(sim) {
-  const d = sim.forceDetail();
-  const st = sim.stats || {};
-  return [
-    { name: '总览', render: () => big(Math.round(d.force), '/100') + bar(d.force, 100, '#7ed07e')
-        + sec('一句话判断')
-        + row('状态', d.level)
-        + row('判断', d.force >= 55 ? '还压得住' : d.force >= 30 ? '只能自保' : '基本无力抵抗')
-        + row('人均弹药', d.ammoPer.toFixed(1) + ' 发')
-        + row('对尸比', st.zombie ? (d.armedN ? (st.zombie / d.armedN).toFixed(1) + ' 只 / 人' : '—') : '暂无丧尸')
-        + sec('三项关键')
-        + row('武装人数', d.armedN + ' 人（占存活 ' + (d.armedRate * 100).toFixed(1) + '%）')
-        + row('警察在位', d.police + ' 人')
-        + row('总弹药', d.ammoN + ' 发')
-        + sec('混乱度门槛')
-        + row('20% · 巡逻警回局', (st.chaos || sim.chaos || 0) >= 20 ? '已触发' : '未触发')
-        + row('50% · 全城避难 + 警局开库', (sim.chaos || 0) >= 50 ? '已触发' : '未触发')
-        + row('80% · 要员八人队出城', (sim.chaos || 0) >= 80 ? '已触发' : '未触发')
-        + sec('损失')
-        + row('警察阵亡', d.policeDead + ' 人')
-        + row('平民误伤', (st.civDeaths || 0).toLocaleString() + ' 人') },
-    { name: '火力', render: () => sec('武器构成')
-        + (d.weaponRows.length
-            ? d.weaponRows.map((w) => row(w.name, w.n + ' 支 · ' + w.ammo + ' 发')).join('')
-            : row('—', '没有武装人员'))
-        + sec('弹药')
-        + row('总弹药', d.ammoN + ' 发')
-        + row('人均', d.ammoPer.toFixed(1) + ' 发')
-        + row('能打多久', d.ammoPer > 40 ? '够打一阵' : d.ammoPer > 15 ? '偏紧' : '很快见底')
-        + sec('射击表现')
-        + row('已开火', (st.shots || 0).toLocaleString() + ' 次')
-        + row('命中率（警察）', (d.accuracy * 100).toFixed(0) + '%') },
-    { name: '警力', render: () => sec('在位分布')
-        + row('总在位', d.police + ' 人')
-        + row('驻局', d.idle + ' 人')
-        + row('巡逻', d.patrol + ' 人')
-        + row('出勤（被调度）', d.onDuty + ' 人')
-        + row('护送要员', d.escort + ' 人')
-        + sec('损失')
-        + row('阵亡', d.policeDead + ' 人')
-        + sec('各局驻员')
-        + d.stations.map((s) => row(s.name, '驻 ' + (s.idle || 0) + ' 人')).join('') },
-    { name: '军械库', render: () => sec('警察局库存（抢一把少一把）')
-        + d.stations.map((s) => row(s.name, s.stock)).join('')
-        + sec('家庭')
-        + row('家庭持枪率', (((sim.params && sim.params.homeGunRate) || 0) * 100).toFixed(0) + '%')
-        + row('说明', '家里有枪的人可以回家取，取完就没了') },
-    { name: '战果', render: () => sec('本局')
-        + row('击毙丧尸', (sim.kills || 0).toLocaleString() + ' 只')
-        + row('平民误伤', (sim.civDeaths || 0).toLocaleString() + ' 人')
-        + row('当前丧尸', (st.zombie || 0).toLocaleString() + ' 只')
-        + sec('比值')
-        + row('人均对尸', d.armedN ? (st.zombie / d.armedN).toFixed(1) + ' 只 / 人' : '—')
-        + row('评价', d.armedN && st.zombie / d.armedN > 20 ? '尸潮已压倒火力' : '尚可周旋') },
-  ];
+// ---------------- 武力（不分标签，两栏一次铺开）----------------
+const fmt = (n) => (n || 0).toLocaleString();
+
+/** 迷你柱状：给"击杀/分钟"这种序列用 */
+function spark(series, color) {
+  if (!series || series.length < 2) return '<div class="fw-spark fw-spark-empty">采样中…</div>';
+  const lo = Math.min(...series), hi = Math.max(...series);
+  const span = Math.max(1, hi - lo);
+  return '<div class="fw-spark">' + series.map((v) => {
+    const k = (v - lo) / span;
+    return `<i style="height:${Math.max(6, Math.round(k * 100))}%;background:${color}"></i>`;
+  }).join('') + '</div>';
 }
 
+function forceView(sim) {
+  const d = sim.forceDetail();
+  const st = sim.stats || {};
+  const tr = d.trend;
+  const chaos = sim.chaos || 0;
+
+  // 分数拆解：三项各自占多少
+  const parts = d.parts.map((p) => {
+    const w = (p.score / p.max) * 100;
+    const col = w >= 70 ? '#7ed07e' : w >= 35 ? '#e0b23c' : '#e8503a';
+    return `<div class="fw-part">
+      <div class="fw-part-top"><span>${p.name}</span>
+        <b>${p.score.toFixed(1)}<i>/${p.max}</i></b></div>
+      <div class="fw-part-bar"><i style="width:${w.toFixed(0)}%;background:${col}"></i></div>
+      <div class="fw-part-detail">${p.detail}${p.score < p.max * 0.35 ? ' · <em>' + p.hint + '</em>' : ''}</div>
+    </div>`;
+  }).join('');
+
+  // 战果趋势
+  const t = tr;
+  const netCls = t ? (t.net > 0 ? 'down' : t.net < 0 ? 'up' : '') : '';
+  const killsSeries = (d.hist || []).map((h, k, arr) => (k === 0 ? 0 : (h.kills || 0) - (arr[k - 1].kills || 0)));
+
+  const left = `
+    <div class="fw-card">
+      <div class="fw-title">武力 <em>${d.level}</em></div>
+      <div class="fw-score"><b>${Math.round(d.force)}</b><small>/100</small></div>
+      <div class="fw-bar"><i style="width:${d.force}%;background:${d.force >= 55 ? '#7ed07e' : d.force >= 30 ? '#e0b23c' : '#e8503a'}"></i></div>
+      <div class="fw-parts">${parts}</div>
+    </div>
+
+    <div class="fw-card">
+      <div class="fw-sub">判断</div>
+      <div class="fw-kv"><span>状态</span><b>${d.level}</b></div>
+      <div class="fw-kv"><span>判断</span><b>${d.force >= 55 ? '还压得住' : d.force >= 30 ? '只能自保' : '基本无力抵抗'}</b></div>
+      <div class="fw-kv"><span>对尸比</span><b>${st.zombie ? (d.armedN ? (st.zombie / d.armedN).toFixed(1) + ' 只 / 人' : '—') : '暂无丧尸'}</b></div>
+      <div class="fw-kv"><span>混乱度门槛</span><b>${chaos >= 80 ? '80% 已触发（要员出城）' : chaos >= 50 ? '50% 已触发（全城避难）' : chaos >= 20 ? '20% 已触发（巡逻警回局）' : '未触发'}</b></div>
+    </div>
+
+    <div class="fw-card">
+      <div class="fw-sub">战果 · 最近 60 秒</div>
+      <div class="fw-metrics">
+        <div><span>击杀</span><b>${t ? fmt(t.kills) : '—'}</b></div>
+        <div><span>新增丧尸</span><b class="down">${t ? '+' + fmt(t.newZombies) : '—'}</b></div>
+        <div><span>净增</span><b class="${t ? (t.net > 0 ? 'up' : 'down') : ''}">${t ? (t.net > 0 ? '+' : '') + fmt(t.net) : '—'}</b></div>
+        <div><span>击杀/分钟</span><b>${t ? t.killsPerMin.toFixed(1) : '—'}</b></div>
+      </div>
+      ${spark(killsSeries, '#e8503a')}
+      <div class="fw-note">${t
+        ? (t.net > 0 ? '在压制：击杀速度高于新增' : t.net < 0 ? '在失守：新增丧尸快于击杀' : '僵持')
+        : '还在采样（每 10 秒一个点）'}</div>
+    </div>
+
+    <div class="fw-card">
+      <div class="fw-sub">损失</div>
+      <div class="fw-kv"><span>警察阵亡</span><b>${fmt(d.policeDead)} 人</b></div>
+      <div class="fw-kv"><span>平民误伤</span><b>${fmt(d.civKilled)} 人</b></div>
+      <div class="fw-kv"><span>未能开火</span><b class="${d.zeroAmmo ? 'down' : ''}">${fmt(d.zeroAmmo)} 人（持枪但没子弹）</b></div>
+    </div>`;
+
+  const right = `
+    <div class="fw-card">
+      <div class="fw-sub">武装构成</div>
+      <div class="fw-kv"><span>已持枪</span><b>${fmt(d.armedN)} 人（民 ${fmt(d.armedCiv)} · 警 ${fmt(d.armedPolice)} · 军 ${fmt(d.armedSoldier)}）</b></div>
+      <div class="fw-kv"><span>家里有枪（潜在）</span><b class="up">${fmt(d.potential)} 人</b></div>
+      <div class="fw-kv"><span>武装率</span><b>${(d.armedRate * 100).toFixed(1)}%（占存活）</b></div>
+      <div class="fw-note">潜在的人要回家取枪才会武装；爆发初期基本都还在家里锁着。</div>
+    </div>
+
+    <div class="fw-card">
+      <div class="fw-sub">弹药</div>
+      <div class="fw-kv"><span>总弹药</span><b>${fmt(d.ammoN)} 发</b></div>
+      <div class="fw-kv"><span>人均</span><b>${d.ammoPer.toFixed(1)} 发</b></div>
+      <div class="fw-kv"><span>每分钟消耗</span><b>${t ? d.burnPerMin.toFixed(1) + ' 发' : '—'}</b></div>
+      <div class="fw-kv"><span>还能撑</span><b>${Number.isFinite(d.ammoMinutes) ? d.ammoMinutes > 999 ? '很久' : d.ammoMinutes.toFixed(0) + ' 分钟' : '—'}</b></div>
+      <div class="fw-kv"><span>命中率</span><b>${d.accuracy === null ? '还没开过枪' : (d.accuracy * 100).toFixed(0) + '%（实算 ' + fmt(d.hits) + '/' + fmt(d.shots) + '）'}</b></div>
+    </div>
+
+    <div class="fw-card">
+      <div class="fw-sub">武器构成</div>
+      ${d.weaponRows.length
+        ? d.weaponRows.map((w) => `<div class="fw-kv"><span>${w.name}</span><b>${w.n} 支 · ${fmt(w.ammo)} 发</b></div>`).join('')
+        : '<div class="fw-note">没有武装人员</div>'}
+    </div>
+
+    <div class="fw-card">
+      <div class="fw-sub">警力</div>
+      <div class="fw-kv"><span>在位</span><b>${fmt(d.police)} 人（警 ${fmt(d.police - d.soldiers)} · 军 ${fmt(d.soldiers)}）</b></div>
+      <div class="fw-kv"><span>驻局 / 巡逻</span><b>${fmt(d.idle)} / ${fmt(d.patrol)} 人</b></div>
+      <div class="fw-kv"><span>出勤 / 护送</span><b>${fmt(d.onDuty)} / ${fmt(d.escort)} 人</b></div>
+      <div class="fw-sub2">各警局</div>
+      ${d.stations.map((s) => `<div class="fw-kv"><span>${s.name}</span><b>驻 ${s.idle} 人</b></div>`).join('')}
+    </div>`;
+
+  return `<div class="fw-grid"><div class="fw-col">${left}</div><div class="fw-col">${right}</div></div>`;
+}
 // ---------------- 卫生（5 个分栏）----------------
 function sanitTabs(sim) {
   const d = sim.sanitDetail();
@@ -144,19 +196,32 @@ function sanitTabs(sim) {
 function render() {
   if (!curSim) return;
   const el = ensure();
-  const tabs = curKind === 'force' ? forceTabs(curSim) : sanitTabs(curSim);
+  const tabBar = el.querySelector('#sp-tabs');
+  const body = el.querySelector('#sp-body');
+
+  // ---- 武力：两栏铺开，没有标签页 ----
+  if (curKind === 'force') {
+    tabBar.innerHTML = '';
+    tabBar.style.display = 'none';
+    el.querySelector('#sp-title').textContent = '武力状态';
+    body.className = 'sp-body sp-body-force';
+    body.innerHTML = forceView(curSim);
+    return;
+  }
+
+  // ---- 卫生：仍然是标签 ----
+  tabBar.style.display = '';
+  body.className = 'sp-body';
+  const tabs = sanitTabs(curSim);
   curTab = Math.max(0, Math.min(curTab, tabs.length - 1));
-  el.querySelector('#sp-title').textContent =
-    (curKind === 'force' ? '武力状态' : '卫生状态') + ' · ' + tabs[curTab].name;
-  const barEl = el.querySelector('#sp-tabs');
-  barEl.innerHTML = tabs.map((t, i) =>
+  el.querySelector('#sp-title').textContent = '卫生状态 · ' + tabs[curTab].name;
+  tabBar.innerHTML = tabs.map((t, i) =>
     `<button class="sp-tab ${i === curTab ? 'on' : ''}" data-i="${i}">${t.name}</button>`).join('');
-  barEl.querySelectorAll('.sp-tab').forEach((b) => {
+  tabBar.querySelectorAll('.sp-tab').forEach((b) => {
     b.onclick = () => { curTab = +b.dataset.i; render(); };
   });
-  el.querySelector('#sp-body').innerHTML = tabs[curTab].render();
+  body.innerHTML = tabs[curTab].render();
 }
-
 export function openForce(sim) { curSim = sim; curKind = 'force'; curTab = 0; render(); ensure().classList.remove('hidden'); }
 export function openSanit(sim) { curSim = sim; curKind = 'sanit'; curTab = 0; render(); ensure().classList.remove('hidden'); }
 
