@@ -43,7 +43,7 @@ def stitch(mid):
 def collision(mid):
     raw = zlib.decompress(zf.read(f"assets/data/collision_layer_{mid}.cl"))
     g = int(round(math.isqrt(len(raw))))
-    arr = np.frombuffer(raw, dtype=np.uint8).reshape(g, g)   # 不翻转：实测叠图时 flipV 才对上房子
+    arr = np.frombuffer(raw, dtype=np.uint8).reshape(g, g)[::-1]   # 引擎 row0 = 南，影像 row0 = 北 → 必须翻
     out = np.zeros_like(arr)
     for k, v in VALUE_MAP.items():
         out[arr == k] = v
