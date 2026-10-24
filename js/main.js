@@ -2240,8 +2240,13 @@ function loop(t) {
   updateFx(t);
   if (audio.ok) {
     const rx = Math.cos(rig.yaw), rz = -Math.sin(rig.yaw);
-    audio.setView(camera.position.x, camera.position.z, rx, rz);
-    if (sim) { sim.playerX = camera.position.x; sim.playerZ = camera.position.z; }
+    // 听者位置用 rig.target（相机盯住的地面点）：
+    //   2D 模式渲染用的是 orthoCam，透视相机 camera 的位置是旧的/不动的，
+    //   拿它当听者会让"整个地图的声音都在耳边"。
+    const lx = Number.isFinite(rig.target.x) ? rig.target.x : 0;
+    const lz = Number.isFinite(rig.target.z) ? rig.target.z : 0;
+    audio.setView(lx, lz, rx, rz);
+    if (sim) { sim.playerX = lx; sim.playerZ = lz; }
     audio.frame(sim);
   }
   if (ground) {
