@@ -1739,9 +1739,13 @@ async function boot() {
   if (!Q.get('pop')) {
     const km2 = (city.size[0] * city.size[1]) / 1e6;
     const k = km2 / 7.594;                       // 面积比
-    const cl = (v, el, st) => Math.max(+el.min, Math.min(+el.max, Math.round(v / st) * st));
+    // ≤100 用精确值；>100 才按步长取整（步长只用于"好看"，不用于小数值）
+    const cl = (v, el, st) => {
+      const r = v <= 100 ? Math.round(v) : Math.round(v / st) * st;
+      return Math.max(+el.min, Math.min(+el.max, r));
+    };
     sPop.value = cl(50000 * k, sPop, 100);
-    sZ0.value  = cl(1000 * k, sZ0, 1);      // 丧尸要精确整数
+    sZ0.value  = cl(1000 * k, sZ0, 10);
     sPol.value = cl(1000 * k, sPol, 10);
     if (typeof syncLabels === 'function') syncLabels();
     console.log('[ZOS-R] 面积 ' + km2.toFixed(2) + ' km²（柏林的 ' + (k * 100).toFixed(1) + '%）：人口 ' +
