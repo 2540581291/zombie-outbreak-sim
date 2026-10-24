@@ -19,7 +19,7 @@ let timer = null;
 let fired = new Set();
 let idleIdx = 0;
 let lastShown = 0;
-let CITY_NAME = '本市';
+let CITY = { full: '本市', short: '本市', paper: '本市晨报' };
 let currentIcon = '📰';
 
 const history = [];          // 最近的快讯 [{icon, text, t}]
@@ -37,7 +37,7 @@ const STORIES = [
   {
     id: 'first', icon: ICON.infect, when: (s) => s.stats.infected + s.stats.zombie >= 1,
     lines: () => [
-      `${CITY_NAME}晨报：市立医院接诊一名「行为异常」患者，院方称正在观察`,
+      `${CITY.paper}：市立医院接诊一名「行为异常」患者，院方称正在观察`,
       '目击者称昨晚有人在中央车站附近突然倒地抽搐，警方已封锁现场',
       '急诊科值班医生：病人瞳孔对光反应异常，我们从来没见过这种情况',
     ],
@@ -304,9 +304,9 @@ function poll(sim) {
   }
 }
 
-export function initNews(sim, cityName) {
+export function initNews(sim, cityNames) {
   simRef = sim;
-  if (cityName) CITY_NAME = cityName;
+  if (cityNames) CITY = cityNames;
   ensure();
   fired = new Set();
   queue = [];
@@ -319,12 +319,12 @@ export function initNews(sim, cityName) {
     if (!simRef) return;
     poll(simRef);
   }, 1500);
-  pushNews(`${CITY_NAME}：又是平常的一天。`, '🏙️');
+  pushNews(`${CITY.full}：又是平常的一天。`, '🏙️');
 }
 
-export function resetNews(sim, cityName) {
+export function resetNews(sim, cityNames) {
   simRef = sim;
-  if (cityName) CITY_NAME = cityName;
+  if (cityNames) CITY = cityNames;
   fired = new Set();
   queue = [];
   playing = false;

@@ -3,6 +3,7 @@
 // ============================================================
 import * as THREE from 'three';
 import { buildCity, buildSatelliteGround, localizeCityNames } from './city.js';
+import { cityFull, cityShort, cityNewspaper } from './citymeta.js';
 import { TiledGround } from './ground.js';
 import { buildNav, Sim, ST, GOAL } from './sim.js';
 import { loadCollision, collisionStats } from './collision.js';
@@ -1167,15 +1168,9 @@ const sArm = $('s-arm'), sPol = $('s-pol');
 
 // 难度档：一次调四组参数（人口 / 初始尸 / 持枪率 / 警力）
 // 城市名中文化
-const CITY_CN = {
-  berlin: '柏林·米特', tokyo: '东京·千代田', zhengzhou: '郑州·金水',
-  nanyang: '南阳·卧龙', zhenping: '镇平',
-};
-function cnCity(id, fallback) {
-  const k = String(id || '').toLowerCase();
-  for (const key of Object.keys(CITY_CN)) if (k.includes(key)) return CITY_CN[key];
-  return fallback || id || '未知城市';
-}
+// 城市名统一走 js/citymeta.js（国家在前、城市在后）
+const cnCity = (id, fallback) => cityShort(id, fallback);   // 城市短名（不带国家）
+let NEWS_NAMES = null;   // 给新闻模块用的 {full, short, paper}，boot 时填
 
 const DIFF_PRESET = {
   easy:      { pop: 0.6, zomb: 0.6, armed: 1.6, police: 1.4 },
@@ -1245,7 +1240,7 @@ $('btn-restart').onclick = () => {
   deselectAgent();
   restoreNavBase();          // 墙壁/门窗的运行时改动在这里丢掉，回到开局的碰撞层
   sim.reset(readParams());
-  resetNews(sim, cnCity(CID, city.name));
+  resetNews(sim, NEWS_NAMES);
   hideBanner();
 };
 $('btn-report').onclick = () => {
@@ -1289,8 +1284,8 @@ function restoreNavBase() {
   if (nav.buildDoorField) nav.buildDoorField();
   return true;
 }
-window.__zosRestart = () => { clearLink(); deselectAgent(); restoreNavBase(); sim.reset(readParams()); resetNews(sim, cnCity(CID, city.name)); buildEscapeMarker(); buildPoiLabels(); hideBanner(); };
-$('btn-seed').onclick = () => { clearLink(); deselectAgent(); restoreNavBase(); seed = (Math.random() * 1e9) | 0; sim.reset(readParams()); resetNews(sim, cnCity(CID, city.name)); buildEscapeMarker(); buildPoiLabels(); hideBanner(); };
+window.__zosRestart = () => { clearLink(); deselectAgent(); restoreNavBase(); sim.reset(readParams()); resetNews(sim, NEWS_NAMES); buildEscapeMarker(); buildPoiLabels(); hideBanner(); };
+$('btn-seed').onclick = () => { clearLink(); deselectAgent(); restoreNavBase(); seed = (Math.random() * 1e9) | 0; sim.reset(readParams()); resetNews(sim, NEWS_NAMES); buildEscapeMarker(); buildPoiLabels(); hideBanner(); };
 $('p-toggle').onclick = () => {
   const b = $('p-body');
   b.classList.toggle('hide');
@@ -1726,7 +1721,7 @@ async function boot() {
   }
   if (Q.get('maxb')) city.buildings = city.buildings.slice(0, +Q.get('maxb'));
   cityRef = city;
-  setL(30, `载入 ${city.name}：${city.buildings.length.toLocaleString()} 栋建筑…`);
+  setL(30, `载入 ${cityFull(CID, city.name)}：${city.buildings.length.toLocaleString()} 栋建筑…`);
 
   await new Promise(r => setTimeout(r, 30));
 
@@ -1804,7 +1799,8 @@ async function boot() {
   sim = new Sim(nav, city);   // city 里有 POI（工作地分配用）
   sim.reset(readParams());
   buildEscapeMarker();
-  initNews(sim, cnCity(CID, city.name));
+  NEWS_NAMES = { full: cityFull(CID, city.name), short: cnCity(CID, city.name), paper: cityNewspaper(CID, city.name) };
+  initNews(sim, NEWS_NAMES);
 
   agents = new AgentRenderer(scene, 160000);
 
@@ -2056,7 +2052,7 @@ async function boot() {
     if (l) l.style.display = 'none';
   }, 650);
 
-  $('tb-city').textContent = cnCity(CID, city.name);
+  $('tb-city').textContent = cityFull(CID, city.name);   // 国家在前：德国 · 柏林·米特
   {
     const tb = $('tb-tools') || $('topbar');   // 顶栏右侧的工具区
     const b = document.createElement('button');
@@ -2084,7 +2080,7 @@ async function boot() {
       for (const c of cityIndex) {
         const o = document.createElement('option');
         o.value = c.id;
-        o.textContent = cnCity(c.id, c.name);
+        o.textContent = cityFull(c.id, c.name);
         if (c.id === CID) o.selected = true;
         sel.appendChild(o);
       }
@@ -2134,7 +2130,7 @@ async function boot() {
   } else {
     renderer.render(scene, camera);
   }
-  document.title = '生化危机模拟器 · ' + city.name;
+  document.title = '生化危机模拟器 · ' + cityFull(CID, city.name);
   startLoop();
 }
 
