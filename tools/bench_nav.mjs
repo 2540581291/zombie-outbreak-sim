@@ -14,6 +14,9 @@
 import { loadCity } from './_city.mjs';
 import { loadCollision } from '../js/collision.js';
 import { Sim, ST } from '../js/sim.js';
+import { makeNavGrid } from '../js/nav/grid.js';
+import { buildHierarchy } from '../js/nav/sectors.js';
+import { Planner } from '../js/nav/planner.js';
 
 const ARGS = process.argv.slice(2);
 const JSON_OUT = ARGS.includes('--json');
@@ -130,6 +133,53 @@ const out = { tag: process.env.ZOS_TAG || 'baseline', city: process.env.ZOS_CITY
   };
 }
 
+// ---------------- C. 新栈（NavCore）：建图成本 + HPA* 同协议微基准 ----------------
+{
+  const t0 = performance.now();
+  const ngb = makeNavGrid(nav);
+  const edtMs = performance.now() - t0;
+  const t1 = performance.now();
+  const hier = buildHierarchy(ngb, { cellSize: 8, sectorCells: 16, radius: 0.35 });
+  const hierMs = performance.now() - t1;
+  const t2 = performance.now();
+  const pl = new Planner(ngb, hier);
+  const portalMs = performance.now() - t2;
+
+  let seed = 7;
+  const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const pts = [];
+  let guard = 0;
+  while (pts.length < 200 && guard++ < 400000) {
+    const x = (rnd() - 0.5) * nav.W * 0.9, z = (rnd() - 0.5) * nav.H * 0.9;
+    if (!ngb.walkableR(x, z, 0.4) || ngb.indoor(x, z)) continue;
+    const c = pl.snap(x, z);
+    if (c < 0 || hier.compOf[c] !== hier.compOf[pl.snap(0, 0)]) continue;
+    pts.push([x, z]);
+  }
+  const qq = (arr, p) => { const a = [...arr].sort((x, y) => x - y); return a.length ? a[Math.min(a.length - 1, Math.floor(a.length * p))] : 0; };
+  const times = [], ratios = [];
+  let ok = 0, tries = 0;
+  for (let k = 0; k + 1 < pts.length && tries < 150; k += 2) {
+    const [sx, sz] = pts[k], [gx, gz] = pts[k + 1];
+    const straight = Math.hypot(gx - sx, gz - sz);
+    if (straight < 150) continue;
+    tries++;
+    const a = performance.now();
+    const r = pl.plan(sx, sz, gx, gz);
+    times.push(performance.now() - a);
+    if (!r) continue;
+    ok++;
+    ratios.push(r.cost / straight);
+  }
+  out.navcore = {
+    edtMs: +edtMs.toFixed(0), hierMs: +hierMs.toFixed(0), portalMs: +portalMs.toFixed(0),
+    cells: hier.stats.cells, nodes: hier.stats.nodes, clusters: hier.stats.clusters,
+    queries: tries, okRate: +(ok / Math.max(1, tries)).toFixed(3),
+    msP50: +qq(times, 0.5).toFixed(3), msP95: +qq(times, 0.95).toFixed(3),
+    lenRatioP50: +qq(ratios, 0.5).toFixed(3), lenRatioP95: +qq(ratios, 0.95).toFixed(3),
+  };
+}
+
 if (JSON_OUT) {
   console.log(JSON.stringify(out, null, 2));
 } else {
@@ -145,4 +195,11 @@ if (JSON_OUT) {
   console.log(`  平均速度    ${c.avgSpeed} m/s`);
   console.log(`  曾卡住      ${c.stuckPct}%      穿门 ${c.doorPct}%      瞬时被挡 ${c.blockedSamplesPct}%`);
   console.log(`  结局        平民 ${c.final.civ} 潜伏 ${c.final.infected} 丧尸 ${c.final.zombie} 死亡 ${c.final.dead}`);
+  const n = out.navcore;
+  console.log('\n[C] 新栈 NavCore（同协议）');
+  console.log(`  建图        EDT ${n.edtMs} ms + 分层 ${n.hierMs} ms + portal ${n.portalMs} ms`);
+  console.log(`  图规模      ${n.cells.toLocaleString()} 个 8 m 格 / ${n.clusters} 个簇 / ${n.nodes} 个边界节点`);
+  console.log(`  成功率      ${(n.okRate * 100).toFixed(1)}%`);
+  console.log(`  单次耗时    P50 ${n.msP50} ms   P95 ${n.msP95} ms`);
+  console.log(`  路径/直线   P50 ${n.lenRatioP50}   P95 ${n.lenRatioP95}`);
 }
