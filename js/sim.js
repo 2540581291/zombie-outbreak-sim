@@ -2871,7 +2871,15 @@ export class Sim {
                 // 正在转身/倒地的人不该再被咬（原版：状态 6/7 没有 LiveHuman 位）
                 if (this.aStage[c]) { this.tgt[i] = -1; break; }
                 const vsp = SPECIES[this.kind[c]] || SPECIES[SP.CIV1];
-                this.hp[c] -= (sp.dmg || 2) * (this.pow[i] || 1);
+                // 伤害规则：普通丧尸一律 20（不管它生前是什么职业）；
+                //   特殊感染者（坦克/冲锋者/喷吐者/自爆者）用自己的 dmg；
+                //   动物变的丧尸走 zombiePow 倍率（犬 2.4、猫 2.0）
+                const zKind = this.kind[i];
+                const isAnimalZ = zKind >= 12;
+                const biteDmg = sp.special ? (sp.dmg || 20)
+                              : isAnimalZ ? (sp.dmg || 5)
+                              : 20;
+                this.hp[c] -= biteDmg * (this.pow[i] || 1);
                 this.panic[c] = 1.4;
                 this.stam[c] = 1;
                 this.tgt[i] = -1;

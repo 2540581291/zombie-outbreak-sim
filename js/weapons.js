@@ -9,6 +9,7 @@
 export const WPN = {
   NONE: 0, PISTOL9: 1, PISTOL45: 2, REVOLVER: 3, SHOTGUN: 4,
   SMG: 5, RIFLE: 6, SNIPER: 7, RPG: 8, MOLOTOV: 9,
+  DBSHOTGUN: 10, AR: 11, LMG: 12, CROSSBOW: 13,
 };
 
 export const WEAPONS = [
@@ -22,6 +23,11 @@ export const WEAPONS = [
   { id: 7, name: '狙击枪', dmg: 200, rate: 1.8, range: 120, mag: 5, reserve: 15, noise: 170, reload: 2.8 },
   { id: 8, name: '火箭筒', dmg: 800, rate: 3.5, range: 90, mag: 1, reserve: 1, noise: 300, reload: 4.0 },
   { id: 9, name: '燃烧瓶', dmg: 90, rate: 2.5, range: 20, mag: 1, reserve: 3, noise: 20, reload: 2.0 },
+  // ---- 扩充：远近兼顾，形成"精度 / 火力 / 隐蔽"三条线 ----
+  { id: 10, name: '双管霰弹枪', dmg: 160, rate: 1.4, range: 15, mag: 2, reserve: 20, noise: 150, reload: 2.2 },
+  { id: 11, name: '突击步枪', dmg: 38, rate: 0.14, range: 55, mag: 30, reserve: 120, noise: 145, reload: 2.3 },
+  { id: 12, name: '轻机枪', dmg: 32, rate: 0.09, range: 70, mag: 100, reserve: 200, noise: 180, reload: 4.5 },
+  { id: 13, name: '十字弩', dmg: 150, rate: 2.2, range: 45, mag: 1, reserve: 12, noise: 10, reload: 2.0 },
 ];
 
 /** 职业 → 初始武器（警局/军营库存按这个发） */
