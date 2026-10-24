@@ -386,7 +386,8 @@ export class Sim {
     this.goal.fill(0); this.goalX.fill(0); this.goalZ.fill(0); this.decT.fill(0); this.lastScore.fill(0); this.stuckT.fill(0);
     this.lastX.fill(0); this.lastZ.fill(0); this.stuckT2 = 0; this.wpT.fill(0); this.freeT.fill(0);
     this.pathN.fill(0); this.pathIdx.fill(0); this.pathBudget = 8; this.stuckSlice = 0;
-    this.preyBudget = 8;       // 锁敌扫描预算也要重置，否则第二次 reset 起手值不同 → 非确定性
+    this.preyBudget = 8;
+    this.tgtCount = new Int16Array(NMAX);   // 每个目标被多少丧尸同时盯着（本 tick）       // 锁敌扫描预算也要重置，否则第二次 reset 起手值不同 → 非确定性
     this.infectRate = 0; this.awareRate = 0; this.chaos = 0;
     this.martialLaw = false; this.rateT = 0;
     this.homeGunRate = P.homeGunRate == null ? 0.12 : +P.homeGunRate;
@@ -2640,6 +2641,8 @@ export class Sim {
   // ---------- 主 tick ----------
   step(dt, camX, camZ) {
     this.tick++;
+    // 每个 tick 重算"谁被多少丧尸盯着"——用来让追猎目标分散开
+    this.tgtCount.fill(0);
     this.time += dt;
 
     // 特感投放：疫情越严重，刷得越快、类型越狠
@@ -3116,6 +3119,32 @@ export class Sim {
             }
           }
           if (c < 0 && this.nearC[i] >= 0) c = this.nearC[i];
+          // ---- 近处猎物优先：已经在追一个人时，如果身边有个更近的活人，就改追他 ----
+          //   不加这条会出现"一大群丧尸追同一个人，旁边 3 米的人视而不见"：
+          //   目标一旦记住就只按 90m 的缰绳放，不会主动换。
+          //   滞回：新目标必须近得多（<60%）而且够近（<15m）才换，避免来回横跳。
+          // ---- 目标分散：同一个猎物最多被 5 只盯（锁敌除外）----
+          //   否则会出现"上百只丧尸围猎同一个人"，而旁边的人没人管。
+          if (c >= 0 && !this.lockOn[i] && this.tgtCount[c] >= 5) {
+            // 在这只丧尸周围 35m 里挑一个"被盯得最少"的活人，而不是永远选最近那个
+            // （最近那个往往就是已经被上百只围住的那位）
+            let best = -1, bestN = 99, bestD = 1e9;
+            this.forEachNear(this.px[i], this.pz[i], 35, (j) => {
+              const js = this.state[j];
+              if (!(js === ST.CIV || js === ST.FLEE || js === ST.FIGHT || js === ST.INFECTED)) return;
+              const cnt = this.tgtCount[j];
+              const d = Math.hypot(this.px[j] - this.px[i], this.pz[j] - this.pz[i]);
+              if (cnt < bestN || (cnt === bestN && d < bestD)) { bestN = cnt; bestD = d; best = j; }
+            });
+            if (best >= 0 && best !== c && bestN <= this.tgtCount[c]) c = best;
+          }
+          if (c >= 0) this.tgtCount[c]++;
+          if (c >= 0 && !this.lockOn[i] && this.nearC[i] >= 0 && this.nearC[i] !== c) {
+            const nc = this.nearC[i];
+            const dCur = Math.hypot(this.px[c] - this.px[i], this.pz[c] - this.pz[i]);
+            const dNew = Math.hypot(this.px[nc] - this.px[i], this.pz[nc] - this.pz[i]);
+            if (dNew < 15 && dNew < dCur * 0.6) c = nc;
+          }
           // 锁敌：**注意力范围（60m）里真的一个活人都没有**时，每 60 秒抓一个"全城最近的人"。
           // 注意不能只看缓存的 nearC（它每 3 tick 才刷一次，可能过时），
           // 真要锁之前现场再确认一次 60m 内是空的；只要有人就不锁，直接用他。
