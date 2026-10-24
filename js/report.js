@@ -40,7 +40,10 @@ function computeScore(sim) {
 
 function drawChart(canvas, hist, pop) {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const W = 760, H = 210;
+  // 跟着弹窗宽度走（弹窗统一成 1440×900 之后，原来写死的 760×210 会留一大片空白）
+  const pw = canvas.parentElement ? canvas.parentElement.clientWidth : 760;
+  const W = Math.max(520, Math.min(1180, pw - 6));
+  const H = 380;
   canvas.width = W * dpr;
   canvas.height = H * dpr;
   canvas.style.width = W + 'px';
