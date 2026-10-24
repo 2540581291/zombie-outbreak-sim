@@ -213,8 +213,8 @@ el.addEventListener('pointermove', (e) => {
   const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
 
   if (drag.btn === 2) {
-    // 右键 = 平移（灵敏度系数 0.0016 → 0.00085）
-    const k = rig.dist * 0.00085;
+    // 右键 = 平移（灵敏度 0.0016 → 0.00085 → 0.00062：再降一档，拖起来更跟手）
+    const k = rig.dist * 0.00062;
     rig.target.addScaledVector(fwd, dy * k).addScaledVector(right, -dx * k);
   } else if (drag.btn === 1 && !retroMode) {
     // 中键 = 旋转 / 俯仰（2D 禁止旋转，正北朝上）
