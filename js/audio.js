@@ -47,16 +47,8 @@ export class AudioEngine {
     const d = this.noiseBuf.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
 
-    // 环境底噪（远处的城市/风）
-    this.ambient = ctx.createGain();
-    this.ambient.gain.value = 0.055;
-    const amb = ctx.createBufferSource();
-    amb.buffer = this.noiseBuf;
-    amb.loop = true;
-    const lp = ctx.createBiquadFilter();
-    lp.type = 'lowpass'; lp.frequency.value = 380;
-    amb.connect(lp).connect(this.ambient).connect(this.bus);
-    amb.start();
+    // 环境底噪已移除：不触发就不出声（之前这里有个 loop=true 的噪声床，
+    // 一直在低低地轰，听起来像"战场余音"）
 
     // 警报（常驻，默认静音）
 
@@ -106,7 +98,7 @@ export class AudioEngine {
   _noise(dur) {
     const s = this.ctx.createBufferSource();
     s.buffer = this.noiseBuf;
-    s.loop = true;
+    s.loop = false;          // 不循环：万一哪条分支忘了 stop()，最多响 2 秒就自然结束，不会变成永久枪声
     s.playbackRate.value = 0.8 + Math.random() * 0.5;
     s.__dur = dur;
     return s;
