@@ -291,16 +291,31 @@ export class AudioEngine {
       ev.length = 0;
     }
 
-    // ---- 警报：有 siren 效果就响 ----
+    // ---- 警笛：有 siren 效果时响；否则"附近有警察/士兵"时也响（警察在场感）----
     if (this.sirenNode) {
       let s = null;
       for (const e of sim.effects) if (e.type === 'siren') { s = e; break; }
+      let gain = 0;
       if (s) {
         const sp = this._spatial(s.x, s.z);
-        this.sirenNode.gain.setTargetAtTime(0.30 * sp.gain, t, 0.1);
+        gain = 0.30 * sp.gain;
       } else {
-        this.sirenNode.gain.setTargetAtTime(0, t, 0.2);
+        // 找最近的警察 / 士兵（120m 内），越近越响
+        const L3 = this.listener;
+        let bd = 120 * 120, bi = -1;
+        for (let i = 0; i < sim.n; i++) {
+          const st = sim.state[i];
+          if (st !== 3 && st !== 6) continue;          // POLICE / SOLDIER
+          const dx = sim.px[i] - L3.x, dz = sim.pz[i] - L3.z;
+          const d2 = dx * dx + dz * dz;
+          if (d2 < bd) { bd = d2; bi = i; }
+        }
+        if (bi >= 0) {
+          const sp = this._spatial(sim.px[bi], sim.pz[bi]);
+          gain = 0.26 * sp.gain;                        // 比真·警报轻一档，避免吵
+        }
       }
+      this.sirenNode.gain.setTargetAtTime(gain, t, gain > 0 ? 0.12 : 0.25);
     }
 
     // ---- 火区噼啪声 ----
