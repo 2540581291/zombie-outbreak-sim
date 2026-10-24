@@ -1645,6 +1645,16 @@ async function boot() {
   const res = await fetch(CDIR + '/city.json');
   if (!res.ok) { fail('找不到 ' + CDIR + '/city.json —— 请先运行 pipeline/bake_pbf.py'); return; }
   const city = await res.json();
+  // 默认人口按面积算：2600 人/km²（柏林 7.59km² ≈ 2 万，莱斯特 0.26km² ≈ 700）
+  // URL 显式给了 ?pop= 就不覆盖
+  if (!Q.get('pop')) {
+    const km2 = (city.size[0] * city.size[1]) / 1e6;
+    const auto = Math.max(+sPop.min || 200, Math.min(+sPop.max || 100000,
+      Math.round(km2 * 2600 / 100) * 100));
+    sPop.value = auto;
+    if (typeof syncLabels === 'function') syncLabels();
+    console.log('[ZOS-R] 默认人口 ' + auto.toLocaleString() + '（面积 ' + km2.toFixed(2) + ' km² × 2600/km²）');
+  }
   if (Q.get('maxb')) city.buildings = city.buildings.slice(0, +Q.get('maxb'));
   cityRef = city;
   setL(30, `载入 ${city.name}：${city.buildings.length.toLocaleString()} 栋建筑…`);
