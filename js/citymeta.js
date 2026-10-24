@@ -14,7 +14,7 @@
 export const CITY_INFO = {
   berlin:    { country: '德国', city: '柏林',   district: '米特' },
   tokyo:     { country: '日本', city: '东京',   district: '千代田' },
-  zhengzhou: { country: '中国', city: '郑州',   district: '金水' },
+  zhengzhou: { country: '中国', city: '郑州',   district: '二七' },
   nanyang:   { country: '中国', city: '南阳',   district: '卧龙' },
   zhenping:  { country: '中国', city: '南阳',   district: '镇平' },
   leicester: { country: '英国', city: '莱斯特', district: '' },   // 原版 2009 的那张图

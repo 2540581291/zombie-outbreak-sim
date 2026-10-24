@@ -1,0 +1,29 @@
+城市命名统一：一份真值 + 三处对齐
+
+原来的状态：
+  js/citymeta.js  CITY_INFO 是唯一真值映射（id → 国家/城市/区），
+                  提供 cityFull（"德国 · 柏林·米特"）/ cityShort（"柏林·米特"）/
+                  cityCountry / cityNewspaper（"柏林晨报"）四个派生函数。
+                  顶栏、窗口标题、新闻报头都走它。
+  但 index.json 和 city.json 里的 name 是各自手写的英文/中文混排：
+      index: "Berlin Mitte" / "南阳 卧龙区" / "东京 新宿·千代田" / "郑州 二七区"
+      city:  "Berlin Mitte" / "Leicester" / ...
+  而且 CITY_INFO 把郑州写成"金水"，数据里是"二七区"——直接矛盾。
+
+本次统一：
+1) CITY_INFO 纠错：zhengzhou district 金水 → 二七
+2) index.json 的 name 全部改成中文短名（与 cityShort 一致）：
+     莱斯特（原版 2009） / 柏林·米特 / 南阳·卧龙 / 东京·千代田 / 郑州·二七 / 南阳·镇平
+3) 六个 city.json 的 name 同步成同一套中文名
+
+现在三处的分工是明确的：
+  CITY_INFO     结构化真值（国家/城市/区）
+  city.json     name —— 只作为日志/兜底（"[ZOS-R] 柏林·米特 | 建筑 4755"）
+  index.json    name —— 只作为选择器的兜底（正常情况走 cityOption → cityFull）
+
+实测：
+  柏林   顶栏「德国 · 柏林·米特」  日志「柏林·米特」
+  莱斯特 顶栏「英国 · 莱斯特」      日志「莱斯特（原版 2009）」
+
+注意：tools/pull_original_map.py 里写的 name 是 "Leicester"，
+      重新拉取后会被改回英文 —— 用脚本重跑时记得同步成中文名。
