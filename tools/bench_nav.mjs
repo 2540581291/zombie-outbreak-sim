@@ -185,7 +185,7 @@ if (JSON_OUT) {
 } else {
   const p = out.planner, c = out.crowd;
   console.log(`\n=== NavCore 基线（${out.city}）${out.tag} ===`);
-  console.log('\n[A] 规划器（随机 OD，≥150 m）');
+  console.log('\n[A] 模拟内规划（sim.planPath → HPA*，随机 OD ≥150 m）');
   console.log(`  样本        ${p.tries} 组`);
   console.log(`  成功率      ${(p.okRate * 100).toFixed(1)}%`);
   console.log(`  单次耗时    P50 ${p.msP50} ms   P95 ${p.msP95} ms   max ${p.msMax} ms`);
