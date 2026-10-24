@@ -237,11 +237,6 @@ export class Sim {
     this.expStart = new Float32Array(NMAX);      // 这段连续接触是什么时候开始的
     this.escortOf = new Uint8Array(NMAX);        // 该警员在护送哪位要员（0 = 不在护送）
     this.boostT = new Float32Array(NMAX);        // 加速到期时间（护送 / 出警 30 秒内 ×2）
-    this.wallT = new Float32Array(NMAX);         // 连续被卡住的累计秒数（旧指标，保留兼容）
-    this.anchorT = new Float32Array(NMAX);       // 上次取样时间
-    this.anchorX = new Float32Array(NMAX);       // 取样时的位置
-    this.anchorZ = new Float32Array(NMAX);
-    this.ghostT = new Float32Array(NMAX);        // （已废弃）原穿墙窗口
     this.wallHitT = new Float32Array(NMAX);      // 撞墙计数的节流时间
     // ---- 政府行动（面板）：机构归属 + 清剿任务 ----
     this.jobKind = new Uint8Array(NMAX);         // 工作地类型：0 其它 / 1 政府 / 2 医院 / 3 学校
@@ -306,7 +301,6 @@ export class Sim {
     this.awareRate = 0;                          // 知情率（全城知道出事的人的比例）
     this.chaos = 0;                              // **混乱度 0-100**：很多规则的开关都看它
     this.martialLaw = false;                     // 感染率 > 阈值 → 平民敢去警局抢枪
-    this.martialAt = 0.2;                        // 阈值（面板可调）
     // ---- 家庭（M2）：家庭 = 平民索引上的连续区间 ----
     this.hh = new Uint16Array(NMAX);             // 家庭 id
     this.tourist = new Uint8Array(NMAX);         // 1 = 旅客（无家无家属）
@@ -398,8 +392,6 @@ export class Sim {
     this.homeStocks.clear();
     this.stationOf.fill(0); this.patrol.fill(0);
     this.boostT.fill(0);
-    this.wallT.fill(0);
-    this.ghostT.fill(0);
     // 撞塌的墙会改 nav.grid —— 开新局必须先还原，否则第二次跑的地图和第一次不同
     if (!this.navBase) this.navBase = this.nav && this.nav.grid ? this.nav.grid.slice() : null;
     else if (this.navBase) this.nav.grid.set(this.navBase);
@@ -423,9 +415,6 @@ export class Sim {
     this.stationHist = [];      // 每个警局的弹药存量采样（军械库曲线）
     this.govT = 0;             // 下一次评估的倒计时
     this.duties = new Map();   // 在外执行的派遣：id -> { x, z, what, dest, why, t }
-    this.anchorT.fill(0);
-    this.anchorX.fill(0);
-    this.anchorZ.fill(0);
     this.escortOf.fill(0); this.vipStage.fill(0); this.vipGoal.fill(0); this.vipDone.fill(0); this.vipStation.fill(0);
     this.trust.fill(0); this.familyDuty.fill(0); this.willpower.fill(0); this.courage.fill(0);
     this.infRoute.fill(0); this.exposedAt.fill(0); this.expStart.fill(0);
@@ -447,7 +436,6 @@ export class Sim {
     this.tgtCount = new Int16Array(NMAX);   // 每个目标被多少丧尸同时盯着（本 tick）       // 锁敌扫描预算也要重置，否则第二次 reset 起手值不同 → 非确定性
     this.infectRate = 0; this.awareRate = 0; this.chaos = 0;
     this.martialLaw = false; this.rateT = 0;
-    this.homeGunRate = P.homeGunRate == null ? 0.12 : +P.homeGunRate;
     this.chaosAt = 50;          // 混乱度到这个数 = 秩序崩溃（警戒线）
     this.nAware = 0; this.heat = 0; this.netT = 0;
     this.infoRate = P.infoRate == null ? 1 : +P.infoRate;
@@ -485,7 +473,7 @@ export class Sim {
     this.vip.fill(0);
     this.vips.length = 0;
     this.vipTotal = 0;
-    this.vips.length = 0; this.vipGov = null;   // 要员列表也要清，否则第二次 reset 就没要员了（非确定性）
+    this.vips.length = 0;   // 要员列表也要清，否则第二次 reset 就没要员了（非确定性）
     this.cd = {};
     this.effects.length = 0;
     this.helis.length = 0;
@@ -743,7 +731,6 @@ export class Sim {
         this.idle[v] = 1;
         this.actT[v] = 1e9;              // 待在政府不走
         this.chainStep[v] = 0;
-        this.vipGov = v;                 // 记录一下，方便 UI/日志
       }
     }
 

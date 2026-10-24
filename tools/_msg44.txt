@@ -1,0 +1,14 @@
+清理无调用字段：删掉 8 个（穿墙遗留 + 只写不读）
+
+删除（完全没人读）：
+· ghostT / anchorT / anchorX / anchorZ / wallT —— 上一版"穿墙"改"撞塌"后遗留的字段，
+  只剩声明和 fill，逻辑已不再引用
+· homeGunRate —— 只赋值，真正用的是参数 P.homeGunRate
+· martialAt —— 只赋值（戒严阈值），从未被读
+· vipGov —— 只赋值（记录政府要员），从未被读
+
+保留但标注（外部在用 / 预留）：
+· cured、vipTotal —— report.js 会读
+· nextWild —— 只在 reset 里赋值，野生动物刷新逻辑没接上（预留）
+
+test_chain 5/5。
