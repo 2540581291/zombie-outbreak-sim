@@ -2258,6 +2258,16 @@ function loop(t) {
   }
   updateTracers();
   updateBooms(dtReal);
+  // 墙体坍塌：尘雾 + 地形图层局部重绘 + HUD 计数
+  if (sim && sim.wallDownQueue && sim.wallDownQueue.length) {
+    for (const c of sim.wallDownQueue) {
+      ping(new THREE.Vector3(c.x, 0.4, c.z), 0xbfa77a, 1.4);
+      if (overlay && overlay.repaintRect) overlay.repaintRect(c.c - 1, c.r - 1, c.c + 1, c.r + 1);
+    }
+    sim.wallDownQueue.length = 0;
+    const el = document.getElementById('n-wall');
+    if (el) el.textContent = (sim.wallsDown || 0).toLocaleString();
+  }
   updateFx(t);
   if (audio.ok) {
     const rx = Math.cos(rig.yaw), rz = -Math.sin(rig.yaw);

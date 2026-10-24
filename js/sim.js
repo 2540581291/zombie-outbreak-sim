@@ -396,6 +396,7 @@ export class Sim {
     if (!this.navBase) this.navBase = this.nav && this.nav.grid ? this.nav.grid.slice() : null;
     else if (this.navBase) this.nav.grid.set(this.navBase);
     this.wallHit = new Map();       // 每格被撞次数（撞满 10 次塌掉）
+    this.wallDownQueue = [];        // 本帧新塌的格子 [{x,z,c,r}]，UI 每帧取走
     this.wallsDown = 0;            // 本局撞塌的墙格数
     this.wallHitT.fill(0);
     this.jobKind.fill(0);
@@ -2405,6 +2406,10 @@ export class Sim {
               this.nav.grid[ci] = 0x03;        // 塌了：变成可走空地
               this.wallHit.delete(ci);
               this.wallsDown = (this.wallsDown || 0) + 1;
+              if (this.wallDownQueue.length < 64) {
+                const cc = ci % this.nav.cols, rr = (ci / this.nav.cols) | 0;
+                this.wallDownQueue.push({ x: bx, z: bz, c: cc, r: rr });
+              }
               this.booms.push({ x: bx, z: bz, r: 1.6, life: 0.35 });
             } else {
               this.wallHit.set(ci, nk);
