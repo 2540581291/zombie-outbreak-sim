@@ -341,7 +341,7 @@ def _deck(g, a, b, halfw):
             g.set(g.col(px + nx * k), g.row(py + ny * k), OPEN)
 
 
-def build(city, cell=0.44, verbose=True, sat_path=None):  # 默认 0.44m/格（原版 Leicester 的格子大小）
+def build(city, cell=1.0, verbose=True, sat_path=None):   # 自建城市默认 1m/格；原版地图走 tools/pull_original_map.py（按资源推 cell）
     W, H = city["size"]
     g = Grid(W, H, cell)
     per_m = 1.0 / cell
