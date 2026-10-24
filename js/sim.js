@@ -4648,7 +4648,7 @@ export class Sim {
     const popAlive = Math.max(1, this.stats.civ + this.stats.police);
     const needArmed = Math.max(1, popAlive * 0.15);
     const needPolice = Math.max(1, (this.params && this.params.police) || 60);
-    const needAmmo = Math.max(1, popAlive * 8);
+    const needAmmo = Math.max(1, popAlive * 2);   // 人均 2 发算满配（原来 8 发，几乎不可能达标）
     const pArmed = Math.min(1, armedN / needArmed);
     const pPolice = Math.min(1, police / needPolice);
     const pAmmo = Math.min(1, ammoN / needAmmo);
