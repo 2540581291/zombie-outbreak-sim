@@ -23,11 +23,11 @@ export const CITY_INFO = {
   leicester: { country: '英国', city: '莱斯特', district: '' },   // 原版 2009 的那张图
 
   // ===== 原版手游内嵌的 5 张（买断影像，坐标未知，按影像内容命名）=====
-  map01: { country: '原版', city: '英国郊区', district: '' },
-  map02: { country: '原版', city: '机场',     district: '' },
-  map03: { country: '原版', city: '海滨商业区', district: '' },
-  map04: { country: '原版', city: '密集城区', district: '' },
-  map05: { country: '原版', city: '热带度假区', district: '' },
+  map01: { country: '英国', city: '考文垂', district: '' },
+  map02: { country: '英国', city: '达克斯福德',     district: '' },
+  map03: { country: '美国', city: '克利尔沃特', district: '' },
+  map04: { country: '越南', city: '岘港', district: '' },
+  map05: { country: '阿联酋', city: '迪拜', district: '' },
 
   // ===== 原版手游的 15 张 Google 图（坐标来自 3DS MapConfig，精确到小数点后两位）=====
   g17:     { country: '澳大利亚', city: '珀斯',       district: '' },
