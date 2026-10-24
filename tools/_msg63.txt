@@ -1,0 +1,26 @@
+按审查报告继续修：卡片性能、翻页、换种子、死代码
+
+1) 护送人数不再 O(n)
+   people.js 原来 for (k<sim.n) 数 escortOf === slot 的人 —— 卡片停在要员身上时每帧 2 万次。
+   改为 sim.escortCount[]（Uint16Array(16)）：
+     · 登记 escortOf 时 +1（同一槽位不重复计）
+     · 解除 escortOf 时 -1
+     · people.js 直接读计数
+   reset 时清零。
+
+2) 卡片刷新节流
+   主循环原来每帧都调 renderAgentCard()（内容没变时不重建 DOM，但字符串每帧都在拼）。
+   改为 200ms 一次（lastCardT）。血量/倒计时/距离变化很慢，观感无差别。
+
+3) ‹ › 翻页跳过已撤离
+   原来只跳过 ST.CORPSE，现在也跳过 ST.SAVED（否则会显示"已从撤离口离开"的卡片）。
+
+4) 换种子 / 重开复位选中
+   btn-seed 和 window.__zosRestart 都先 deselectAgent()，避免 selected 越界读到 NaN。
+
+5) 删掉地点视图死代码
+   placeView / renderPlace() / #ac-back 绑定整条链从未被激活
+   （placeView 全仓只被赋 null，没有一处赋值进入地点视图）。
+   全部删除，placeView 现在零残留。
+
+test_chain 5/5、页面无运行错误。

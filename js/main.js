@@ -529,12 +529,12 @@ function buildEscapeMarker() {
 }
 
 let lastCardHtml = '';       // 卡片内容缓存：内容没变就不重建 DOM
+let lastCardT = 0;           // 上次刷新卡片的时间戳（节流到 200ms）
 
 function selectAgent(i) {
   if (multiSel.size) { multiSel.clear(); updateGroupBadge(); }
   if (i === selected) {
     // 同一个人的情况下也要能"从地点视图回到他本人"
-    placeView = null;
     renderAgentCard();
     return;
   }
@@ -544,7 +544,6 @@ function selectAgent(i) {
   if (pathLine) pathLine.visible = false;
   if (pathRing) pathRing.visible = false;
   selected = i;
-  placeView = null;           // 回到"角色视图"
   if (followSelected) rig.target.set(sim.px[i], 0, sim.pz[i]);   // 跟随中就直接对准新人
   const el = document.getElementById('agentcard');
   if (!el) return;
@@ -613,7 +612,6 @@ const KIND_NAME = {
   police: '警察局', hospital: '医院', school: '学校', market: '超市',
   transit: '车站', pharmacy: '药店', gov: '政府', fire: '消防',
 };
-let placeView = null;        // 当前查看的地点（null = 看角色）
 
 /** 坐标附近有什么设施（默认 150m 内最近的 POI） */
 function placeNear(x, z, maxD = 150) {
@@ -710,28 +708,7 @@ function agentRules(i, p) {
     return chips.join('');
   }
 
-  function renderPlace() {
-  const p = placeView;
-  const kind = KIND_NAME[p.k] || '地点';
-  document.getElementById('ac-name').textContent = p.n || kind;
-  document.getElementById('ac-sub').textContent = `${kind} · 坐标 ${p.x.toFixed(0)}, ${p.z.toFixed(0)}`;
-  document.getElementById('ac-vip').style.display = 'none';
-
-  const rows = [['类型', kind], ['面积', p.a ? `${Math.round(p.a)} m²` : '—']];
-  if (p.k === 'police') {
-    rows.push(['军械库', stockText(p.store)]);
-    const si = (sim.poiByKind.police || []).indexOf(p);
-    rows.push(['驻局警员', si >= 0 ? `${sim.idleAt(si)} 人在局` : '—']);
-  }
-  rows.push(['附近', `${crowdAt(p.x, p.z)} 人在 50m 内`]);
-  rows.push(['离镜头', `${Math.hypot(p.x - rig.target.x, p.z - rig.target.z).toFixed(0)} m`]);
-
-  document.getElementById('ac-body').innerHTML =
-    `<div class="ac-sec">地点信息</div>` +
-    rows.map(([k, v]) => `<div class="ac-row"><span>${k}</span><em>${v}</em></div>`).join('');
-}
-
-  // ---------- 行动溯源 + 属性条（P0.3 / P0.4） ----------
+    // ---------- 行动溯源 + 属性条（P0.3 / P0.4） ----------
   function bar(v, max, cls) {
     const pct = Math.max(0, Math.min(100, (v / max) * 100));
     return `<div class="ac-bar ${cls || ''}"><i style="width:${pct.toFixed(0)}%"></i></div>`;
@@ -834,7 +811,6 @@ function renderAgentCard() {
   if (!sim || selected < 0) return;
   const el = document.getElementById('agentcard');
   if (!el) return;
-  if (placeView) { renderPlace(); return; }
 
   cardShownFor = selected;
   const p = profileFor(sim, selected);
@@ -1300,8 +1276,8 @@ function restoreNavBase() {
   if (nav.buildDoorField) nav.buildDoorField();
   return true;
 }
-window.__zosRestart = () => { clearLink(); restoreNavBase(); sim.reset(readParams()); buildEscapeMarker(); buildPoiLabels(); hideBanner(); };
-$('btn-seed').onclick = () => { clearLink(); restoreNavBase(); seed = (Math.random() * 1e9) | 0; sim.reset(readParams()); buildEscapeMarker(); buildPoiLabels(); hideBanner(); };
+window.__zosRestart = () => { clearLink(); deselectAgent(); restoreNavBase(); sim.reset(readParams()); buildEscapeMarker(); buildPoiLabels(); hideBanner(); };
+$('btn-seed').onclick = () => { clearLink(); deselectAgent(); restoreNavBase(); seed = (Math.random() * 1e9) | 0; sim.reset(readParams()); buildEscapeMarker(); buildPoiLabels(); hideBanner(); };
 $('p-toggle').onclick = () => {
   const b = $('p-body');
   b.classList.toggle('hide');
@@ -1545,7 +1521,8 @@ selectTool('select');
     let i = selected;
     for (let k = 0; k < 400; k++) {
       i = (i + d + sim.n) % sim.n;
-      if (sim.state[i] !== ST.CORPSE) { selectAgent(i); return; }
+      const s2 = sim.state[i];
+      if (s2 !== ST.CORPSE && s2 !== ST.SAVED) { selectAgent(i); return; }
     }
   };
   const pv = document.getElementById('ac-prev');
@@ -1553,14 +1530,6 @@ selectTool('select');
   const nx = document.getElementById('ac-next');
   if (nx) nx.onclick = (ev) => { ev.stopPropagation(); step(1); };
 
-  // 返回角色
-  const bk = document.getElementById('ac-back');
-  if (bk) bk.onclick = (ev) => {
-    ev.stopPropagation();
-    placeView = null;
-    bk.classList.add('hidden');
-    renderAgentCard();
-  };
 
   // 点"住址 / 工作地 / 最近警局…" → 看地点
   const body = document.getElementById('ac-body');
@@ -2303,8 +2272,9 @@ function loop(t) {
     renderer.render(scene, camera);
   }
   updatePoiLabels();   // 相机矩阵这一帧已更新，投影才不会 NaN
-  // 卡片实时刷新：每帧（内容没变时不重建 DOM，所以不贵）
-  if (sim && selected >= 0) {
+  // 卡片刷新：200ms 一次（血量/倒计时/距离变化很慢，没必要每帧拼字符串）
+  if (sim && selected >= 0 && t - (lastCardT || 0) > 200) {
+    lastCardT = t;
     const cEl = document.getElementById('agentcard');
     if (cEl && !cEl.classList.contains('hidden')) {
       try { renderAgentCard(); } catch (e) { window.__cardErr = String((e && e.message) || e); }

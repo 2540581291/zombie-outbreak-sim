@@ -151,9 +151,9 @@ export function profileFor(sim, i) {
       const st = sim.vipStage[i], gl = sim.vipGoal[i];
       if (sim.vipDone && sim.vipDone[i]) return '已安置（护送完成）';
       if (!st) return '暂无护送（混乱度未到 20%）';
-      let n = 0;
+      // 用 sim 维护的计数（每帧在 escortOf 变更处维护），不再 O(n) 扫描
       const slot = (sim.vips || []).indexOf(i) + 1;
-      for (let k = 0; k < sim.n; k++) if (sim.escortOf[k] === slot) n++;
+      const n = (sim.escortCount && sim.escortCount[slot]) || 0;
       return `${st === 2 ? '八人' : '四人'}小队护送中（当前 ${n} 人）→ ${gl === 2 ? '撤离城区' : '前往警察局'}`;
     })() : null,
     infected: state === ST.INFECTED,

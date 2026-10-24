@@ -12,9 +12,11 @@ const send=(m,p={})=>new Promise(res=>{const id=++seq;pend.set(id,res);ws.send(J
 const ev=(e)=>send('Runtime.evaluate',{expression:e,returnByValue:true});
 await new Promise(r=>{ws.onopen=r;});
 await send('Page.enable'); await send('Runtime.enable');
-await send('Page.navigate',{url:'http://127.0.0.1:8777/'}); await sleeps(26000);
+await send('Page.navigate',{url:'http://127.0.0.1:8777/'}); await sleeps(70000);
 await ev(`document.getElementById('g-chaos').click()`); await sleeps(1000);
-const r = await send('Page.captureScreenshot',{format:'png'});
-writeFileSync('C:/项目/生化危机模拟器/shots/_chaos_dyn.png', Buffer.from(r.data,'base64'));
+let r = await send('Page.captureScreenshot',{format:'png'});
+writeFileSync('C:/项目/生化危机模拟器/shots/_chaos_ev.png', Buffer.from(r.data,'base64'));
+const scroll = await ev(`(()=>{const b=document.querySelector('#sp-body'); return b.scrollWidth + '/' + b.clientWidth;})()`);
+console.log('scrollWidth/clientWidth =', scroll.result.value, '（相等 = 无横向滚动）');
 console.log('errors:', errs.length ? errs.slice(0,3) : 'none');
 ws.close(); process.exit(0);

@@ -1,4 +1,6 @@
 // 武力 / 卫生 两个独立信息面板（分标签页）
+import { shortName } from './people.js';
+
 let root = null;
 let curKind = 'force';
 let curTab = 0;
@@ -359,6 +361,26 @@ export function openForce(sim) { curSim = sim; curKind = 'force'; curTab = 0; re
 export function openSanit(sim) { curSim = sim; curKind = 'sanit'; curTab = 0; render(); ensure().classList.remove('hidden'); }
 
 // ---------------- 顶栏三个指标的明细 ----------------
+const hhmmss = (t) => {
+  const m = Math.max(0, Math.floor(t / 60));
+  return Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0');
+};
+
+/** 把某类事件渲染成"逐条"的列表（时间 + 具体对象 + 这次加/减多少） */
+function eventLines(list, sim, max) {
+  if (!list.length) return '<div class="sp-ev none">还没有发生过</div>';
+  return list.slice(0, max).map((e) => {
+    let label;
+    if (e.type === 'station') label = `${e.text} 沦陷（50m 内已无警力）`;
+    else if (e.type === 'vip') label = `要员 ${shortName(e.i, sim)} 死亡`;
+    else if (e.type === 'death') label = `平民 ${shortName(e.i, sim)} 死亡`;
+    else if (e.type === 'infect') label = `${shortName(e.i, sim)} 被感染`;
+    else label = e.text || e.type;
+    return `<div class="sp-ev"><b>${hhmmss(e.t)}</b><span>${label}</span>`
+      + `<i class="${e.delta >= 0 ? 'up' : 'down'}">${e.delta >= 0 ? '+' : ''}${e.delta.toFixed(3)}</i></div>`;
+  }).join('');
+}
+
 export function openChaosInfo(sim) {
   const el = ensure();
   const d = sim.chaosDetail();
@@ -371,6 +393,7 @@ export function openChaosInfo(sim) {
   const pct = (v) => (v * 100).toFixed(1) + '%';
   const plus = (v) => (v >= 0 ? '+' : '') + v.toFixed(1);
   const sub = (t) => `<div class="sp-sub">${t}</div>`;
+  const evs = (type) => d.events.filter((e) => e.type === type);
 
   let h = big((sim.chaos || 0).toFixed(0), '/100') + bar(sim.chaos || 0, 100, '#ff8a3d');
 
@@ -383,22 +406,25 @@ export function openChaosInfo(sim) {
   h += sub(`累计 ${d.counts.infected.toLocaleString()} 人曾被感染`);
 
   h += row('枪声', plus(d.heat.gun));
-  h += sub(`累计 ${d.counts.shots.toLocaleString()} 枪 · 每千人 +${d.units.gun}（本图 ≈ 每枪 +${d.perEvent.gun.toFixed(3)}）· 本项封顶 ${d.gunCap}`);
+  h += sub(`累计 ${d.counts.shots.toLocaleString()} 枪 · 每枪 +${d.perEvent.gun.toFixed(3)} · 本项封顶 ${d.gunCap}`);
 
   h += row('平民死亡', plus(d.heat.death));
-  h += sub(`累计 ${d.counts.civKilled.toLocaleString()} 人 · 当前存活 ${d.pools.civ.toLocaleString()} → 每人 +${d.perEvent.death.toFixed(4)}（${d.maxBy.death} ÷ 存活）`);
+  h += sub(`共 ${d.counts.civKilled.toLocaleString()} 人 · 当前单价 +${d.perEvent.death.toFixed(4)}/人（${d.maxBy.death} ÷ 存活 ${d.pools.civ.toLocaleString()}）`);
+  h += eventLines(evs('death'), sim, 3);
 
   h += row('新增感染', plus(d.heat.infect));
-  h += sub(`累计 ${d.counts.infected.toLocaleString()} 人次 · 未感染 ${d.pools.susceptible.toLocaleString()} → 每人 +${d.perEvent.infect.toFixed(4)}（${d.maxBy.infect} ÷ 未感染）`);
+  h += sub(`当前单价 +${d.perEvent.infect.toFixed(4)}/人（${d.maxBy.infect} ÷ 未感染 ${d.pools.susceptible.toLocaleString()}）`);
+  h += eventLines(evs('infect'), sim, 3);
 
   h += row('要员死亡', plus(d.heat.vip));
-  h += sub(`累计 ${d.counts.vipDeaths} 人 · 要员共 ${d.pools.vips} 人 → 每人 +${d.perEvent.vip.toFixed(2)}（${d.maxBy.vip} ÷ 要员数）`);
+  h += sub(`每死一个 +${d.perEvent.vip.toFixed(2)}（${d.maxBy.vip} ÷ 要员 ${d.pools.vips} 人）`);
+  h += eventLines(evs('vip'), sim, 3);
 
   h += row('警局沦陷', plus(d.heat.station));
-  h += sub(`${d.counts.fallen} / ${d.counts.stations} 处（50m 内无警力即认定）· 每处 +${d.perEvent.station.toFixed(2)}（${d.maxBy.station} ÷ 警局数）`);
+  h += sub(`每处 +${d.perEvent.station.toFixed(2)}（${d.maxBy.station} ÷ 警局 ${d.pools.stations} 处）`);
+  h += eventLines(evs('station'), sim, 4);
 
   h += `<div class="sp-sum up">增长合计 ${plus(d.growth)} / 上限 ${d.max.growth}</div>`;
-
   h += '<div class="sp-divider"></div>';
 
   // ---------------- 减少 ----------------
@@ -407,27 +433,19 @@ export function openChaosInfo(sim) {
   h += sub(`每游戏小时 −1 点（一天 −24），已累积 ${d.calm.toFixed(1)}`);
 
   h += row('击杀丧尸', '−' + d.killCut.toFixed(1) + `（上限 ${d.max.kill}）`);
-  h += sub(`累计击杀 ${d.counts.kills.toLocaleString()} 只 · 场上 ${d.pools.zombies} 只 → 每只 −${d.perEvent.kill.toFixed(3)}（150 ÷ 当前丧尸数）`);
+  h += sub(`场上 ${d.pools.zombies.toLocaleString()} 只 → 每杀一只 −${d.perEvent.kill.toFixed(3)}（150 ÷ 当前丧尸数）`);
 
   h += `<div class="sp-sum down">减少合计 −${d.shrink.toFixed(1)} / 上限 ${d.max.shrink}</div>`;
-
   h += '<div class="sp-divider"></div>';
   h += row('最终混乱度', (d.chaos || 0).toFixed(1) + '（钳 0–100）');
-
-  // ---------------- 理论最大 ----------------
-  h += sec('两边的最大（互不影响）');
-  h += row('增长最大', '+' + d.max.growth);
-  h += sub(`知情 ${d.max.aware} + 感染 ${d.max.infect} + 事件热度 ${d.max.heat}`);
-  h += row('减少最大', '−' + d.max.shrink);
-  h += sub(`自然平静 ${d.max.calm} + 击杀削减 ${d.max.kill}`);
-  h += sub('两边都是 200：把丧尸清干净、平静攒满，混乱可以降到 0');
 
   // ---------------- 门槛 ----------------
   h += sec('门槛');
   h += row('20% · 巡逻警回局', (sim.chaos || 0) >= 20 ? '已触发' : '未触发');
   h += row('35% · 宵禁', (sim.chaos || 0) >= 35 ? '已触发' : '未触发');
-  h += row('50% · 秩序崩溃（全城避难 + 警局开库）', (sim.chaos || 0) >= 50 ? '已触发' : '未触发');
+  h += row('50% · 秩序崩溃', (sim.chaos || 0) >= 50 ? '已触发' : '未触发');
   h += row('80% · 要员八人队出城', (sim.chaos || 0) >= 80 ? '已触发' : '未触发');
+
   body.innerHTML = h;
   el.classList.remove('hidden');
 }

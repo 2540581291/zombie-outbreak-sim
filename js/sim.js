@@ -258,6 +258,7 @@ export class Sim {
     this.exposedAt = new Float32Array(NMAX);     // 上一次被"接触类感染者"贴住的时刻（0 = 没被贴）
     this.expStart = new Float32Array(NMAX);      // 这段连续接触是什么时候开始的
     this.escortOf = new Uint8Array(NMAX);        // 该警员在护送哪位要员（0 = 不在护送）
+    this.escortCount = new Uint16Array(16);      // 每个要员槽位当前有几个警员护送
     this.boostT = new Float32Array(NMAX);        // 加速到期时间（护送 / 出警 30 秒内 ×2）
     this.wallHitT = new Float32Array(NMAX);      // 撞墙计数的节流时间
     // ---- 政府行动（面板）：机构归属 + 清剿任务 ----
@@ -326,6 +327,7 @@ export class Sim {
     this.chaosHeat = { gun: 0, death: 0, infect: 0, vip: 0, station: 0 };
     this.chaosKillCut = 0;                       // 击杀丧尸带来的削减（也是独立项，会衰减）
     this.everInfected = 0;                       // 累计被感染过的人数（面板显示用）
+    this.chaosEvents = [];                       // 最近发生的混乱度事件（逐条，面板直接列出来）
     this.vipDeaths = 0;                          // 累计死亡的要员数
     this.chaosCalm = 0;                          // 自然平静的累积削减（每游戏小时 +1，封顶 50）
     this.stationFallen = null;                   // 每处警局是否已判定"沦陷"（全局，不按个体）
@@ -444,7 +446,7 @@ export class Sim {
     this.stationHist = [];      // 每个警局的弹药存量采样（军械库曲线）
     this.govT = 0;             // 下一次评估的倒计时
     this.duties = new Map();   // 在外执行的派遣：id -> { x, z, what, dest, why, t }
-    this.escortOf.fill(0); this.vipStage.fill(0); this.vipGoal.fill(0); this.vipDone.fill(0); this.vipStation.fill(0);
+    this.escortOf.fill(0); this.escortCount.fill(0); this.vipStage.fill(0); this.vipGoal.fill(0); this.vipDone.fill(0); this.vipStation.fill(0);
     this.trust.fill(0); this.familyDuty.fill(0); this.willpower.fill(0); this.courage.fill(0);
     this.infRoute.fill(0); this.exposedAt.fill(0); this.expStart.fill(0);
     this.ill.fill(0); this.chainStep.fill(0); this.arrGoal.fill(0);
@@ -466,7 +468,7 @@ export class Sim {
     this.infectRate = 0; this.awareRate = 0; this.chaos = 0;
     this.chaosHeat = { gun: 0, death: 0, infect: 0, vip: 0, station: 0 };
     this.chaosKillCut = 0; this.chaosCalm = 0; this.stationFallen = null;
-    this.everInfected = 0; this.vipDeaths = 0;
+    this.everInfected = 0; this.vipDeaths = 0; this.chaosEvents = [];
     this.martialLaw = false; this.rateT = 0;
     this.chaosAt = 50;          // 混乱度到这个数 = 秩序崩溃（警戒线）
     this.nAware = 0; this.heat = 0; this.netT = 0;
@@ -2121,8 +2123,9 @@ export class Sim {
         const p = polList[k];
         if (this.policeNear(p.x, p.z, 50) === 0) {
           this.stationFallen[k] = 1;
-          this.chaosHeat.station = Math.min(CHAOS_W.heatCap,
-            this.chaosHeat.station + this.stationPer());
+          const dSt = this.stationPer();
+          this.chaosHeat.station = Math.min(CHAOS_W.heatCap, this.chaosHeat.station + dSt);
+          this.chaosLog('station', dSt, -1, (p.n || '警察局'));
           this.pushEvent('警局沦陷：' + (p.n || '警察局') + ' 周边 50m 已无警力', 'danger');
         }
       }
@@ -3649,7 +3652,10 @@ export class Sim {
     const r = this.dispatchPolice(x, z, n);
     if (!r.ok) return false;
     const slot = this.vips.indexOf(vipIdx) + 1;    // 存"第几个要员"，不能存个体下标（Uint8 会溢出）
-    if (slot > 0) for (const i of (r.ids || [])) { this.escortOf[i] = slot; this.boostT[i] = this.time + 30; }
+    if (slot > 0) for (const i of (r.ids || [])) {
+      if (this.escortOf[i] !== slot) { this.escortOf[i] = slot; this.escortCount[slot]++; }
+      this.boostT[i] = this.time + 30;
+    }
     this.vipGoal[vipIdx] = goalKind;
     this.pushEvent(`派出 ${r.n} 人护送要员（${goalKind === 1 ? '去警局' : '撤离'}）`, 'start');
     return true;
@@ -3697,7 +3703,7 @@ export class Sim {
           this.goal[v] = GOAL.NONE;
           this.decT[v] = 1e9;
           for (let i = 0; i < this.n; i++) {
-            if (this.escortOf[i] === slot2) { this.escortOf[i] = 0; this.goal[i] = GOAL.NONE; }
+            if (this.escortOf[i] === slot2) { this.escortOf[i] = 0; this.escortCount[slot2] = Math.max(0, this.escortCount[slot2] - 1); this.goal[i] = GOAL.NONE; }
           }
           this.pushEvent('要员已进入警察局待命（等撤离令）', 'start');
           continue;
@@ -4487,8 +4493,9 @@ export class Sim {
     this.state[i] = ST.INFECTED;
     if (!this.chaosHeat) this.chaosHeat = { gun: 0, death: 0, infect: 0, vip: 0, station: 0 };
     // 混乱度：新增感染者单独一项
-    this.chaosHeat.infect = Math.min(CHAOS_W.heatCap,
-      this.chaosHeat.infect + this.infectPer());
+    const dInf = this.infectPer();
+    this.chaosHeat.infect = Math.min(CHAOS_W.heatCap, this.chaosHeat.infect + dInf);
+    this.chaosLog('infect', dInf, i, '感染者');
     this.everInfected = (this.everInfected || 0) + 1;
     this.infRoute[i] = route || 1;
     this.incTot[i] = seconds;
@@ -4585,12 +4592,14 @@ export class Sim {
     } else if (this.stats) {
       this.stats.civKilled = (this.stats.civKilled || 0) + 1;
       // 混乱度：平民死亡单独一项（按人口归一）
-      this.chaosHeat.death = Math.min(CHAOS_W.heatCap,
-        this.chaosHeat.death + this.deathPer());
+      const dDeath = this.deathPer();
+      this.chaosHeat.death = Math.min(CHAOS_W.heatCap, this.chaosHeat.death + dDeath);
+      this.chaosLog('death', dDeath, i, '平民');
       // 要员死亡：单独一项
       if (this.vips && this.vips.indexOf(i) >= 0) {
-        this.chaosHeat.vip = Math.min(CHAOS_W.heatCap,
-          this.chaosHeat.vip + this.vipPer());
+        const dVip = this.vipPer();
+        this.chaosHeat.vip = Math.min(CHAOS_W.heatCap, this.chaosHeat.vip + dVip);
+        this.chaosLog('vip', dVip, i, '要员');
         this.vipDeaths = (this.vipDeaths || 0) + 1;
         this.pushEvent('要员死亡：全城恐慌加剧', 'danger');
       }
@@ -4854,6 +4863,17 @@ export class Sim {
     };
   }
   /** 混乱度明细（给面板用）：增长项 / 减少项分开列，每一项都带来源计数 */
+  /**
+   * 记一条混乱度事件（逐条，不合并）。
+   * @param {string} type gun|death|infect|vip|station
+   * @param {number} delta 这次事件让混乱度变化多少
+   * @param {number} [i]   相关个体（面板用它显示名字）
+   * @param {string} [text] 附加说明（比如"警察局 2 号"）
+   */
+  chaosLog(type, delta, i, text) {
+    this.chaosEvents.push({ t: this.time, type, delta, i: i == null ? -1 : i, text: text || '' });
+    if (this.chaosEvents.length > 120) this.chaosEvents.shift();
+  }
   /** 枪声：按每千人（枪声不是"池子"，没有分母可除） */
   chaosUnit(k) {
     return k * 1000 / Math.max(1, this.pop0 || this.n);
@@ -4936,6 +4956,7 @@ export class Sim {
         station: this.stationPer(),
         kill: this.killPer(),
       },
+      events: (this.chaosEvents || []).slice(-60).reverse(),
       pools: {
         zombies: (this.stats && this.stats.zombie) || 0,
         civ: (this.stats && this.stats.civ) || 0,
