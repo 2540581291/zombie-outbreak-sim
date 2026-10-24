@@ -70,6 +70,3 @@
 #topbar .tb-mid{margin-left:auto}
 
 /* 原本在顶栏的 5 个按钮（政府/武力/卫生/总览/战报）挪到面板里 */
-.p-tools{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 10px}
-.p-tools-inner{display:flex;flex-wrap:wrap;gap:6px}
-.p-tools .tb-btn{font-size:12px;padding:5px 10px;border-radius:7px}

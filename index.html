@@ -50,6 +50,12 @@
     <span class="tb-sep">·</span>
     <span class="tb-clock" id="tb-clock">00:00:00</span>
   </div>
+  <div class="tb-mid">
+    <button class="spd" data-spd="0">⏸</button>
+    <button class="spd on" data-spd="1">1×</button>
+    <button class="spd" data-spd="4">4×</button>
+    <button class="spd" data-spd="16">16×</button>
+  </div>
   <div class="tb-group tb-pops">
     <span class="tb-stat" title="还活着的平民"><span class="tb-cap"><i class="dot civ"></i><em>平民</em></span><b id="n-civ">0</b></span>
     <span class="tb-stat" title="已感染、还没尸变的人"><span class="tb-cap"><i class="dot inf"></i><em>感染</em></span><b id="n-inf">0</b></span>
@@ -75,12 +81,13 @@
     </span>
   </div>
   <span class="tb-div"></span>
-  <div class="tb-mid">
-    <button class="spd" data-spd="0">⏸</button>
-    <button class="spd on" data-spd="1">1×</button>
-    <button class="spd" data-spd="4">4×</button>
-    <button class="spd" data-spd="16">16×</button>
-  </div>
+  <div class="tb-tools" id="tb-tools">
+    <button class="tb-btn" id="btn-gov" title="政府行动：政府 / 警察 / 医院 / 学校">政府行动</button>
+    <button class="tb-btn" id="btn-force" title="武力状态明细">武力</button>
+    <button class="tb-btn" id="btn-sanit" title="卫生状态明细">卫生</button>
+    <button class="tb-btn" id="btn-overview" title="全体人员总览（O）">总览</button>
+    <button class="tb-btn" id="btn-report" title="结算本局">战报</button>
+    </div>
   <span class="tb-fps" id="fps">—</span>
 </div>
 
@@ -127,15 +134,6 @@
         <option value="apocalypse">末日降临（全城）</option>
       </select></label>
     <div id="mode-opts"></div>
-    <div class="p-sec">面板 / 菜单</div>
-    <div class="p-tools"><div class="p-tools-inner" id="tb-tools">
-    <button class="tb-btn" id="btn-gov" title="政府行动：政府 / 警察 / 医院 / 学校">政府行动</button>
-    <button class="tb-btn" id="btn-force" title="武力状态明细">武力</button>
-    <button class="tb-btn" id="btn-sanit" title="卫生状态明细">卫生</button>
-    <button class="tb-btn" id="btn-overview" title="全体人员总览（O）">总览</button>
-    <button class="tb-btn" id="btn-report" title="结算本局">战报</button>
-  </div>
-    </div>
     <div class="p-sec">操作</div>
     <div class="p-btns">
       <button id="btn-restart" class="primary">重新爆发</button>
