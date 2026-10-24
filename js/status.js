@@ -361,6 +361,7 @@ export function openForce(sim) { curSim = sim; curKind = 'force'; curTab = 0; re
 export function openSanit(sim) { curSim = sim; curKind = 'sanit'; curTab = 0; render(); ensure().classList.remove('hidden'); }
 
 // ---------------- 顶栏三个指标的明细 ----------------
+const d4 = (v) => (Math.abs(v) >= 0.1 ? v.toFixed(2) : v.toFixed(4));
 const hhmmss = (t) => {
   const m = Math.max(0, Math.floor(t / 60));
   return Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0');
@@ -377,7 +378,7 @@ function eventLines(list, sim, max) {
     else if (e.type === 'infect') label = `${shortName(e.i, sim)} 被感染`;
     else label = e.text || e.type;
     return `<div class="sp-ev"><b>${hhmmss(e.t)}</b><span>${label}</span>`
-      + `<i class="${e.delta >= 0 ? 'up' : 'down'}">${e.delta >= 0 ? '+' : ''}${e.delta.toFixed(3)}</i></div>`;
+      + `<i class="${e.delta >= 0 ? 'up' : 'down'}">${e.delta >= 0 ? '+' : ''}${d4(e.delta)}</i></div>`;
   }).join('');
 }
 

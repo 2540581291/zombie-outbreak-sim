@@ -190,8 +190,9 @@
 .st-typebar>i{display:block;height:100%;border-radius:2px}
 
 /* ---- 混乱度明细：增长 / 减少 分区 ---- */
-#statuspanel .sp-body-one{ column-count: 1 !important; width: 100%; max-width: 980px;
-  margin: 0 auto; overflow-x: hidden; box-sizing: border-box; }
+#statuspanel .sp-body-one{ column-count: 1 !important;
+  width: min(980px, 100%); max-width: 980px; margin: 0 auto;
+  padding: 20px 28px 26px; overflow-x: hidden; box-sizing: border-box; }
 .sp-sub{ font-size: 10.5px; color: #66727f; padding: 0 0 6px 12px;
   border-left: 1px solid rgba(255,255,255,.07); margin: 0 0 4px 2px; }
 .sp-divider{ height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,.45), transparent);
@@ -215,3 +216,10 @@
 .sp-ev i.up{ color: #ff8a6a; }
 .sp-ev i.down{ color: #7ed07e; }
 .sp-ev.none{ color: #5f6b78; font-size: 11px; }
+
+/* 彻底禁止横向滚动（内容按宽度换行） */
+#statuspanel .sp-body{ overflow-x: hidden !important; }
+#statuspanel .sp-card{ overflow: hidden; }
+#statuspanel .sp-row, #statuspanel .sp-sub, #statuspanel .sp-ev{ min-width: 0; }
+
+#statuspanel .sp-body-one > *{ max-width: 100%; box-sizing: border-box; }
