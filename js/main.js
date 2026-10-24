@@ -1966,7 +1966,11 @@ async function boot() {
       } else {
         window.__boxDbg = 'soldiers=' + ids.length;
       }
-      document.title = 'BOXTEST ' + (window.__boxDbg || '');
+      const pre = document.createElement('pre');
+      pre.id = 'boxdbg';
+      pre.style.cssText = 'position:fixed;right:8px;bottom:120px;z-index:99;color:#9fe;background:rgba(0,0,0,.75);padding:6px;font:12px/1.3 monospace';
+      pre.textContent = 'BOXTEST ' + (window.__boxDbg || '');
+      document.body.appendChild(pre);
     }, 1200);
   }
   // 调试：?pickrole=police|zombie|vip|dog|flee 直接选中第一个该角色（看行为文案用）
