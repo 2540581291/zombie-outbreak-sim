@@ -386,16 +386,16 @@ export function openChaosInfo(sim) {
   h += sub(`累计 ${d.counts.shots.toLocaleString()} 枪 · 每千人 +${d.units.gun}（本图 ≈ 每枪 +${d.perEvent.gun.toFixed(3)}）· 本项封顶 ${d.gunCap}`);
 
   h += row('平民死亡', plus(d.heat.death));
-  h += sub(`累计 ${d.counts.civKilled.toLocaleString()} 人 · 每千人 +${d.units.death}（本图 ≈ 每人 +${d.perEvent.death.toFixed(2)}）`);
+  h += sub(`累计 ${d.counts.civKilled.toLocaleString()} 人 · 当前存活 ${d.pools.civ.toLocaleString()} → 每人 +${d.perEvent.death.toFixed(4)}（${d.maxBy.death} ÷ 存活）`);
 
   h += row('新增感染', plus(d.heat.infect));
-  h += sub(`累计 ${d.counts.infected.toLocaleString()} 人次 · 每千人 +${d.units.infect}（本图 ≈ 每人 +${d.perEvent.infect.toFixed(3)}）`);
+  h += sub(`累计 ${d.counts.infected.toLocaleString()} 人次 · 未感染 ${d.pools.susceptible.toLocaleString()} → 每人 +${d.perEvent.infect.toFixed(4)}（${d.maxBy.infect} ÷ 未感染）`);
 
   h += row('要员死亡', plus(d.heat.vip));
-  h += sub(`累计 ${d.counts.vipDeaths} 人 · 每千人 +${d.units.vip}（本图 ≈ 每人 +${d.perEvent.vip.toFixed(2)}）`);
+  h += sub(`累计 ${d.counts.vipDeaths} 人 · 要员共 ${d.pools.vips} 人 → 每人 +${d.perEvent.vip.toFixed(2)}（${d.maxBy.vip} ÷ 要员数）`);
 
   h += row('警局沦陷', plus(d.heat.station));
-  h += sub(`${d.counts.fallen} / ${d.counts.stations} 处（50m 内无警力即认定）· 每千人 +${d.units.station}（本图 ≈ 每处 +${d.perEvent.station.toFixed(2)}）`);
+  h += sub(`${d.counts.fallen} / ${d.counts.stations} 处（50m 内无警力即认定）· 每处 +${d.perEvent.station.toFixed(2)}（${d.maxBy.station} ÷ 警局数）`);
 
   h += `<div class="sp-sum up">增长合计 ${plus(d.growth)} / 上限 ${d.max.growth}</div>`;
 
@@ -407,7 +407,7 @@ export function openChaosInfo(sim) {
   h += sub(`每游戏小时 −1 点（一天 −24），已累积 ${d.calm.toFixed(1)}`);
 
   h += row('击杀丧尸', '−' + d.killCut.toFixed(1) + `（上限 ${d.max.kill}）`);
-  h += sub(`累计击杀 ${d.counts.kills.toLocaleString()} 只 · 每千人 −${d.units.kill}（本图 ≈ 每只 −${d.perEvent.kill.toFixed(3)}）`);
+  h += sub(`累计击杀 ${d.counts.kills.toLocaleString()} 只 · 场上 ${d.pools.zombies} 只 → 每只 −${d.perEvent.kill.toFixed(3)}（150 ÷ 当前丧尸数）`);
 
   h += `<div class="sp-sum down">减少合计 −${d.shrink.toFixed(1)} / 上限 ${d.max.shrink}</div>`;
 

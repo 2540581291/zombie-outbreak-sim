@@ -70,7 +70,7 @@ export function goalText(sim, i) {
   switch (g) {
     case GOAL.WORK: return near(sim.workX[i], sim.workZ[i]) ? '在单位' : '在去上班的路上';
     case GOAL.HOME: return near(sim.homeX[i], sim.homeZ[i]) ? '在家' : '在回家的路上';
-    case GOAL.FLEE: return 正在逃往侧出口;
+    case GOAL.FLEE: return '正在撤往撤离线';
     case GOAL.ARM_HOME: return near(sim.homeX[i], sim.homeZ[i]) ? '在家取枪' : '赶回家取枪';
     case GOAL.SHELTER: return dist(sim.goalX[i], sim.goalZ[i]) < 8 ? '在警察局避难' : '正赶往警察局避难';
     case GOAL.HELP: return dist(sim.goalX[i], sim.goalZ[i]) < 8 ? '在医院门口' : '正赶往医院';

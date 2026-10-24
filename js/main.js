@@ -599,8 +599,12 @@ function setFollow(on) {
 
 function deselectAgent() {
   selected = -1;
+  cardShownFor = -1;
   clearLink();                // 点空白：连线一并消失
   followSelected = false;
+  if (multiSel.size) { multiSel.clear(); updateGroupBadge(); }   // 编组一起清掉
+  const f = document.getElementById('ac-follow');
+  if (f) f.textContent = '跟随镜头';
   const el = document.getElementById('agentcard');
   if (el) el.classList.add('hidden');
 }
@@ -841,8 +845,6 @@ function renderAgentCard() {
   document.getElementById('ac-vip').style.display = p.vip ? 'inline-block' : 'none';
 
   const px = sim.px[selected], pz = sim.pz[selected];
-  const homeP = placeNear(sim.homeX[selected], sim.homeZ[selected], 200);
-  const workP = placeNear(sim.workX[selected], sim.workZ[selected], 200);
   const polP = sim.nearestPoi('police', px, pz);
   const hosP = sim.nearestPoi('hospital', px, pz);
 
