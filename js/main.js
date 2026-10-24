@@ -1245,7 +1245,7 @@ $('btn-restart').onclick = () => {
   deselectAgent();
   restoreNavBase();          // 墙壁/门窗的运行时改动在这里丢掉，回到开局的碰撞层
   sim.reset(readParams());
-  resetNews(sim);
+  resetNews(sim, cnCity(CID, city.name));
   hideBanner();
 };
 $('btn-report').onclick = () => {
@@ -1289,8 +1289,8 @@ function restoreNavBase() {
   if (nav.buildDoorField) nav.buildDoorField();
   return true;
 }
-window.__zosRestart = () => { clearLink(); deselectAgent(); restoreNavBase(); sim.reset(readParams()); resetNews(sim); buildEscapeMarker(); buildPoiLabels(); hideBanner(); };
-$('btn-seed').onclick = () => { clearLink(); deselectAgent(); restoreNavBase(); seed = (Math.random() * 1e9) | 0; sim.reset(readParams()); resetNews(sim); buildEscapeMarker(); buildPoiLabels(); hideBanner(); };
+window.__zosRestart = () => { clearLink(); deselectAgent(); restoreNavBase(); sim.reset(readParams()); resetNews(sim, cnCity(CID, city.name)); buildEscapeMarker(); buildPoiLabels(); hideBanner(); };
+$('btn-seed').onclick = () => { clearLink(); deselectAgent(); restoreNavBase(); seed = (Math.random() * 1e9) | 0; sim.reset(readParams()); resetNews(sim, cnCity(CID, city.name)); buildEscapeMarker(); buildPoiLabels(); hideBanner(); };
 $('p-toggle').onclick = () => {
   const b = $('p-body');
   b.classList.toggle('hide');
@@ -1804,7 +1804,7 @@ async function boot() {
   sim = new Sim(nav, city);   // city 里有 POI（工作地分配用）
   sim.reset(readParams());
   buildEscapeMarker();
-  initNews(sim);
+  initNews(sim, cnCity(CID, city.name));
 
   agents = new AgentRenderer(scene, 160000);
 
