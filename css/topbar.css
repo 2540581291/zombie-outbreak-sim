@@ -1,55 +1,70 @@
-/* ===== 顶栏重排（v3 · 强制横向）===== */
+/* ===== 顶栏重排（v5 · 双倍高度，数值带两字说明）===== */
 #topbar{display:flex;align-items:center;gap:14px;flex-wrap:nowrap;overflow:hidden;
-  padding:6px 14px;height:52px;box-sizing:border-box}
-#topbar .tb-left{display:flex;align-items:center;gap:8px;flex:0 0 auto}
-#topbar .tb-mid{display:flex;align-items:center;gap:4px;flex:0 0 auto}
-#topbar .tb-right{display:flex;align-items:center;gap:10px;flex:1 1 auto;
+  padding:10px 16px;height:104px;box-sizing:border-box}
+#topbar .tb-left{display:flex;align-items:center;gap:10px;flex:0 0 auto}
+#topbar .tb-mid{display:flex;align-items:center;gap:5px;flex:0 0 auto}
+#topbar .tb-right{display:flex;align-items:center;gap:12px;flex:1 1 auto;
   justify-content:flex-end;flex-wrap:nowrap;min-width:0;overflow:hidden}
 
-.tb-group{display:flex;flex-direction:row;align-items:center;gap:8px;flex:0 0 auto}
-.tb-div{width:1px;height:18px;background:rgba(255,255,255,.10);flex:0 0 auto}
+.tb-group{display:flex;flex-direction:row;align-items:center;gap:7px;flex:0 0 auto}
+.tb-div{width:1px;height:46px;background:rgba(255,255,255,.10);flex:0 0 auto}
 
-#topbar .tb-stat{display:flex;flex-direction:row;align-items:center;gap:4px;
-  padding:2px 7px;border-radius:6px;background:rgba(255,255,255,.045);white-space:nowrap;flex:0 0 auto}
-#topbar .tb-stat b{font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums;color:#eaf1f8}
-#topbar .tb-stat em{font-size:11px;color:#8492a3;font-style:normal}
+/* 计数块：上面两个字的说明（圆点 + 文案），下面大数字 */
+#topbar .tb-stat{display:flex;flex-direction:column;align-items:flex-start;gap:6px;
+  padding:9px 12px;border-radius:9px;background:rgba(255,255,255,.045);
+  white-space:nowrap;flex:0 0 auto;min-width:74px}
+#topbar .tb-cap{display:flex;align-items:center;gap:6px;line-height:1;
+  font-size:12px;color:#8492a3;letter-spacing:.10em}
+#topbar .tb-cap em{font-style:normal}
+#topbar .tb-stat b{font-size:23px;font-weight:700;line-height:1;
+  font-variant-numeric:tabular-nums;color:#eaf1f8;letter-spacing:.01em}
+#topbar .tb-stat:hover{background:rgba(255,255,255,.075)}
 
-#topbar .dot{width:8px;height:8px;border-radius:50%;display:block;flex:0 0 auto}
+#topbar .dot{width:9px;height:9px;border-radius:50%;display:block;flex:0 0 auto}
 .dot.civ{background:#57d98a} .dot.inf{background:#e0b23c}
 .dot.zomb{background:#c8452f} .dot.dead{background:#7a7a86}
 .dot.info{background:#4aa8ff} .dot.chaos{background:#ff8a3d}
 .dot.force{background:#7ed07e} .dot.sanit{background:#c8a6ff}
 
-.tb-gauges{display:flex;flex-direction:row;align-items:center;gap:10px}
-#topbar .tb-gauge{display:flex;flex-direction:column;gap:3px;width:74px;flex:0 0 auto}
-#topbar .tg-top{display:flex;align-items:center;gap:3px;line-height:1}
-#topbar .tg-top em{font-size:11px;color:#8492a3;font-style:normal}
-#topbar .tg-top b{font-size:12.5px;font-weight:600;margin-left:auto;font-variant-numeric:tabular-nums;color:#dfe7f0}
-#topbar .tg-bar{height:5px;border-radius:2px;background:rgba(255,255,255,.10);overflow:hidden}
-#topbar .tg-bar>i{display:block;height:100%;width:0;border-radius:2px;transition:width .25s}
+/* 百分比块：说明 + 数值一行，下面一条进度条 */
+.tb-gauges{display:flex;flex-direction:row;align-items:center;gap:12px}
+#topbar .tb-gauge{display:flex;flex-direction:column;gap:7px;width:98px;flex:0 0 auto;
+  padding:9px 10px;border-radius:9px;background:rgba(255,255,255,.03)}
+#topbar .tg-top{display:flex;align-items:center;gap:5px;line-height:1}
+#topbar .tg-top em{font-size:12px;color:#8492a3;font-style:normal;letter-spacing:.10em}
+#topbar .tg-top b{font-size:17px;font-weight:700;margin-left:auto;line-height:1;
+  font-variant-numeric:tabular-nums;color:#dfe7f0}
+#topbar .tg-bar{height:7px;border-radius:4px;background:rgba(255,255,255,.10);overflow:hidden}
+#topbar .tg-bar>i{display:block;height:100%;width:0;border-radius:4px;transition:width .25s}
 #bar-aware{background:#4aa8ff} #bar-chaos{background:#ff8a3d}
 #bar-force{background:#7ed07e} #bar-sanit{background:#c8a6ff}
 
-#topbar .tb-exit{display:flex;flex-direction:row;align-items:center;gap:6px;
-  padding:3px 9px;border-radius:6px;background:rgba(67,224,138,.10);
+#topbar .tb-exit{display:flex;flex-direction:column;align-items:flex-start;gap:6px;
+  padding:9px 13px;border-radius:9px;background:rgba(67,224,138,.10);
   border:1px solid rgba(67,224,138,.28);white-space:nowrap;flex:0 0 auto}
-#topbar .tb-exit em{font-size:10px;color:#8fae9c;font-style:normal}
-#topbar .tb-exit b{font-size:14px;color:#43e08a;font-weight:700}
+#topbar .tb-exit em{font-size:11px;color:#8fae9c;font-style:normal;letter-spacing:.10em;line-height:1}
+#topbar .tb-exit b{font-size:19px;color:#43e08a;font-weight:700;line-height:1}
 
-#topbar .tb-btn{padding:5px 11px;border-radius:6px;border:1px solid rgba(255,255,255,.10);
-  background:rgba(255,255,255,.04);color:#cfd8e3;font-size:11px;cursor:pointer;white-space:nowrap;flex:0 0 auto}
+#topbar .tb-btn{padding:9px 13px;border-radius:8px;border:1px solid rgba(255,255,255,.10);
+  background:rgba(255,255,255,.04);color:#cfd8e3;font-size:12px;cursor:pointer;white-space:nowrap;flex:0 0 auto}
 #topbar .tb-btn:hover{background:rgba(255,255,255,.09)}
-#topbar .spd{padding:2px 7px;font-size:11px}
+#topbar .spd{padding:7px 12px;font-size:12.5px}
 
-/* v4：收窄，避免溢出 */
-#topbar{gap:9px;padding:6px 10px}
-#topbar .tb-stat{padding:2px 6px;gap:3px}
-#topbar .tb-stat em{display:none}          /* 人口只留 圆点+数字，靠 tooltip 说明 */
-#topbar .tb-gauge{width:62px}
-#topbar .tb-gauges{gap:8px}
-#topbar .tb-group{gap:6px}
+/* 左侧城市/时钟放大一号 */
+#topbar .tb-city{font-size:18px}
+#topbar .tb-sep{font-size:16px;margin:0 4px}
+#topbar .tb-clock{font-size:14px}
 #fps,#heat{display:none}
-#topbar .tb-left .tb-sep,#topbar .tb-left .tb-city{font-size:13px}
+
+/* 窄屏：等比收一点，避免右侧按钮被裁掉 */
+@media (max-width:1720px){
+  #topbar{gap:10px;padding:9px 12px}
+  #topbar .tb-stat{min-width:64px;padding:8px 9px}
+  #topbar .tb-stat b{font-size:20px}
+  #topbar .tb-gauge{width:86px;padding:8px 9px}
+  #topbar .tb-btn{padding:8px 10px;font-size:11.5px}
+  #topbar .tb-city{font-size:16px}
+}
 /* ===== 武力 / 卫生 信息面板 ===== */
 #statuspanel{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.55);
   display:flex;align-items:center;justify-content:center}

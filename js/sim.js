@@ -2737,7 +2737,7 @@ export class Sim {
           }
           this.timer[i] -= cdt;    // 潜伏倒计时按真实时间走（远处 5Hz 更新时步长已补偿）
           // ---- 发病阶段（M6）：潜伏期最后 40% 开始发烧 ----
-          if (!this.sick[i] && this.incTot[i] > 0 && this.timer[i] < this.incTot[i] * 0.25) {
+          if (!this.sick[i] && this.state[i] === ST.INFECTED) {
             this.sick[i] = 1;
             this.panic[i] = 0.8;
             this.decT[i] = 0;      // 立刻重新决策 → 去医院
@@ -3840,6 +3840,7 @@ export class Sim {
     this.incTot[i] = seconds;
     this.timer[i] = seconds;
     this.riseAt[i] = this.time + seconds;
+    this.sick[i] = 1;          // 一感染就发烧 → 立刻决定去医院（不再等最后 25%）
   }
 
   /** 站着变：turn01，播完才真的变丧尸。 */

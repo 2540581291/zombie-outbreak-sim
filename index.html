@@ -54,14 +54,14 @@
     <button class="spd" data-spd="16">16×</button>
   </div>
   <div class="tb-right">
-    <!-- 人口（计数） -->
+    <!-- 人口（计数）：上面两字说明，下面数字 -->
     <span class="tb-group">
-      <span class="tb-stat" title="还活着的平民"><i class="dot civ"></i><em>平民</em><b id="n-civ">0</b></span>
-      <span class="tb-stat" title="已感染、还没尸变的人"><i class="dot inf"></i><em>感染</em><b id="n-inf">0</b></span>
-      <span class="tb-stat" title="丧尸"><i class="dot zomb"></i><em>丧尸</em><b id="n-zomb">0</b></span>
-      <span class="tb-stat" title="死亡人数"><i class="dot dead"></i><em>死亡</em><b id="n-dead">0</b></span>
-        <span class="tb-stat" id="tb-saved" title="已从撤离口撤离出城的人"><i class="dot saved"></i><em>已撤离</em><b id="n-saved">0</b></span>
-        <span class="tb-stat" id="tb-flee" title="正在逃跑的人"><i class="dot inf"></i><b id="n-flee">0</b><em>逃</em></span>
+      <span class="tb-stat" title="还活着的平民"><span class="tb-cap"><i class="dot civ"></i><em>平民</em></span><b id="n-civ">0</b></span>
+      <span class="tb-stat" title="已感染、还没尸变的人"><span class="tb-cap"><i class="dot inf"></i><em>感染</em></span><b id="n-inf">0</b></span>
+      <span class="tb-stat" title="丧尸"><span class="tb-cap"><i class="dot zomb"></i><em>丧尸</em></span><b id="n-zomb">0</b></span>
+      <span class="tb-stat" title="死亡人数"><span class="tb-cap"><i class="dot dead"></i><em>死亡</em></span><b id="n-dead">0</b></span>
+      <span class="tb-stat" id="tb-saved" title="已从撤离口撤离出城的人"><span class="tb-cap"><i class="dot saved"></i><em>撤离</em></span><b id="n-saved">0</b></span>
+      <span class="tb-stat" id="tb-flee" title="正在逃跑的人"><span class="tb-cap"><i class="dot inf"></i><em>逃跑</em></span><b id="n-flee">0</b></span>
     </span>
     <span class="tb-div"></span>
     <!-- 状态（百分比条）：混乱 → 感染 → 知情，点一下看明细 -->
@@ -180,6 +180,22 @@
 <div id="banner" class="hidden"><span id="banner-txt"></span></div>
 
 <script type="module" src="js/main.js"></script>
+<script>
+  // TEMP-DEBUG-TOP
+  window.addEventListener('load', () => setTimeout(() => {
+    const r = (sel) => { const el = document.querySelector(sel); if (!el) return null; const b = el.getBoundingClientRect(); return [Math.round(b.x), Math.round(b.y), Math.round(b.width), Math.round(b.height)]; };
+    const tb = document.querySelector('#topbar');
+    document.title = 'M ' + JSON.stringify({
+      tb: r('#topbar'), right: r('.tb-right'), stat: r('.tb-stat'), cap: r('.tb-cap'), num: r('.tb-stat b'),
+      gauge: r('.tb-gauge'), exit: r('.tb-exit'), btn: r('.tb-btn'),
+      tbH: getComputedStyle(tb).height, tbPad: getComputedStyle(tb).padding,
+      statH: getComputedStyle(document.querySelector('.tb-stat')).height,
+      overflow: getComputedStyle(document.querySelector('.tb-right')).overflow,
+      rightW: document.querySelector('.tb-right').scrollWidth,
+      viewW: innerWidth,
+    });
+  }, 4000));
+</script>
 </body>
 </html>
 

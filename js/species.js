@@ -67,13 +67,13 @@ export const SPECIES = {
     name: '士兵', team: TEAM.HUMAN, scale: 1.06, hp: 100, speed: 2.10,
     dmg: 8, rate: 0.42, range: 42, biteR: 1.8,
     color: [0.42, 0.55, 0.34], infectedColor: [0.97, 0.72, 0.26],
-    infectable: false,            // 装甲：不会被感染，只会被打死
+    infectable: true,
   },
   [SP.ELITE]: {
     name: '重装兵', team: TEAM.HUMAN, scale: 1.20, hp: 200, speed: 1.75,
     dmg: 14, rate: 0.28, range: 55, biteR: 1.8,
     color: [0.26, 0.30, 0.26], infectedColor: [0.97, 0.72, 0.26],
-    infectable: false,
+    infectable: true,
   },
   [SP.ZOMBIE]: {
     name: '丧尸', team: TEAM.ZOMBIE, scale: 1.0, hp: 100, speed: ZOMBIE_SPEED,
