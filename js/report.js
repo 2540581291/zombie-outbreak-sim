@@ -147,6 +147,7 @@ export function openReport(sim) {
     ['击毙丧尸', sim.kills.toLocaleString(), ''],
     ['平民误伤', sim.civDeaths.toLocaleString(), ''],
     ['治愈', (sim.cured || 0).toLocaleString(), ''],
+    ['撞塌的墙', (sim.wallsDown || 0).toLocaleString() + ' 格', ''],
     ['要员撤离', (sim.stats.vipSaved || 0) + ' / ' + (sim.vipTotal || 0), (sim.stats.vipSaved ? 'saved' : '')],
     ['经费支出', fmtMoney(sim.spentTotal || 0), ''],
     ['开火次数', st.shots.toLocaleString(), ''],

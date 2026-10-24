@@ -3933,6 +3933,7 @@ export class Sim {
       for (let i = 0; i < this.n; i++) {
         const s = this.state[i];
         if (s !== ST.CIV && s !== ST.FLEE && s !== ST.FIGHT) continue;
+        if (this.fleeMode[i] === 2) continue;   // 有目标逃跑（回家/去警局/出城）不受宵禁打扰
         if (this.goal[i] === GOAL.NONE || this.goal[i] === GOAL.FOLLOW) {
           this.setGoal(i, GOAL.HOME, this.homeX[i], this.homeZ[i]);
           n++;
