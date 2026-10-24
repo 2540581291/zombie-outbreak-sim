@@ -399,7 +399,15 @@ export class Sim {
     this.ghostT.fill(0);
     this.jobKind.fill(0);
     this.purgeT.fill(0);
-    this.govOrders = { schoolClosed: false, hospitalClosed: false };
+    this.govOrders = {
+      schoolClosed: false, hospitalClosed: false,
+      schoolSince: 0, hospSince: 0, hospEvacAt: 0, purgeAt: 0, guardAt: 0, schoolGuardAt: 0,
+      // 冷却初值给 -1e9：游戏一开始就该允许第一次触发，否则前 10 分钟什么都等不到
+      cd: { purge: -1e9, guard: -1e9, schoolGuard: -1e9, policeALL: -1e9 },
+    };
+    this.govLog = [];          // 政府/机构的自动决策日志（面板显示）
+    this.govT = 0;             // 下一次评估的倒计时
+    this.duties = new Map();   // 在外执行的派遣：id -> { x, z, what, dest, why, t }
     this.anchorT.fill(0);
     this.anchorX.fill(0);
     this.anchorZ.fill(0);
@@ -1976,7 +1984,7 @@ export class Sim {
           }
         }
         if (this.time >= this.nextDispatch && !e.responders && this.time - e.t < 180) {
-          const r = this.dispatchPolice(e.x, e.z, 2);
+          const r = this.dispatchPolice(e.x, e.z, 2, { dest: '事发地点', why: '目击丧尸' });
           if (r.ok) {
             e.responders = r.n;
             e.ids = r.ids || [];
@@ -2474,6 +2482,8 @@ export class Sim {
         this.pushAudio('groan', wx, wz, 1.2);
       }
     }
+
+    this.updateGov(dt);        // 政府/机构的自动调度（玩家只读，没有操作权）
 
     this.pathBudget = 4;       // 每帧恢复寻路预算（HPA* 约 0.5-2 ms/次，40 会把 tick 吃掉）
     this.guideBudget = 24;     // 每帧室内出门引导预算（BFS 不便宜，必须分帧摊开）
@@ -3692,7 +3702,7 @@ export class Sim {
     }
     this.deathAlarms.push({ x, z, t: this.time });
     if (this.deathAlarms.length > 32) this.deathAlarms.shift();
-    const r = this.dispatchPolice(x, z, 2);
+    const r = this.dispatchPolice(x, z, 2, { dest: '报案地点', why: '有人死亡' });
     this.pushEvent(r.ok ? '有人死亡：派 2 名警员前往' : '有人死亡：附近警局已无可用警力', 'start');
     return r;
   }
@@ -3715,7 +3725,7 @@ export class Sim {
    * 出警 / 调度：从最近的警局派人，**先在警局门口生成，再走过去**（没有瞬移）。
    * 返回 { ok, n, station, dist } —— 玩家调度和自动出警走同一段代码。
    */
-  dispatchPolice(x, z, n) {
+  dispatchPolice(x, z, n, info) {
     const want = Math.max(1, n | 0 || 1);
     const st = this.nearestStation(x, z, want);
     if (!st) return { ok: false, n: 0, reason: 'no-station' };
@@ -3736,6 +3746,13 @@ export class Sim {
       this.setGoal(i, GOAL.MOVE_TO, x, z);
       this.decT[i] = 1e9;          // 警察不听"社会决策"，只听调度
       this.boostT[i] = this.time + 30;   // 出警 30 秒内速度翻倍
+      // 记入"在外执勤名单"（面板显示谁去了哪儿）
+      if (this.duties) {
+        this.duties.set(i, {
+          x, z, what: '出警', dest: (info && info.dest) || '现场',
+          why: (info && info.why) || '', t: this.time,
+        });
+      }
       made.push(i);
     }
     this.pushEvent(`出警 ${made.length} 人（${st.dist.toFixed(0)}m 外警局）`, 'start');
@@ -3748,6 +3765,96 @@ export class Sim {
   //   士兵：从政府大楼门口刷出来，然后走过去
   // 这样"派军队去医院"和"派警察去医院"除了出发点不同，行为链路完全一致。
 
+  // ---------- 政府 / 机构：自动决策（玩家没有操作权，只能看）----------
+
+  /** 记一条政府/机构的自动决策（面板会显示） */
+  govSay(inst, text) {
+    this.govLog.push({ t: this.time, inst, text });
+    if (this.govLog.length > 80) this.govLog.shift();
+    this.pushEvent(text, 'start');
+  }
+
+  /**
+   * 自动调度：每 2 秒评估一次局势，由"条件"触发机构行为。
+   * 触发条件全部写在这里，玩家不能点——只读面板能看到它做了什么。
+   */
+  updateGov(dt) {
+    this.govT -= dt;
+    if (this.govT > 0) return;
+    this.govT = 2.0;
+    const o = this.govOrders, cd = o.cd, t = this.time;
+    if (t < 90) return;                 // 开局 90 秒的"观察期"：还没人反应过来
+    const chaos = this.chaos || 0;
+    const inf = (this.infectRate || 0) * 100;
+    const P = this.poiByKind;
+    const hosp = (P.hospital || [])[0];
+    const school = (P.school || [])[0];
+
+    // 一次扫描拿到"正在前往医院的病人数"和"已发病者"
+    let patients = 0, sickN = 0;
+    for (let i = 0; i < this.n; i++) {
+      const s = this.state[i];
+      if (s === ST.CORPSE || s === ST.SAVED) continue;
+      if (this.goal[i] === GOAL.HELP) patients++;
+      if (s === ST.INFECTED && this.sick[i]) sickN++;
+    }
+
+    // ---- 学校：混乱 ≥ 25 或 感染 ≥ 1.5% → 停课；回落 → 复课 ----
+    if (!o.schoolClosed && (chaos >= 25 || inf >= 5)) {
+      o.schoolClosed = true; o.schoolSince = t;
+      this.govSay('school', `混乱 ${chaos.toFixed(0)}、感染 ${inf.toFixed(1)}% → 全城学校停课`);
+    } else if (o.schoolClosed && chaos < 12 && inf < 1.5 && t - o.schoolSince > 240) {
+      o.schoolClosed = false; o.schoolSince = 0;
+      this.govSay('school', '局势回落 → 学校复课');
+    }
+
+    // ---- 医院：病人挤爆 → 停止收治；压力缓解 → 恢复 ----
+    if (!o.hospitalClosed && (patients >= 800 || inf >= 8)) {
+      o.hospitalClosed = true; o.hospSince = t;
+      this.govSay('hosp', `病人 ${patients} 人、感染 ${inf.toFixed(1)}% → 医院停止收治`);
+    } else if (o.hospitalClosed && patients < 200 && inf < 2 && t - o.hospSince > 300) {
+      o.hospitalClosed = false; o.hospSince = 0;
+      this.govSay('hosp', '压力缓解 → 医院恢复收治');
+    }
+    if (inf >= 12 && t - o.hospEvacAt > 300) {
+      o.hospEvacAt = t;
+      const n = this.clearPatients();
+      if (n > 0) this.govSay('hosp', `感染 ${inf.toFixed(1)}% → 疏散 ${n} 名病患`);
+    }
+
+    // ---- 警察：混乱 ≥ 50 → 全员回局（警员自身也会做，这里补一条统一命令）----
+    if (chaos >= 50 && t - cd.policeALL > 120) {
+      cd.policeALL = t;
+      const r = this.orderPoliceHome();
+      if (r.n > 0) this.govSay('police', `混乱 ${chaos.toFixed(0)}% → ${r.n} 名警员回局待命`);
+    }
+
+    // ---- 军队：疫情失控 → 进驻医院；混乱爆表 → 清剿医院 ----
+    if (hosp && inf >= 10 && t - cd.guard > 240) {
+      cd.guard = t;
+      const r = this.dispatchTo('soldier', hosp.x, hosp.z, 6, { dest: '医院', why: '疫情失控' });
+      if (r.ok) this.govSay('gov', `感染 ${inf.toFixed(1)}% → 派 ${r.n} 名士兵进驻医院`);
+    }
+    if (hosp && (chaos >= 85 || inf >= 20) && t - cd.purge > 600) {
+      cd.purge = t;
+      const r = this.orderPurge(hosp.x, hosp.z, 10, false);
+      if (r.ok) this.govSay('gov', `混乱 ${chaos.toFixed(0)}、感染 ${inf.toFixed(1)}% → 清剿医院（${r.n} 名士兵）`);
+    }
+    if (school && chaos >= 50 && t - cd.schoolGuard > 300) {
+      cd.schoolGuard = t;
+      const r = this.dispatchTo('police', school.x, school.z, 4, { dest: '学校', why: '维持秩序' });
+      if (r.ok) this.govSay('police', `混乱 ${chaos.toFixed(0)}% → ${r.n} 名警员前往学校维持秩序`);
+    }
+
+    // ---- 派遣名单维护：到达 / 阵亡 / 换目标就摘掉 ----
+    for (const [i, d] of this.duties) {
+      if (i >= this.n) { this.duties.delete(i); continue; }
+      const s = this.state[i];
+      if (s !== ST.POLICE && s !== ST.SOLDIER) { this.duties.delete(i); continue; }
+      if (this.goal[i] !== GOAL.MOVE_TO) { this.duties.delete(i); continue; }
+      if (Math.hypot(this.px[i] - d.x, this.pz[i] - d.z) < 12) this.duties.delete(i);
+    }
+  }
   /**
    * 统一派遣。
    * @param {'police'|'soldier'} kind 派谁
@@ -3758,7 +3865,7 @@ export class Sim {
   dispatchTo(kind, x, z, n, opt) {
     const want = Math.max(1, n | 0 || 1);
     if (kind === 'police') {
-      const r = this.dispatchPolice(x, z, want);
+      const r = this.dispatchPolice(x, z, want, opt);
       if (opt && opt.purge && r.ids) {
         for (const i of r.ids) this.purgeT[i] = this.time + (opt.purge | 0 || 180);
       }
@@ -3777,6 +3884,12 @@ export class Sim {
       this.orderMove(i, x + (this.rng() - 0.5) * 12, z + (this.rng() - 0.5) * 12);
       this.boostT[i] = this.time + 60;
       if (opt && opt.purge) this.purgeT[i] = this.time + (opt.purge | 0 || 180);
+      if (this.duties) {
+        this.duties.set(i, {
+          x, z, what: (opt && opt.purge) ? '清剿' : '增援',
+          dest: (opt && opt.dest) || '目标', why: (opt && opt.why) || '', t: this.time,
+        });
+      }
       made.push(i);
     }
     return { ok: made.length > 0, n: made.length, from: base.n || '政府', ids: made };
@@ -3899,6 +4012,27 @@ export class Sim {
     out.patientsInside = inside;
     out.police.stations = (P.police || []).length;
     out.gov.pois = (P.gov || []).length;
+
+    // 自动决策日志（最新的在前）+ 在外执勤名单
+    out.log = this.govLog.slice(-12).reverse();
+    out.duties = [];
+    if (this.duties) {
+      for (const [i, d] of this.duties) {
+        if (i >= this.n) continue;
+        const s = this.state[i];
+        if (s !== ST.POLICE && s !== ST.SOLDIER) continue;
+        out.duties.push({
+          i, soldier: s === ST.SOLDIER, what: d.what, dest: d.dest, why: d.why, t: d.t,
+          dist: Math.hypot(this.px[i] - d.x, this.pz[i] - d.z),
+        });
+      }
+      out.duties.sort((a, b) => a.dist - b.dist);
+    }
+    out.since = {
+      school: this.govOrders.schoolSince || 0,
+      hosp: this.govOrders.hospSince || 0,
+    };
+    out.now = this.time;
     return out;
   }
   /** 命令士兵移动到某点（只有士兵接受命令，警察不行） */
