@@ -197,11 +197,61 @@ let drag = null;
 // 右键拖拽的位移先攒在 panPending 里，每帧按指数衰减地消化掉 ——
 // 直接 add 到 target 上会跟着鼠标事件一跳一跳（尤其高刷新率鼠标），加了这个就变成顺滑滑动+收尾减速
 const panPending = new THREE.Vector3();
+// 左键框选：只框"可指挥单位"（士兵/重装兵/装甲车），框住的一起下命令
+function updateGroupBadge() {
+  let b = document.getElementById('selgroup');
+  if (!multiSel.size) { if (b) b.style.display = 'none'; return; }
+  if (!b) {
+    b = document.createElement('div');
+    b.id = 'selgroup';
+    b.style.cssText = 'position:fixed;left:18px;top:110px;z-index:41;pointer-events:none;' +
+      'background:rgba(10,20,30,.82);border:1px solid rgba(127,224,255,.6);color:#9fe8ff;' +
+      'font:700 12px/1.3 ui-monospace,monospace;padding:4px 9px;border-radius:6px';
+    document.body.appendChild(b);
+  }
+  b.style.display = 'block';
+  b.textContent = '编组 ' + multiSel.size + ' · 右键移动';
+}
+
+let boxStart = null;                 // { x, y } 屏幕坐标
+let boxEl = null;                    // 选框 DOM
+const multiSel = new Set();          // 被框选的单位下标（不含 clicked 单个选中的那个）
+
+function ensureBoxEl() {
+  if (boxEl) return boxEl;
+  boxEl = document.createElement('div');
+  boxEl.id = 'selbox';
+  boxEl.style.cssText = 'position:fixed;border:1px solid #7fe0ff;background:rgba(127,224,255,.14);' +
+    'pointer-events:none;z-index:40;display:none;border-radius:2px';
+  document.body.appendChild(boxEl);
+  return boxEl;
+}
+
+/** 屏幕矩形里有哪些可指挥单位（士兵/重装兵/装甲车） */
+function unitsInRect(x0, y0, x1, y1) {
+  const out = [];
+  if (!sim) return out;
+  const cam = activeCamera();
+  const v = new THREE.Vector3();
+  const lx = Math.min(x0, x1), rx = Math.max(x0, x1);
+  const ty = Math.min(y0, y1), by = Math.max(y0, y1);
+  for (let i = 0; i < sim.n; i++) {
+    const st = sim.state[i];
+    if (st !== ST.SOLDIER) continue;
+    v.set(sim.px[i], 0.9, sim.pz[i]).project(cam);
+    if (v.z > 1) continue;
+    const sx = (v.x * 0.5 + 0.5) * window.innerWidth;
+    const sy = (-v.y * 0.5 + 0.5) * window.innerHeight;
+    if (sx >= lx && sx <= rx && sy >= ty && sy <= by) out.push(i);
+  }
+  return out;
+}
 const el = renderer.domElement;
 el.addEventListener('contextmenu', (e) => e.preventDefault());
 
 el.addEventListener('pointerdown', (e) => {
   drag = { x: e.clientX, y: e.clientY, moved: 0, btn: e.button, sx: e.clientX, sy: e.clientY };
+  if (e.button === 0) boxStart = { x: e.clientX, y: e.clientY };
   el.setPointerCapture(e.pointerId);
 });
 el.addEventListener('pointermove', (e) => {
@@ -215,6 +265,15 @@ el.addEventListener('pointermove', (e) => {
   const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
   const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
 
+  if (drag.btn === 0 && boxStart && drag.moved > 6) {
+    const b = ensureBoxEl();
+    b.style.display = 'block';
+    b.style.left = Math.min(boxStart.x, e.clientX) + 'px';
+    b.style.top = Math.min(boxStart.y, e.clientY) + 'px';
+    b.style.width = Math.abs(e.clientX - boxStart.x) + 'px';
+    b.style.height = Math.abs(e.clientY - boxStart.y) + 'px';
+    return;                                  // 框选时不平移
+  }
   if (drag.btn === 2) {
     // 右键 = 平移（灵敏度 0.0016 → 0.00085 → 0.00062）
     // 位移先进 panPending，由主循环平滑消化（见 loop 里 panPending 那段）
@@ -230,7 +289,26 @@ el.addEventListener('pointermove', (e) => {
 el.addEventListener('pointerup', (e) => {
   const wasClick = drag && drag.moved < 5 && drag.btn === 0;   // 只有左键算点击
   const wasRight = drag && drag.moved < 8 && drag.btn === 2;   // 右键 = 给士兵下令
+  // ---- 左键框选结算 ----
+  let boxed = null;
+  if (drag && drag.btn === 0 && boxStart && drag.moved > 6) {
+    boxed = unitsInRect(boxStart.x, boxStart.y, e.clientX, e.clientY);
+  }
+  if (boxEl) boxEl.style.display = 'none';
+  boxStart = null;
   drag = null;
+  if (boxed) {
+    if (boxed.length) {
+      selectAgent(boxed[0]);
+      multiSel.clear();
+      for (const i of boxed) multiSel.add(i);
+      updateGroupBadge();
+      toast(`框选 ${boxed.length} 个单位 · 右键下达移动命令`);
+    } else {
+      toast('框选区域里没有可指挥的单位（只有士兵/重装兵能指挥）');
+    }
+    return;
+  }
   // 右键：选中的是士兵 → 命令他走到这里（警察不接受命令）
   if (wasRight && sim && selected >= 0) {
     const ndc2 = new THREE.Vector2(
@@ -241,8 +319,18 @@ el.addEventListener('pointerup', (e) => {
     rc2.setFromCamera(ndc2, activeCamera());
     const hit2 = new THREE.Vector3();
     if (rc2.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit2)) {
-      if (sim.orderMove(selected, hit2.x, hit2.z)) {
-        toast('命令：移动到此处');
+      // 有框选就整队一起走（散开成一个小队形，免得挤成一坨）
+      const group = multiSel.size ? [...multiSel] : [selected];
+      let n = 0;
+      for (let gi = 0; gi < group.length; gi++) {
+        const ui = group[gi];
+        // 多人时按环形散开 3~6m
+        const ang = (gi / Math.max(1, group.length)) * Math.PI * 2;
+        const rr = group.length > 1 ? 3 + 3 * (gi % 2) : 0;
+        if (sim.orderMove(ui, hit2.x + Math.cos(ang) * rr, hit2.z + Math.sin(ang) * rr)) n++;
+      }
+      if (n > 0) {
+        toast(n > 1 ? `命令：${n} 个单位移动` : '命令：移动到此处');
         ping(hit2, 0x7aa7ff, 8);
       } else {
         toast(sim.state[selected] === 3 ? '警察不接受命令（只能命令士兵）' : '这个人不能接受命令');
@@ -427,6 +515,7 @@ function buildEscapeMarker() {
 let lastCardHtml = '';       // 卡片内容缓存：内容没变就不重建 DOM
 
 function selectAgent(i) {
+  if (multiSel.size) { multiSel.clear(); updateGroupBadge(); }
   if (i === selected) {
     // 同一个人的情况下也要能"从地点视图回到他本人"
     placeView = null;
@@ -1645,15 +1734,18 @@ async function boot() {
   const res = await fetch(CDIR + '/city.json');
   if (!res.ok) { fail('找不到 ' + CDIR + '/city.json —— 请先运行 pipeline/bake_pbf.py'); return; }
   const city = await res.json();
-  // 默认人口按面积算：2600 人/km²（柏林 7.59km² ≈ 2 万，莱斯特 0.26km² ≈ 700）
+  // 默认三件套按面积等比缩放，基准 = 柏林（7.594 km² / 5 万人 / 1000 丧尸 / 1000 警察）
   // URL 显式给了 ?pop= 就不覆盖
   if (!Q.get('pop')) {
     const km2 = (city.size[0] * city.size[1]) / 1e6;
-    const auto = Math.max(+sPop.min || 200, Math.min(+sPop.max || 100000,
-      Math.round(km2 * 2600 / 100) * 100));
-    sPop.value = auto;
+    const k = km2 / 7.594;                       // 面积比
+    const cl = (v, el, st) => Math.max(+el.min, Math.min(+el.max, Math.round(v / st) * st));
+    sPop.value = cl(50000 * k, sPop, 100);
+    sZ0.value  = cl(1000 * k, sZ0, 50);
+    sPol.value = cl(1000 * k, sPol, 50);
     if (typeof syncLabels === 'function') syncLabels();
-    console.log('[ZOS-R] 默认人口 ' + auto.toLocaleString() + '（面积 ' + km2.toFixed(2) + ' km² × 2600/km²）');
+    console.log('[ZOS-R] 面积 ' + km2.toFixed(2) + ' km²（柏林的 ' + (k * 100).toFixed(1) + '%）：人口 ' +
+      (+sPop.value).toLocaleString() + ' · 丧尸 ' + sZ0.value + ' · 警察 ' + sPol.value);
   }
   if (Q.get('maxb')) city.buildings = city.buildings.slice(0, +Q.get('maxb'));
   cityRef = city;
@@ -1851,6 +1943,31 @@ async function boot() {
       selectAgent(i);
       followSelected = true;
     }, 900);
+  }
+  // 调试：?boxall=1 在屏幕中央放 5 个士兵，然后用"框选"逻辑整队选中并下令（验证多选链路）
+  if (Q.get('boxall')) {
+    setTimeout(() => {
+      if (!sim) return;
+      const cx = rig.target.x, cz = rig.target.z;
+      const ids = [];
+      for (let k = 0; k < 5; k++) {
+        const u = sim.addUnit(cx + (k - 2) * 4, cz + 6, 'soldier');
+        if (u >= 0) ids.push(u);
+      }
+      const mode = Q.get('boxall');
+      if (mode === '1') {
+        const picked = unitsInRect(0, 0, window.innerWidth, window.innerHeight);
+        selectAgent(picked[0]);
+        multiSel.clear();
+        for (const i of picked) multiSel.add(i);
+        updateGroupBadge();
+        const ok = picked.map((i) => sim.orderMove(i, cx + 30, cz + 30)).filter(Boolean).length;
+        window.__boxDbg = 'soldiers=' + ids.length + ' pickedByRect=' + picked.length + ' ordered=' + ok;
+      } else {
+        window.__boxDbg = 'soldiers=' + ids.length;
+      }
+      document.title = 'BOXTEST ' + (window.__boxDbg || '');
+    }, 1200);
   }
   // 调试：?pickrole=police|zombie|vip|dog|flee 直接选中第一个该角色（看行为文案用）
   if (Q.get('pickrole')) {
