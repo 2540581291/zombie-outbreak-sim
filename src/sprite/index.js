@@ -252,7 +252,10 @@ export class SpriteView {
       let scaleZ = py * M_PER_PX * (sp.scale || 1);
 
       // 极远：纯色圆点（阶段动画不降级，否则"变"看不见）
-      if (naturalPx < DOT_BELOW_PX && stage === STAGE.NONE) {
+      // forceDot：屏幕上一个 2m 的人不足 6px 时，全场强制用点（与 3D 的 LOD 规则一致），
+      // 否则小地图拉到最远时人还是被放大成"小碎片"，不是干净的点
+      const forceDot = pxPerM * 2 < 6;
+      if ((naturalPx < DOT_BELOW_PX || forceDot) && stage === STAGE.NONE) {
         if (pk >= CAP) continue;
         if (dotStride > 1 && (i % dotStride)) continue;
         dummy.position.set(x, 0.7, z);
