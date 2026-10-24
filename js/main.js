@@ -2073,13 +2073,14 @@ function loop(t) {
   if (keys.has('KeyR')) rig.pitch = Math.min(1.52, rig.pitch + dtReal * 0.7);
   if (keys.has('KeyF')) rig.pitch = Math.max(0.18, rig.pitch - dtReal * 0.7);
   clampTarget();
-  // 右键平移的平滑消化：每帧吃掉一部分（指数衰减），拖完会有一点顺滑的收尾
+  // 右键平移的平滑消化：每帧吃掉一部分（指数衰减）
+  //   系数越大 = 越快跟上鼠标 = 滑行越少。16 太滑 → 26，并提高收尾死区，松手很快就停。
   if (panPending.x !== 0 || panPending.z !== 0) {
-    const f = 1 - Math.exp(-Math.max(0.001, dtReal) * 16);
+    const f = 1 - Math.exp(-Math.max(0.001, dtReal) * 26);
     rig.target.x += panPending.x * f;
     rig.target.z += panPending.z * f;
     panPending.multiplyScalar(1 - f);
-    if (Math.abs(panPending.x) < 0.01 && Math.abs(panPending.z) < 0.01) panPending.set(0, 0, 0);
+    if (Math.abs(panPending.x) < 0.3 && Math.abs(panPending.z) < 0.3) panPending.set(0, 0, 0);
     clampTarget();
   }
   updatePathLine();
