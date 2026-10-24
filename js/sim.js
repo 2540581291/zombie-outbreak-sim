@@ -326,6 +326,7 @@ export class Sim {
     this.saved = 0;             // 已救出人数
     this.cured = 0;             // 已治愈人数
     this.barricaded = [];       // 被路障改掉的栅格下标（重开时恢复）
+    this.barricadeVal = [];     // 对应的原值（不能写死成 1：路面是 0x03、门是 0x0f）
 
     // ---- 音频事件 & 战报数据 ----
     this.audio = [];            // 每 tick 收集，主线程取走
@@ -444,8 +445,14 @@ export class Sim {
     this.helis.length = 0;
     this.saved = 0;
     this.cured = 0;
-    for (const k of this.barricaded) this.nav.grid[k] = 1;
+    for (let i = 0; i < this.barricaded.length; i++) this.nav.grid[this.barricaded[i]] = this.barricadeVal[i];
+    const hadBarricade = this.barricaded.length > 0;
     this.barricaded.length = 0;
+    this.barricadeVal.length = 0;
+    // 路障期间 8 m 图被局部改过 → 重开时整张导航图重建一次（一次性 0.6 s）
+    if (hadBarricade && this.navWorld) {
+      try { this.navWorld.rebuildAll(); } catch (e) { console.warn('[ZOS-R] 导航图重建失败：', e); }
+    }
     this.audio.length = 0;
     this.hist = { t: [], civ: [], inf: [], zom: [], dead: [], saved: [] };
     this.events = [];
@@ -3737,6 +3744,7 @@ export class Sim {
     const r0 = Math.max(0, Math.floor((z - ext + nav.halfH) / nav.cell));
     const r1 = Math.min(nav.rows - 1, Math.ceil((z + ext + nav.halfH) / nav.cell));
     let n = 0;
+    const blocked = [];   // 记下改掉的格子，交给 NavCore 做局部修复（S6）
     for (let r = r0; r <= r1; r++) {
       const wz = nav.halfH - (r + 0.5) * nav.cell - z;
       for (let c = c0; c <= c1; c++) {
@@ -3746,11 +3754,18 @@ export class Sim {
         const v = -wx * sa + wz * ca;
         if (Math.abs(u) <= halfLen && Math.abs(v) <= halfThick) {
           const k = r * nav.cols + c;
-          if (nav.grid[k] === 1) { nav.grid[k] = 0; this.barricaded.push(k); n++; }
+          // 注意：可走格的位域值不是 1（路面是 0x03、门 0x0f、室内 0x1f），
+          // 旧代码写 === 1 在城市数据上永远不成立 —— 路障其实一格都没堵住。
+          if (nav.grid[k] & 1) { this.barricadeVal.push(nav.grid[k]); nav.grid[k] = 0; this.barricaded.push(k); blocked.push(k); n++; }
         }
       }
     }
     this.effects.push({ type: 'wall', x, z, r: halfLen, life: 1.2, max: 1.2, angle });
+    // ---- S6：让导航层立刻知道这几格被堵了 ----
+    if (this.ensureNav() && blocked.length) {
+      this.navWorld.blockCells(blocked);
+      this.pathN.fill(0); this.pathIdx.fill(0); this.guideOK.fill(0);
+    }
     return n;
   }
 

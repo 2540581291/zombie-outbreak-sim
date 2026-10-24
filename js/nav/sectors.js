@@ -279,24 +279,68 @@ export function buildHierarchy(ng, opts = {}) {
   }
 
   // ---------- L2：簇内节点距离矩阵 ----------
-  const dist = new Float32Array(N);
-  const closed = new Uint8Array(N);
-  const heap = new Int32Array(4096);
-  const intra = new Array(clusterN).fill(null);
-  let dijkstras = 0;
+  const hier = {
+    ng, cellSize, cell, cs, sectorCells, radius, excludeIndoor,
+    cols, rows, N, walk, repX, repZ, adj,
+    scols, srows, sectorN, sectorOf,
+    partner, partnerB, partnerC, partnerCost, partnerCostB, partnerCostC, nodeIdx,
+    clusterOf, clusterNodes, clusterSector,
+    sectorAdj, compOf, compN,
+    intra: new Array(clusterN).fill(null),
+  };
+  for (let sid = 0; sid < clusterN; sid++) computeClusterIntra(hier, sid);
 
-  const heapPush = (hn, k) => {
-    heap[hn] = k;
+  hier.stats = {
+    cells: N, walkable: walkN, edges: edgeN,
+    sectors: sectorN, clusters: clusterN, nodes: nodeN,
+    dijkstras: clusterN, components: compN,
+    buildMs: now() - t0,
+  };
+  return hier;
+}
+
+/**
+ * 重算一个簇的节点距离矩阵（就地写进 hier.intra[sid]）。
+ *
+ * 单独抽出来是为了**动态世界**：路障/手绘墙改了 8 m 图之后，
+ * 只有受影响的簇需要重算，不必整张图重建（重建 430 ms，重算一个簇 <1 ms）。
+ *
+ * @param {object} hier buildHierarchy 的返回值
+ * @param {number} sid 簇下标
+ */
+export function computeClusterIntra(hier, sid) {
+  const { clusterNodes, clusterSector, scols, sectorCells, cols, rows, adj, cs } = hier;
+  const nodes = clusterNodes[sid];
+  if (!nodes || nodes.length === 0) { hier.intra[sid] = null; return null; }
+  const k = nodes.length;
+  const mat = new Float32Array(k * k);
+  const N = hier.N;
+  let sc = hier._scratch;
+  if (!sc || sc.N !== N) {
+    sc = hier._scratch = {
+      N,
+      dist: new Float32Array(N),
+      closed: new Uint8Array(N),
+      heap: new Int32Array(N + 1),
+    };
+  }
+  const dist = sc.dist, closed = sc.closed, heap = sc.heap;
+  const baseR = ((clusterSector[sid] / scols) | 0) * sectorCells;
+  const baseC = (clusterSector[sid] % scols) * sectorCells;
+  const inR = Math.min(sectorCells, rows - baseR);
+  const inC = Math.min(sectorCells, cols - baseC);
+
+  const push = (hn, kk) => {
+    heap[hn] = kk;
     let i = hn;
     while (i > 0) {
       const p = (i - 1) >> 1;
       if (dist[heap[p]] <= dist[heap[i]]) break;
-      const t = heap[p]; heap[p] = heap[i]; heap[i] = t;
-      i = p;
+      const t = heap[p]; heap[p] = heap[i]; heap[i] = t; i = p;
     }
     return hn + 1;
   };
-  const heapPop = (hn) => {
+  const pop = (hn) => {
     const top = heap[0];
     heap[0] = heap[--hn];
     let i = 0;
@@ -306,62 +350,35 @@ export function buildHierarchy(ng, opts = {}) {
       if (l < hn && dist[heap[l]] < dist[heap[m]]) m = l;
       if (r < hn && dist[heap[r]] < dist[heap[m]]) m = r;
       if (m === i) break;
-      const t = heap[m]; heap[m] = heap[i]; heap[i] = t;
-      i = m;
+      const t = heap[m]; heap[m] = heap[i]; heap[i] = t; i = m;
     }
     return [top, hn];
   };
 
-  for (let sid = 0; sid < clusterN; sid++) {
-    const nodes = clusterN ? clusterNodes[sid] : [];
-    if (!nodes.length) continue;
-    const k = nodes.length;
-    const mat = new Float32Array(k * k);
-    const sectorOfCluster = clusterSector[sid];
-    const baseR = ((sectorOfCluster / scols) | 0) * sectorCells;
-    const baseC = (sectorOfCluster % scols) * sectorCells;
-    const inR = Math.min(sectorCells, rows - baseR);
-    const inC = Math.min(sectorCells, cols - baseC);
-
-    for (let i = 0; i < k; i++) {
-      const src = nodes[i];
-      for (let r = 0; r < inR; r++) {
-        const b = (baseR + r) * cols + baseC;
-        for (let c = 0; c < inC; c++) { dist[b + c] = Infinity; closed[b + c] = 0; }
-      }
-      dist[src] = 0;
-      let hn = heapPush(0, src);
-      while (hn > 0) {
-        let cur; [cur, hn] = heapPop(hn);
-        if (closed[cur]) continue;
-        closed[cur] = 1;
-        const cr = (cur / cols) | 0, cc2 = cur - cr * cols;
-        for (let d = 0; d < 8; d++) {
-          if ((adj[cur] & (1 << d)) === 0) continue;
-          const nk = (cr + DDr[d]) * cols + (cc2 + DDc[d]);
-          if (closed[nk]) continue;
-          const nd = dist[cur] + DIR_COST[d] * cs;
-          if (nd < dist[nk]) { dist[nk] = nd; hn = heapPush(hn, nk); }
-        }
-      }
-      dijkstras++;
-      for (let j = 0; j < k; j++) mat[i * k + j] = dist[nodes[j]];
+  for (let i = 0; i < k; i++) {
+    const src = nodes[i];
+    for (let r = 0; r < inR; r++) {
+      const b = (baseR + r) * cols + baseC;
+      for (let c = 0; c < inC; c++) { dist[b + c] = Infinity; closed[b + c] = 0; }
     }
-    intra[sid] = { k, mat, nodes };
+    if (!hier.walk[src]) { for (let j = 0; j < k; j++) mat[i * k + j] = Infinity; continue; }
+    dist[src] = 0;
+    let hn = push(0, src);
+    while (hn > 0) {
+      let cur; [cur, hn] = pop(hn);
+      if (closed[cur]) continue;
+      closed[cur] = 1;
+      const cr = (cur / cols) | 0, cc2 = cur - cr * cols;
+      for (let d = 0; d < 8; d++) {
+        if ((adj[cur] & (1 << d)) === 0) continue;
+        const nk = (cr + DDr[d]) * cols + (cc2 + DDc[d]);
+        if (closed[nk]) continue;
+        const nd = dist[cur] + DIR_COST[d] * cs;
+        if (nd < dist[nk]) { dist[nk] = nd; hn = push(hn, nk); }
+      }
+    }
+    for (let j = 0; j < k; j++) mat[i * k + j] = dist[nodes[j]];
   }
-
-  return {
-    ng, cellSize, cell, cs, sectorCells, radius, excludeIndoor,
-    cols, rows, N, walk, repX, repZ, adj,
-    scols, srows, sectorN, sectorOf,
-    partner, partnerB, partnerC, partnerCost, partnerCostB, partnerCostC, nodeIdx,
-    clusterOf, nodeIdx, clusterNodes, clusterSector,
-    sectorAdj, compOf, compN,
-    intra,
-    stats: {
-      cells: N, walkable: walkN, edges: edgeN,
-      sectors: sectorN, clusters: clusterN, nodes: nodeN, dijkstras, components: compN,
-      buildMs: now() - t0,
-    },
-  };
+  hier.intra[sid] = { k, mat, nodes };
+  return hier.intra[sid];
 }

@@ -16,6 +16,7 @@ import { Portals } from './portal.js';
 import { Planner } from './planner.js';
 import { FlowFieldCache } from './flowfield.js';
 import { Steering } from './steering.js';
+import { blockCells } from './dynamic.js';
 
 export { NavGrid, buildHierarchy, Portals, Planner, FlowFieldCache, Steering };
 
@@ -47,11 +48,37 @@ export class NavWorld {
     return new Steering(this.ng, { radius: this.radius, ...arrays });
   }
 
-  /** 世界被改过（手绘墙/路障）→ 场与规划缓存全部作废，clearance 需重算 */
+  /** 世界被改过（手绘墙/路障）→ 场与规划缓存全部作废 */
   invalidate(reason = 'world') {
     this.flows.invalidateAll();
     this.planner.cache.clear();
     this.reason = reason;
+  }
+
+  /**
+   * 局内局部改动（路障）：只修受影响的 8 m 格与簇，不重建全图。
+   * @param {Iterable<number>} cells1m 已经被写成 0 的 1 m 格下标
+   */
+  blockCells(cells1m, opts) {
+    const r = blockCells(this, cells1m, opts);
+    this.lastBlock = r;
+    return r;
+  }
+
+  /** 大改动（手绘墙/编辑器）：全部重建（EDT 270 ms + 分层 340 ms，一次性） */
+  rebuildAll() {
+    const t0 = performance.now();
+    this.edtMs = this.ng.buildClearance();
+    this.hier = buildHierarchy(this.ng, {
+      cellSize: this.opts.cellSize || 8,
+      sectorCells: this.opts.sectorCells || 16,
+      radius: this.radius,
+    });
+    this.portals = new Portals(this.ng, { radius: this.radius });
+    this.planner = new Planner(this.ng, this.hier, { portals: this.portals });
+    this.flows = new FlowFieldCache(this.hier, { maxFields: this.opts.maxFields || 48 });
+    this.rebuildMs = performance.now() - t0;
+    return this.rebuildMs;
   }
 
   stats() {
@@ -69,8 +96,8 @@ export class NavWorld {
 }
 
 /**
- * 每个 nav 对象只建一次（挂到 nav 上）。
- * @param {any} nav  loadCollision() 返回的碰撞层
+ * 每个 nav 对象只建一次（挂在 nav 上）。
+ * @param {any} nav loadCollision() 返回的碰撞层
  * @param {object} [opts]
  */
 export function getNavWorld(nav, opts) {
