@@ -508,16 +508,20 @@ function buildEscapeMarker() {
   const nav = sim.nav;
   const horizontal = sim.escapeSide === 'N' || sim.escapeSide === 'S';
   const len = horizontal ? nav.halfW * 2 : nav.halfH * 2;
-  const geo = new THREE.PlaneGeometry(len, 34);
+  // 绿带就画在 escapeLine() 那条线上，厚度取"偏移量的 2 倍"（最小 12m），
+  // 这样 UI 和判定用的是同一个位置，不会再错位。
+  const off = sim.escapeOffset ? sim.escapeOffset() : 30;
+  const depth = Math.max(12, off * 2);
+  const geo = new THREE.PlaneGeometry(len, depth);
   const mat = new THREE.MeshBasicMaterial({
     color: 0x43e08a, transparent: true, opacity: 0.45, depthWrite: false,
   });
   const m = new THREE.Mesh(geo, mat);
   m.rotation.x = -Math.PI / 2;
-  if (horizontal) m.position.set(0, 1.2, side.z > 0 ? nav.halfH - 18 : -nav.halfH + 18);
+  if (horizontal) m.position.set(0, 1.2, side.z);
   else {
     m.rotation.z = Math.PI / 2;
-    m.position.set(side.x > 0 ? nav.halfW - 18 : -nav.halfW + 18, 1.2, 0);
+    m.position.set(side.x, 1.2, 0);
   }
   m.renderOrder = 3;
   scene.add(m);

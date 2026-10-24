@@ -1217,8 +1217,21 @@ export class Sim {
   }
 
   /** 撤离口在哪里（给 UI 用）：返回 {name, x, z} —— 边的中点 */
+  /**
+   * 撤离线离边界的距离：取"垂直于撤离方向的那条边"长度的 1%（最小 4m）。
+   *   例：50 宽 × 20 高的地图，北方撤离 → 50 的 1% = 0.5m（最小 4m → 4m）
+   *   莱斯特 507m → 约 5.1m；柏林 3162m → 约 31.6m
+   * onEscapeLine / escapePoint / escapeLine / UI 绿线全部用这一个值，保证一致。
+   */
+  escapeOffset() {
+    const nav = this.nav;
+    const horizontal = this.escapeSide === 'N' || this.escapeSide === 'S';
+    const span = horizontal ? nav.halfW * 2 : nav.halfH * 2;
+    return Math.max(4, span * 0.01);
+  }
+
   escapeLine() {
-    const nav = this.nav, m = 30;
+    const nav = this.nav, m = this.escapeOffset();
     const map = {
       N: { name: '北', x: 0, z: -nav.halfH + m },
       S: { name: '南', x: 0, z: nav.halfH - m },
@@ -1230,7 +1243,7 @@ export class Sim {
 
   /** 是否已经站到逃离线上（离那条边 60m 内） */
   onEscapeLine(i) {
-    const nav = this.nav, b = 60;
+    const nav = this.nav, b = this.escapeOffset();
     switch (this.escapeSide) {
       case 'N': return this.pz[i] <= -nav.halfH + b;
       case 'S': return this.pz[i] >= nav.halfH - b;
@@ -1242,7 +1255,7 @@ export class Sim {
 
   /** 朝逃离线的目标点（垂直投影：走最短路） */
   escapePoint(i) {
-    const nav = this.nav, m = 40;
+    const nav = this.nav, m = this.escapeOffset();
     switch (this.escapeSide) {
       case 'N': return [this.px[i], -nav.halfH + m];
       case 'S': return [this.px[i], nav.halfH - m];
