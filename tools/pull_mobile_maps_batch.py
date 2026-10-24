@@ -31,7 +31,11 @@ def stitch(mid):
     one = Image.open(io.BytesIO(zf.read(next(iter(t.values())))))
     tw, th = one.size
     img = Image.new("RGB", (nx * tw, ny * th))
-    for (x, y), name in t.items():
+    # 文件名是 tile_<zoom>_<行>_<列>：第一个数字是 y（行），第二个是 x（列）。
+    # 之前按 (x, y) 贴，整张图被转置了 —— 用 z16 缩略图做模板比对，transpose
+    # 的相关性 0.225 明显高于原样 0.073，据此确认行列写反。
+    for (a, b), name in t.items():
+        x, y = b, a
         img.paste(Image.open(io.BytesIO(zf.read(name))), (x * tw, y * th))
     return img
 
@@ -39,7 +43,7 @@ def stitch(mid):
 def collision(mid):
     raw = zlib.decompress(zf.read(f"assets/data/collision_layer_{mid}.cl"))
     g = int(round(math.isqrt(len(raw))))
-    arr = np.frombuffer(raw, dtype=np.uint8).reshape(g, g)[::-1]
+    arr = np.frombuffer(raw, dtype=np.uint8).reshape(g, g)   # 不翻转：实测叠图时 flipV 才对上房子
     out = np.zeros_like(arr)
     for k, v in VALUE_MAP.items():
         out[arr == k] = v

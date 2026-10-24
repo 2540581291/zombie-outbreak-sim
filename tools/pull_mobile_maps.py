@@ -99,7 +99,7 @@ def convert(apk, map_entry, bin_entry, cid, name):
     raw = load_bin(apk, bin_entry)
     grid = int(round(math.isqrt(len(raw))))
     assert grid * grid == len(raw), f"碰撞表不是正方形：{len(raw)} 字节"
-    g = np.frombuffer(raw, dtype=np.uint8).reshape(grid, grid)[::-1]     # 上下翻转
+    g = np.frombuffer(raw, dtype=np.uint8).reshape(grid, grid)   # 手游 .cl 行 0 = 北，不需要翻转
     out = np.zeros_like(g)
     for k, v in VALUE_MAP.items():
         out[g == k] = v
