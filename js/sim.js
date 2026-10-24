@@ -9,6 +9,7 @@ import { buildFamilies } from './family.js';
 import { WPN, WEAPONS, ROLE_WEAPON, skillFor, weaponOf } from './weapons.js';
 import { makeStock, makeStationStock, makeHomeStock, takeWeapon, hasWeapon, stockText } from './storage.js';
 import { STAGE, bodyOf, stageDur, stageAnim } from './bodymap.js';
+import { getNavWorld } from './nav/index.js';
 
 export const ST = {
   CIV: 0,      // 平民
@@ -269,6 +270,17 @@ export class Sim {
     this.pathBlock = new Uint8Array(NMAX);  // 连续走不到当前路点的次数（超过就跳过它）
     this.lastDir = new Float32Array(NMAX); // 上一次实际迈步方向（沿墙滑行时保持，避免来回抖）
     this.lastDirT = new Float32Array(NMAX);
+    this.lastVX = new Float32Array(NMAX);  // 上一帧方向的单位向量（S5 局部跟随用，省掉 atan2）
+    this.lastVZ = new Float32Array(NMAX);
+    // ---- NavCore（S5）：室内出门引导（每 2 秒刷新一次，代替旧的 56 MB 门场）----
+    this.guideX = new Float32Array(NMAX);
+    this.guideZ = new Float32Array(NMAX);
+    this.guideT = new Float32Array(NMAX);
+    this.guideOK = new Uint8Array(NMAX);
+    this.nudgeT = new Float32Array(NMAX);   // 原有代码只写过没分配（旧路径走不到，S5 后走到了）
+    this._navTried = false;
+    this.navWorld = null;
+    this.steer = null;
     this.armHome = new Uint8Array(NMAX);  // 1 = 正在回家补弹（这条 goal 不被 decide 覆盖）
     this.pet = new Uint8Array(NMAX);      // 动物：1 = 家养（绑主人家），0 = 野生
     this.fleeMode = new Uint8Array(NMAX); // 逃跑大类：0 无 / 1 即时（只为离开 40m）/ 2 有目标
@@ -359,8 +371,10 @@ export class Sim {
     this.pet.fill(0);
     this.armHome.fill(0);
     this.forcePlan.fill(0);
-    this.lastDir.fill(0); this.lastDirT.fill(0);
+    this.lastDir.fill(0); this.lastDirT.fill(0); this.lastVX.fill(0); this.lastVZ.fill(0);
     this.pathBlock.fill(0);
+    this.guideX.fill(0); this.guideZ.fill(0); this.guideT.fill(0); this.guideOK.fill(0);
+    this.nudgeT.fill(0);
     // 关键：全部状态清零，否则上一局的残留会让结果不可复现
     this.cool.fill(0); this.timer.fill(0); this.panic.fill(0);
     this.wpn.fill(0); this.mag.fill(0); this.reserve.fill(0); this.skill.fill(0); this.rlUntil.fill(0);
@@ -2488,7 +2502,62 @@ export class Sim {
     return moved;
   }
 
+  // ============================================================
+  //  NavCore 接线（S5）：局部跟随换成 clearance 感知的 context steering
+  //  —— 行为层不变，只是"落地"这一步换了实现
+  // ============================================================
+
+  /** 懒加载：第一次真正要移动时才建导航世界（建图约 0.7 s，不能放进每局 reset） */
+  ensureNav() {
+    if (this._navTried) return this.steer;
+    this._navTried = true;
+    if (this.navOpt === false) return null;
+    try {
+      this.navWorld = getNavWorld(this.nav);
+      this.steer = this.navWorld.makeSteering({
+        px: this.px, pz: this.pz, heading: this.heading,
+        phase: this.phase, stuck: this.stuck,
+        lastDir: this.lastDir, lastDirT: this.lastDirT,
+        lastVX: this.lastVX, lastVZ: this.lastVZ, side: this.side,
+        stride: null,
+      });
+    } catch (e) {
+      console.warn('[ZOS-R] NavCore 初始化失败，回退旧移动算法：', e);
+      this.navWorld = null;
+      this.steer = null;
+    }
+    return this.steer;
+  }
+
+  /** 室内出门引导：最近出口路径上的第 4 个点（每 3 秒刷新，带每帧预算） */
+  indoorWaypoint(i) {
+    const t = this.time;
+    if (t < this.guideT[i]) {
+      return this.guideOK[i] ? [this.guideX[i], this.guideZ[i]] : null;
+    }
+    if (this.guideBudget <= 0) return this.guideOK[i] ? [this.guideX[i], this.guideZ[i]] : null;
+    this.guideBudget--;
+    this.guideT[i] = t + 3 + this.rng() * 1.5;
+    const P = this.navWorld.portals;
+    const ex = P.exitsFrom(this.px[i], this.pz[i], 1, 900);
+    if (!ex.length) { this.guideOK[i] = 0; return null; }
+    const pts = ex[0].points;
+    const k = Math.min(pts.length - 1, 4);
+    this.guideX[i] = pts[k][0];
+    this.guideZ[i] = pts[k][1];
+    this.guideOK[i] = 1;
+    return [this.guideX[i], this.guideZ[i]];
+  }
+
   moveSmart(i, dx, dz, speed, dt) {
+    if (this.ensureNav()) {
+      const ng = this.navWorld.ng;
+      if (ng.indoor(this.px[i], this.pz[i])) {
+        const wp = this.indoorWaypoint(i);
+        if (wp) return this.move(i, wp[0] - this.px[i], wp[1] - this.pz[i], speed, dt);
+      }
+      return this.move(i, dx, dz, speed, dt);
+    }
     const nav = this.nav;
     if (nav.indoor && nav.indoor(this.px[i], this.pz[i])) {
       // 首选：直接朝"离我最近的那扇门"走（门的位置是烘焙好的，不用自己找）
@@ -2503,6 +2572,22 @@ export class Sim {
   }
 
   move(i, dx, dz, speed, dt) {
+    if (this.ensureNav()) {
+      this.steer.time = this.time;
+      const moved = this.steer.step(i, dx, dz, speed, dt);
+      if (!moved && this.stuck[i] > 0.6) {
+        this.stuck[i] = 0;
+        this.pathN[i] = 0;
+        this.decT[i] = 0;
+        this.forcePlan[i] = 1;
+        this.guideOK[i] = 0;       // 下个 tick 重新找出口
+      }
+      return moved;
+    }
+    return this.moveLegacy(i, dx, dz, speed, dt);
+  }
+
+  moveLegacy(i, dx, dz, speed, dt) {
     const d = Math.hypot(dx, dz);
     if (d < 1e-4) return;
     const nav = this.nav;
@@ -2688,6 +2773,7 @@ export class Sim {
     }
 
     this.pathBudget = 40;      // 每帧恢复寻路预算（只给看不见目标的人用）
+    this.guideBudget = 48;     // 每帧室内出门引导预算（BFS 不便宜，必须分帧摊开）
     this.preyBudget = 8;       // 每帧锁敌扫描预算（一次扫全城 n 个，8/帧 ≈ 160/s）
     this.stepInfo(dt);
     this.rebuildHash();
