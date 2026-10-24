@@ -241,7 +241,8 @@ export class Sim {
     this.anchorT = new Float32Array(NMAX);       // 上次取样时间
     this.anchorX = new Float32Array(NMAX);       // 取样时的位置
     this.anchorZ = new Float32Array(NMAX);
-    this.ghostT = new Float32Array(NMAX);        // 穿墙到期时间（卡 5 秒 → 3 秒无视碰撞）
+    this.ghostT = new Float32Array(NMAX);        // （已废弃）原穿墙窗口
+    this.wallHitT = new Float32Array(NMAX);      // 撞墙计数的节流时间
     // ---- 政府行动（面板）：机构归属 + 清剿任务 ----
     this.jobKind = new Uint8Array(NMAX);         // 工作地类型：0 其它 / 1 政府 / 2 医院 / 3 学校
     this.workPoi = new Uint16Array(NMAX);        // 工作地是第几个 POI（+1，0 = 没有）
@@ -399,6 +400,12 @@ export class Sim {
     this.boostT.fill(0);
     this.wallT.fill(0);
     this.ghostT.fill(0);
+    // 撞塌的墙会改 nav.grid —— 开新局必须先还原，否则第二次跑的地图和第一次不同
+    if (!this.navBase) this.navBase = this.nav && this.nav.grid ? this.nav.grid.slice() : null;
+    else if (this.navBase) this.nav.grid.set(this.navBase);
+    this.wallHit = new Map();       // 每格被撞次数（撞满 10 次塌掉）
+    this.wallsDown = 0;            // 本局撞塌的墙格数
+    this.wallHitT.fill(0);
     this.jobKind.fill(0);
     this.workPoi.fill(0);
     this.purgeT.fill(0);
@@ -2385,49 +2392,37 @@ export class Sim {
     // 护送要员 / 出警执行任务：30 秒内速度翻倍（在 move 里统一加，所有路径都覆盖）
     if (this.boostT[i] > this.time) speed *= 2;
 
-    // ---- 穿墙脱困：连续 5 秒走不动 → 给 3 秒"幽灵"窗口，期间无视碰撞直线穿过 ----
-    if (this.ghostT[i] > this.time) {
-      const d = Math.hypot(dx, dz);
-      if (d > 1e-6) {
-        const nav0 = this.nav;
-        let nx = this.px[i] + (dx / d) * speed * dt;
-        let nz = this.pz[i] + (dz / d) * speed * dt;
-        nx = Math.max(-nav0.halfW + 3, Math.min(nav0.halfW - 3, nx));
-        nz = Math.max(-nav0.halfH + 3, Math.min(nav0.halfH - 3, nz));
-        this.px[i] = nx; this.pz[i] = nz;
-        this.heading[i] = Math.atan2(dz, dx);
-        const sp0 = SPECIES[this.kind[i]] || SPECIES[SP.CIV1];
-        const stride = 1.45 * (sp0.scale || 1);
-        this.phase[i] = (this.phase[i] + (speed / stride) * dt) % 1;
-        this.stuck[i] = 0;
-        return true;
-      }
-      return false;
-    }
-
     if (this.ensureNav()) {
-      // ---- 卡死判定：看"位移"而不是"这一帧有没有动" ----
-      // 打转的人每帧都在动（steer 永远返回 true），只看 moved 永远判断不出来。
-      // 每 5 秒取一次样：这 5 秒里净位移 < 3m → 认定卡死 → 开 3 秒穿墙。
-      // 只对"确实在赶路"的个体做卡死判定：站着待命/原地晃的人不该被传走
-      const going = speed > 0.3 && (dx * dx + dz * dz) > 1 &&
-                    this.goal[i] !== GOAL.NONE && this.goal[i] !== GOAL.HOLD;
-      if (!going) {
-        this.anchorT[i] = 0;
-      } else if (this.anchorT[i] === 0) {
-        this.anchorT[i] = this.time; this.anchorX[i] = this.px[i]; this.anchorZ[i] = this.pz[i];
-      } else if (this.time - this.anchorT[i] >= 5) {
-        const ax = this.px[i] - this.anchorX[i], az = this.pz[i] - this.anchorZ[i];
-        // 双重条件：5 秒挪不到 3m  **并且** 正前方 1.2m 就是墙 —— 只有真被墙挡住才开幽灵，
-        // 单纯走得慢（排队、等人、潜伏去医院）不算，否则会变成大批人穿墙
-        const dl = Math.hypot(dx, dz) || 1;
-        const bx = this.px[i] + (dx / dl) * 1.2, bz = this.pz[i] + (dz / dl) * 1.2;
-        const blockedAhead = !this.walkable(bx, bz);
-        if (ax * ax + az * az < 9 && blockedAhead) this.ghostT[i] = this.time + 3;
-        this.anchorT[i] = this.time; this.anchorX[i] = this.px[i]; this.anchorZ[i] = this.pz[i];
-      }
       this.steer.time = this.time;
       const moved = this.steer.step(i, dx, dz, speed, dt);
+      // ---- 撞墙累积：正前方那格不可走 → 记一次"撞墙"，同一格撞满 10 次塌掉 ----
+      //   不限 moved：打转的人也算在撞（他一直在往墙里挤）；每 0.4 秒最多记一次。
+      if (speed > 0.2 && this.time >= this.wallHitT[i]) {
+        const dl = Math.hypot(dx, dz);
+        if (dl > 1e-6) {
+          const bx = this.px[i] + (dx / dl) * 0.9, bz = this.pz[i] + (dz / dl) * 0.9;
+          const nv = this.nav;
+          const ci = (typeof nv.idx === 'function') ? nv.idx(bx, bz)
+            : (() => {                       // 兜底：没有 idx() 的 nav（合成地图）自己算
+                const c = ((bx + nv.halfW) / nv.cell) | 0;
+                const r = ((nv.halfH - bz) / nv.cell) | 0;
+                return (c < 0 || r < 0 || c >= nv.cols || r >= nv.rows) ? -1 : r * nv.cols + c;
+              })();
+          const g = ci >= 0 ? this.nav.grid[ci] : 0;
+          if (ci >= 0 && (g & 1) === 0) {
+            this.wallHitT[i] = this.time + 0.4;
+            const nk = (this.wallHit.get(ci) || 0) + 1;
+            if (nk >= 10) {
+              this.nav.grid[ci] = 0x03;        // 塌了：变成可走空地
+              this.wallHit.delete(ci);
+              this.wallsDown = (this.wallsDown || 0) + 1;
+              this.booms.push({ x: bx, z: bz, r: 1.6, life: 0.35 });
+            } else {
+              this.wallHit.set(ci, nk);
+            }
+          }
+        }
+      }
       if (!moved && this.stuck[i] > 0.6) {
         this.stuck[i] = 0;
         this.pathN[i] = 0;
