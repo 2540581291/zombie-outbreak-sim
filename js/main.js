@@ -1868,10 +1868,11 @@ async function boot() {
       retro.watchSel = selected;
       // 2D 精灵层有同屏上限（SpriteView 的 CAP）：超了就会有人画不出来，
       // 这里直接显式标出来，免得又出现"10 个人只画 5 个"的困惑
-      const capTxt = sim
-        ? (sim.n > 60000
-            ? `\n⚠ 同屏上限 60000 < 总人数 ${sim.n}，多出的部分 2D 下不画`
-            : `\n同屏：${sim.n} / 上限 60000`)
+      const cap = (retro && retro.cap) || 0;
+      const capTxt = sim && cap
+        ? (sim.n > cap
+            ? `\n⚠ 同屏上限 ${cap} < 总人数 ${sim.n}，多出的部分 2D 下不画`
+            : `\n同屏：${sim.n} / 上限 ${cap}  无剪影/${(retro.noClip||0)} 缺帧/${(retro.noFrame||0)}`)
         : '';
       const selTxt = selected >= 0
         ? ('sel #' + selected + '  state=' + sim.state[selected] +

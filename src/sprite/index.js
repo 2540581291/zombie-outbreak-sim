@@ -21,10 +21,10 @@ import { bodyFor, animFor, silColorFor, SIL } from './bodies.js';
 import { makeSpriteMesh, makeShadowMesh, makeDotMesh } from './layers.js';
 
 const M_PER_PX = 0.11;      // 主角 15×14 px ≈ 1.65 m
-// 同屏上限：必须 ≥ 人口上限（10 万平民 + 1 万丧尸 + 1 万警察），
-// 否则 2D 下只有前 CAP 个人会被画出来 —— 实测默认 5 万人口时
-// 只画了 2 万，剩下的 60% 直接消失（"10 个人只有 4~5 个点"就是这个）
-const CAP = 60000;
+// 同屏上限：取 sim 的个体上限 NMAX（160000），等价于"不限"——
+// 精灵层是实例化的，容量只影响显存，不影响每帧循环。
+// 之前是 20000，导致 5 万人口时只有前 2 万被画出来（"10 个人只显示 4~5 个点"）。
+const CAP = 170000;
 const MIN_SCREEN_PX = 6.0;  // 精灵至少占这么多屏幕像素
 const DOT_BELOW_PX = 2.2;   // 自然尺寸低于这个 → 画圆点
 const DOT_PX = 5.0;
@@ -53,6 +53,7 @@ export class SpriteView {
     this.tex = null;
     this.ready = false;
     this.count = 0;
+    this.cap = CAP;          // 同屏容量（给 UI 显示用）
 
     // 遮挡滞回（每体一个），以及上一帧的时间戳
     this.occlT = new Float32Array(CAP);
@@ -190,6 +191,7 @@ export class SpriteView {
     this.selDrawn = false;
     let k = 0, dk = 0, sk = 0, pk = 0;
     let nSil = 0, nTurn = 0, nDie = 0, nRise = 0;
+    let nNoClip = 0, nNoFrame = 0;   // 统计：为什么有些人没画出来
     let nSilCiv = 0, nSilPol = 0, nSilZom = 0;
     const dotStride = Math.max(1, Math.ceil(n / CAP));
 
@@ -226,7 +228,7 @@ export class SpriteView {
       const sil = this.forceSil || (naturalPx >= DOT_BELOW_PX && occl(i, x, z));
 
       const clip = A.clipFast(body, anim, sil);
-      if (!clip) continue;
+      if (!clip) { nNoClip++; continue; }
 
       // 帧号：阶段动画按"进入阶段后的秒数"，其余按步态相位
       let fi;
@@ -243,7 +245,7 @@ export class SpriteView {
       }
       if (i === this.watchSel) this.selDrawn = true;
       const r = clip.frames[fi];
-      if (!r) continue;
+      if (!r) { nNoFrame++; continue; }
 
       const px = r[2], py = r[3];
       let scaleX = px * M_PER_PX * (sp.scale || 1);
@@ -345,6 +347,7 @@ export class SpriteView {
     if (sMesh) sMesh.count = sk;
     dots.mesh.count = pk;
     this.count = k + dk;
+    this.noClip = nNoClip; this.noFrame = nNoFrame;
     this.stats = {
       w: A.w, h: A.h, clips: Object.keys(A.clips).length,
       actor: k, decal: dk, shadow: sk, dots: pk,
