@@ -59,6 +59,11 @@ export const GOAL = {
 const PROBE = [0, 20, 40, 60, 80, 100, 120, 145, 170];
 const DEG = Math.PI / 180;
 
+// ---------- 政府行动：机构代码 ----------
+// 工作地 POI 种类 → 机构编号（sim.jobKind 里存的就是它）
+export const INST = { NONE: 0, GOV: 1, HOSP: 2, SCHOOL: 3 };
+const JOB_KIND_CODE = { gov: INST.GOV, hospital: INST.HOSP, school: INST.SCHOOL };
+
 // 咬合距离：两个身位（原版约 13px，我们按 1.8m 换算）。
 // 太小会导致「差 0.8m 就永远咬不到」——人和尸都在动，一步只走 0.075m。
 const BITE_R2 = 1.8 * 1.8;
@@ -231,8 +236,14 @@ export class Sim {
     this.expStart = new Float32Array(NMAX);      // 这段连续接触是什么时候开始的
     this.escortOf = new Uint8Array(NMAX);        // 该警员在护送哪位要员（0 = 不在护送）
     this.boostT = new Float32Array(NMAX);        // 加速到期时间（护送 / 出警 30 秒内 ×2）
-    this.wallT = new Float32Array(NMAX);         // 连续被卡住的累计秒数
+    this.wallT = new Float32Array(NMAX);         // 连续被卡住的累计秒数（旧指标，保留兼容）
+    this.anchorT = new Float32Array(NMAX);       // 上次取样时间
+    this.anchorX = new Float32Array(NMAX);       // 取样时的位置
+    this.anchorZ = new Float32Array(NMAX);
     this.ghostT = new Float32Array(NMAX);        // 穿墙到期时间（卡 5 秒 → 3 秒无视碰撞）
+    // ---- 政府行动（面板）：机构归属 + 清剿任务 ----
+    this.jobKind = new Uint8Array(NMAX);         // 工作地类型：0 其它 / 1 政府 / 2 医院 / 3 学校
+    this.purgeT = new Float32Array(NMAX);        // 清剿任务到期时间（期间"对人开火"）
     this.vipStage = new Uint8Array(NMAX);        // 要员护送阶段：0 无 / 1 四人小队去警局 / 2 八人小队出城
     this.vipGoal = new Uint8Array(NMAX);         // 1 = 去警局，2 = 逃出城
     this.vipDone = new Uint8Array(NMAX);         // 1 = 已经安置好（撤离）
@@ -386,6 +397,12 @@ export class Sim {
     this.boostT.fill(0);
     this.wallT.fill(0);
     this.ghostT.fill(0);
+    this.jobKind.fill(0);
+    this.purgeT.fill(0);
+    this.govOrders = { schoolClosed: false, hospitalClosed: false };
+    this.anchorT.fill(0);
+    this.anchorX.fill(0);
+    this.anchorZ.fill(0);
     this.escortOf.fill(0); this.vipStage.fill(0); this.vipGoal.fill(0); this.vipDone.fill(0); this.vipStation.fill(0);
     this.trust.fill(0); this.familyDuty.fill(0); this.willpower.fill(0); this.courage.fill(0);
     this.infRoute.fill(0); this.exposedAt.fill(0); this.expStart.fill(0);
@@ -569,6 +586,7 @@ export class Sim {
       // 工作地：在该职业对应的 POI 里挑"离家最近的那个"（从 3 个候选里挑最近），
       // 这样通勤距离现实一点（原来家和工作地毫无关系，平均 1.2km，走 15 分钟）
       const kind = JOB_POI[jobFor(i, this.age[i] || ageOf(i))];
+      this.jobKind[i] = JOB_KIND_CODE[kind] || 0;   // 政府行动面板按这个统计雇员
       const list = kind ? this.poiByKind[kind] : null;
       let wx, wz;
       if (list && list.length) {
@@ -1334,6 +1352,9 @@ export class Sim {
     add(GOAL.HOLD, '基线', 0.10);
     add(GOAL.FOLLOW, '基线', 0.15 * (0.35 + 0.65 * panic));
     add(GOAL.WORK, '基线', 0.30);
+    // 政府命令：学校停课 → 学生/教职工不用去学校；医院停止收治 → 别再往医院跑
+    if (this.govOrders.schoolClosed && this.jobKind[i] === INST.SCHOOL) add(GOAL.WORK, '学校停课', -1.20);
+    if (this.govOrders.hospitalClosed) add(GOAL.HELP, '医院停止收治', -1.50);
     add(GOAL.NONE, '基线', 0.20);
 
     // ---- 属性项 ----
@@ -1464,8 +1485,18 @@ export class Sim {
       return;
     }
 
+    // ---- 政府命令（行动面板下达）：学校停课 / 医院停止收治 ----
+    if (this.govOrders.schoolClosed && this.jobKind[i] === INST.SCHOOL && this.goal[i] === GOAL.WORK) {
+      this.setGoal(i, GOAL.HOME, this.homeX[i], this.homeZ[i]);
+      return;
+    }
+    if (this.govOrders.hospitalClosed && this.goal[i] === GOAL.HELP) {
+      this.setGoal(i, GOAL.HOME, this.homeX[i], this.homeZ[i]);
+      return;
+    }
+
     // 发病的人：不管知不知道外面出事了，都会往医院跑（零号病人的核心叙事）
-    if (this.sick[i] && this.state[i] === ST.INFECTED) {
+    if (this.sick[i] && this.state[i] === ST.INFECTED && !this.govOrders.hospitalClosed) {
       const hp = this.nearestPoi('hospital', this.px[i], this.pz[i]);
       if (hp) {
         if (this.goal[i] !== GOAL.HELP) this.setGoal(i, GOAL.HELP, hp.x, hp.z);
@@ -2078,7 +2109,10 @@ export class Sim {
                                 st === ST.INFECTED || st === ST.WILD)          // 丧尸的猎物：人和野兽
                   : want === 6 ? (st === ST.CIV || st === ST.FLEE || st === ST.FIGHT ||
                                   st === ST.POLICE || st === ST.SOLDIER || st === ST.ZOMBIE)
-                    : (st === ST.POLICE);
+                    // want 7 = 清剿：除了自己人（警察/士兵）以外全打，人和尸都算
+                    : want === 7 ? (st === ST.CIV || st === ST.FLEE || st === ST.FIGHT ||
+                                    st === ST.INFECTED || st === ST.ZOMBIE || st === ST.WILD)
+                      : (st === ST.POLICE);
           if (!ok) continue;
           if (this.aStage[j]) continue;      // 正在转身/倒地的不是有效目标
           const dx = this.px[j] - x0, dz = this.pz[j] - z0;
@@ -2344,17 +2378,28 @@ export class Sim {
     }
 
     if (this.ensureNav()) {
+      // ---- 卡死判定：看"位移"而不是"这一帧有没有动" ----
+      // 打转的人每帧都在动（steer 永远返回 true），只看 moved 永远判断不出来。
+      // 每 5 秒取一次样：这 5 秒里净位移 < 3m → 认定卡死 → 开 3 秒穿墙。
+      // 只对"确实在赶路"的个体做卡死判定：站着待命/原地晃的人不该被传走
+      const going = speed > 0.3 && (dx * dx + dz * dz) > 1 &&
+                    this.goal[i] !== GOAL.NONE && this.goal[i] !== GOAL.HOLD;
+      if (!going) {
+        this.anchorT[i] = 0;
+      } else if (this.anchorT[i] === 0) {
+        this.anchorT[i] = this.time; this.anchorX[i] = this.px[i]; this.anchorZ[i] = this.pz[i];
+      } else if (this.time - this.anchorT[i] >= 5) {
+        const ax = this.px[i] - this.anchorX[i], az = this.pz[i] - this.anchorZ[i];
+        // 双重条件：5 秒挪不到 3m  **并且** 正前方 1.2m 就是墙 —— 只有真被墙挡住才开幽灵，
+        // 单纯走得慢（排队、等人、潜伏去医院）不算，否则会变成大批人穿墙
+        const dl = Math.hypot(dx, dz) || 1;
+        const bx = this.px[i] + (dx / dl) * 1.2, bz = this.pz[i] + (dz / dl) * 1.2;
+        const blockedAhead = !this.walkable(bx, bz);
+        if (ax * ax + az * az < 9 && blockedAhead) this.ghostT[i] = this.time + 3;
+        this.anchorT[i] = this.time; this.anchorX[i] = this.px[i]; this.anchorZ[i] = this.pz[i];
+      }
       this.steer.time = this.time;
       const moved = this.steer.step(i, dx, dz, speed, dt);
-      // 卡住计时：走得动就清零，连续 5 秒走不动 → 开 3 秒穿墙
-      if (moved) this.wallT[i] = 0;
-      else {
-        this.wallT[i] += dt;
-        if (this.wallT[i] > 5) {
-          this.ghostT[i] = this.time + 3;
-          this.wallT[i] = 0;
-        }
-      }
       if (!moved && this.stuck[i] > 0.6) {
         this.stuck[i] = 0;
         this.pathN[i] = 0;
@@ -2475,7 +2520,9 @@ export class Sim {
           this.nearC[i] = this.findNearest(i, 4, 60);
         } else if (st === ST.POLICE || st === ST.SOLDIER) {
           // 士兵看得更远（步枪 + 训练），警察 46m、士兵 60m
-          this.nearZ[i] = this.findNearest(i, 1, st === ST.SOLDIER ? 80 : 50);
+          // 清剿任务期间：人和尸都打（want 7），否则只打丧尸
+          this.nearZ[i] = this.findNearest(i, this.purgeT[i] > this.time ? 7 : 1,
+            st === ST.SOLDIER ? 80 : 50);
           // 警察有电台，默认知道；但零号病人模式下连他们也不知道（还没发生任何事）
           // 警察有电台，但只有"城里真的还有丧尸"时他们才知道
           if (!this.longInc && this.stats.zombie > 0 && this.aware[i] < 3) this.setAware(i, 3);
