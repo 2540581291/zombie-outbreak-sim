@@ -11,6 +11,7 @@
     "test:navplanner": "node tools/test_navplanner.mjs",
     "test:navportal": "node tools/test_navportal.mjs",
     "bench": "node tools/bench_nav.mjs",
-    "serve": "python -m http.server 8777"
+    "serve": "python -m http.server 8777",
+    "test:navflow": "node tools/test_navflow.mjs"
   }
 }
