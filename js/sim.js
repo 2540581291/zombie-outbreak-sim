@@ -4873,6 +4873,16 @@ export class Sim {
       },
       growth: awarePart + infectPart + heatTotal,
       shrink: this.chaosCalm + this.chaosKillCut,
+      // 两边的理论最大值（增长与减少各自独立，互不影响）
+      max: {
+        aware: 100 * CHAOS_W.aware,          // 知情 100%
+        infect: 100 * CHAOS_W.infect,        // 感染 100%
+        heat: CHAOS_W.heatCap,
+        growth: 100 * CHAOS_W.aware + 100 * CHAOS_W.infect + CHAOS_W.heatCap,
+        calm: CHAOS_W.calmCap,
+        kill: CHAOS_W.heatCap,
+        shrink: CHAOS_W.calmCap + CHAOS_W.heatCap,
+      },
     };
   }
   /** 卫生状态明细（给面板用） */

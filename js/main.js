@@ -2245,7 +2245,6 @@ function loop(t) {
     //   拿它当听者会让"整个地图的声音都在耳边"。
     const lx = Number.isFinite(rig.target.x) ? rig.target.x : 0;
     const lz = Number.isFinite(rig.target.z) ? rig.target.z : 0;
-    if (!audio.__ranged && nav) { audio.setRangeFromNav(nav); audio.__ranged = true; }
     audio.setView(lx, lz, rx, rz);
     if (sim) { sim.playerX = lx; sim.playerZ = lz; }
     audio.frame(sim);

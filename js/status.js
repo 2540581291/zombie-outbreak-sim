@@ -421,6 +421,15 @@ export function openChaosInfo(sim) {
   h += row('50% · 秩序崩溃（全城避难 + 警局开库）', (sim.chaos || 0) >= 50 ? '已触发' : '未触发');
   h += row('80% · 要员八人队出城', (sim.chaos || 0) >= 80 ? '已触发' : '未触发');
 
+  // ---------------- 理论最大 ----------------
+  h += '<div class="sp-divider"></div>';
+  h += sec('两边各自的最大值（互不影响）');
+  h += row('增长最大', '+' + d.max.growth.toFixed(0));
+  h += sub(`知情 ${d.max.aware.toFixed(0)}（100% 知情） + 感染 ${d.max.infect.toFixed(0)}（100% 感染） + 热度 ${d.max.heat}`);
+  h += row('减少最大', '−' + d.max.shrink.toFixed(0));
+  h += sub(`自然平静 ${d.max.calm}（50 游戏小时攒满） + 击杀削减 ${d.max.kill}`);
+  h += row('混乱度', '钳(增长 − 减少, 0, 100)');
+
   body.innerHTML = h;
   el.classList.remove('hidden');
 }

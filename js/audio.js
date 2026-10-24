@@ -3,7 +3,7 @@
 //  全部用 WebAudio 合成，不加载任何素材（零包体、零版权）
 // ============================================================
 
-const RANGE = 500;      // 超过这个距离听不到
+const RANGE = 50;       // 超过这个距离听不到（固定值，按用户要求）
 
 export class AudioEngine {
   constructor() {
@@ -82,18 +82,11 @@ export class AudioEngine {
     return g;
   }
 
-  /** 按地图大小定听距：小图（莱斯特 507m）听不到半个城，大图最多 500m */
-  setRangeFromNav(nav) {
-    if (!nav) return;
-    const span = Math.max(nav.halfW, nav.halfH) * 2;
-    this.range = Math.min(RANGE, Math.max(120, span * 0.5));
-  }
-
   _spatial(x, z) {
     const L = this.listener;
     const dx = x - L.x, dz = z - L.z;
     const d = Math.hypot(dx, dz);
-    const k = Math.max(0, 1 - d / (this.range || RANGE));
+    const k = Math.max(0, 1 - d / RANGE);
     return {
       d,
       gain: k * k,
