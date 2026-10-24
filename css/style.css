@@ -285,9 +285,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
 }
 
 
-/* 指北针 */
-#compass { position: absolute; z-index: 5; left: 12px; top: 116px;
-  width: 88px; height: 88px; pointer-events: none; opacity: .9; }
 /* 参数面板里的下拉 */
 .p-sel { flex: 1; background: rgba(255,255,255,.08); color: #cfd6dd; border: 1px solid rgba(255,255,255,.15);
   border-radius: 5px; padding: 3px 5px; font: inherit; font-size: 11px; }

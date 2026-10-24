@@ -131,53 +131,6 @@ function applyCamera() {
   sky.scale.setScalar(camera.far * 0.8);
 }
 
-// ---------- 指北针 ----------
-//  compass：东 = +x，西 = -x，南 = +z，北 = -z。2D 模式强制正北朝上。
-const CMP = $('compass');
-const CMP_CTX = CMP ? CMP.getContext('2d') : null;
-const DIRS = [
-  ['N', [0, 0, -1]], ['E', [1, 0, 0]], ['S', [0, 0, 1]], ['W', [-1, 0, 0]],
-];
-function drawCompass() {
-  if (!CMP_CTX) return;
-  const yaw = retroMode ? 0 : rig.yaw;
-  const rx = Math.cos(yaw), rz = -Math.sin(yaw);      // 屏幕右方向（世界 xz）
-  const ux = -Math.sin(yaw), uz = -Math.cos(yaw);     // 屏幕上方向（世界 xz，水平投影）
-  const W = CMP.width, H = CMP.height, cx = W / 2, cy = H / 2, R = 30;
-  CMP_CTX.clearRect(0, 0, W, H);
-  CMP_CTX.beginPath();
-  CMP_CTX.arc(cx, cy, R + 9, 0, 6.2832);
-  CMP_CTX.strokeStyle = 'rgba(255,255,255,.16)';
-  CMP_CTX.lineWidth = 1;
-  CMP_CTX.stroke();
-
-  const screen = (d) => [d[0] * rx + d[2] * rz, -(d[0] * ux + d[2] * uz)];
-
-  // 方位字母
-  CMP_CTX.font = '600 13px "Segoe UI", "Microsoft YaHei", sans-serif';
-  CMP_CTX.textAlign = 'center';
-  CMP_CTX.textBaseline = 'middle';
-  for (const [k, d] of DIRS) {
-    const [sx, sy] = screen(d);
-    CMP_CTX.fillStyle = k === 'N' ? '#e2542b' : 'rgba(207,214,221,.85)';
-    CMP_CTX.fillText(k, cx + sx * R, cy + sy * R);
-  }
-  // 北向箭头
-  const [nx, ny] = screen([0, 0, -1]);
-  CMP_CTX.beginPath();
-  CMP_CTX.moveTo(cx + nx * (R - 12), cy + ny * (R - 12));
-  CMP_CTX.lineTo(cx + nx * 8 + (-ny) * 5, cy + ny * 8 + nx * 5);
-  CMP_CTX.lineTo(cx + nx * 8 - (-ny) * 5, cy + ny * 8 - nx * 5);
-  CMP_CTX.closePath();
-  CMP_CTX.fillStyle = 'rgba(226,84,43,.85)';
-  CMP_CTX.fill();
-  // 中心点
-  CMP_CTX.beginPath();
-  CMP_CTX.arc(cx, cy, 2.2, 0, 6.2832);
-  CMP_CTX.fillStyle = 'rgba(207,214,221,.7)';
-  CMP_CTX.fill();
-}
-
 // ---------- 输入 ----------
 const keys = new Set();
 addEventListener('keydown', (e) => {
@@ -1142,7 +1095,7 @@ function updateTracers() {
 }
 
 // ---------- 爆发模式 ----------
-//  compass：东 = +x，西 = -x，南 = +z，北 = -z（正北朝上）
+//  世界坐标约定：东 = +x，西 = -x，南 = +z，北 = -z（2D 模式正北朝上）
 const MOPT = { dir: 'N', points: 3, perPoint: 40, carriers: 3, waves: 4, waveInterval: 40, waveCount: 40 };
 const MODE_HINT = {
   single: '随机一处冒出来（默认）。数量用上面「初始丧尸」。',
@@ -1340,14 +1293,7 @@ function kickAudio() {
 }
 addEventListener('pointerdown', kickAudio, { once: true });
 addEventListener('keydown', kickAudio, { once: true });
-
-$('btn-sound').onclick = () => {
-  audioOn = !audioOn;
-  kickAudio();
-  audio.setMuted(!audioOn);
-  $('btn-sound').textContent = audioOn ? '🔊 声音' : '🔇 静音';
-  $('btn-sound').style.opacity = audioOn ? '1' : '.55';
-};
+// 顶栏的"声音"按钮已移除：音频仍在首次交互时自动初始化（默认开启）
 
 // ---------- 指挥工具：UI + 特效 ----------
 let activeTool = 'select';
@@ -2311,7 +2257,6 @@ function loop(t) {
   }
 
   sky.position.copy(camera.position);
-  drawCompass();
   if (cityRef?.mat) {
     cityRef.mat.uniforms.uCam.value.copy(camera.position);
     cityRef.mat.uniforms.uFog.value.copy(FOG);
@@ -2391,10 +2336,6 @@ function loop(t) {
     setPct("n-infect", (sim.infectRate || 0) * 100);
     setPct("n-aware", (sim.awareRate || 0) * 100);
     if ($("n-chaos")) $("n-chaos").textContent = Math.round(sim.chaos || 0);
-    if ($('n-exit') && sim.escapeSide) {
-      const side = sim.escapeLine ? sim.escapeLine() : null;
-      $('n-exit').textContent = side ? side.name : '—';
-    }
     if ($('n-chaos')) {
       const c = Math.round(sim.chaos || 0);
       $('n-chaos').textContent = c;

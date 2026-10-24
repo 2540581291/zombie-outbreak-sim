@@ -39,12 +39,6 @@
 #bar-aware{background:#4aa8ff} #bar-chaos{background:#ff8a3d}
 #bar-force{background:#7ed07e} #bar-sanit{background:#c8a6ff}
 
-#topbar .tb-exit{display:flex;flex-direction:column;align-items:flex-start;gap:6px;
-  padding:9px 13px;border-radius:9px;background:rgba(67,224,138,.10);
-  border:1px solid rgba(67,224,138,.28);white-space:nowrap;flex:0 0 auto}
-#topbar .tb-exit em{font-size:11px;color:#8fae9c;font-style:normal;letter-spacing:.10em;line-height:1}
-#topbar .tb-exit b{font-size:19px;color:#43e08a;font-weight:700;line-height:1}
-
 #topbar .tb-btn{padding:9px 13px;border-radius:8px;border:1px solid rgba(255,255,255,.10);
   background:rgba(255,255,255,.04);color:#cfd8e3;font-size:12px;cursor:pointer;white-space:nowrap;flex:0 0 auto}
 #topbar .tb-btn:hover{background:rgba(255,255,255,.09)}

@@ -80,11 +80,6 @@
       </span>
     </span>
     <span class="tb-div"></span>
-    <!-- 撤离口（方向，不是计数） -->
-    <span class="tb-exit" title="本局唯一的撤离口：平民跑到这条边就算逃出城">
-      <em>撤离口</em><b id="n-exit">—</b>
-    </span>
-    <button class="tb-btn" id="btn-sound" title="声音开关">🔊</button>
     <button class="tb-btn" id="btn-force" title="武力状态明细">武力</button>
     <button class="tb-btn" id="btn-sanit" title="卫生状态明细">卫生</button>
     <button class="tb-btn" id="btn-overview" title="全体人员总览（O）">总览</button>
@@ -176,26 +171,10 @@
 
 <!-- 结局横幅 -->
 <div id="nighttint"></div>
-<canvas id="compass" width="88" height="88" title="指北针（2D 模式强制正北朝上）"></canvas>
 <div id="banner" class="hidden"><span id="banner-txt"></span></div>
 
 <script type="module" src="js/main.js"></script>
-<script>
-  // TEMP-DEBUG-TOP
-  window.addEventListener('load', () => setTimeout(() => {
-    const r = (sel) => { const el = document.querySelector(sel); if (!el) return null; const b = el.getBoundingClientRect(); return [Math.round(b.x), Math.round(b.y), Math.round(b.width), Math.round(b.height)]; };
-    const tb = document.querySelector('#topbar');
-    document.title = 'M ' + JSON.stringify({
-      tb: r('#topbar'), right: r('.tb-right'), stat: r('.tb-stat'), cap: r('.tb-cap'), num: r('.tb-stat b'),
-      gauge: r('.tb-gauge'), exit: r('.tb-exit'), btn: r('.tb-btn'),
-      tbH: getComputedStyle(tb).height, tbPad: getComputedStyle(tb).padding,
-      statH: getComputedStyle(document.querySelector('.tb-stat')).height,
-      overflow: getComputedStyle(document.querySelector('.tb-right')).overflow,
-      rightW: document.querySelector('.tb-right').scrollWidth,
-      viewW: innerWidth,
-    });
-  }, 4000));
-</script>
+
 </body>
 </html>
 

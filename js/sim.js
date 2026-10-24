@@ -230,6 +230,7 @@ export class Sim {
     this.exposedAt = new Float32Array(NMAX);     // 上一次被"接触类感染者"贴住的时刻（0 = 没被贴）
     this.expStart = new Float32Array(NMAX);      // 这段连续接触是什么时候开始的
     this.escortOf = new Uint8Array(NMAX);        // 该警员在护送哪位要员（0 = 不在护送）
+    this.boostT = new Float32Array(NMAX);        // 加速到期时间（护送 / 出警 30 秒内 ×2）
     this.vipStage = new Uint8Array(NMAX);        // 要员护送阶段：0 无 / 1 四人小队去警局 / 2 八人小队出城
     this.vipGoal = new Uint8Array(NMAX);         // 1 = 去警局，2 = 逃出城
     this.vipDone = new Uint8Array(NMAX);         // 1 = 已经安置好（撤离）
@@ -380,6 +381,7 @@ export class Sim {
     this.noises.length = 0; this.alarms.length = 0; this.deathAlarms.length = 0; this.eventSeq = 0; this.nextDispatch = 0;
     this.homeStocks.clear();
     this.stationOf.fill(0); this.patrol.fill(0);
+    this.boostT.fill(0);
     this.escortOf.fill(0); this.vipStage.fill(0); this.vipGoal.fill(0); this.vipDone.fill(0); this.vipStation.fill(0);
     this.trust.fill(0); this.familyDuty.fill(0); this.willpower.fill(0); this.courage.fill(0);
     this.infRoute.fill(0); this.exposedAt.fill(0); this.expStart.fill(0);
@@ -2314,6 +2316,8 @@ export class Sim {
   }
 
   move(i, dx, dz, speed, dt) {
+    // 护送要员 / 出警执行任务：30 秒内速度翻倍（在 move 里统一加，所有路径都覆盖）
+    if (this.boostT[i] > this.time) speed *= 2;
     if (this.ensureNav()) {
       this.steer.time = this.time;
       const moved = this.steer.step(i, dx, dz, speed, dt);
@@ -3498,7 +3502,7 @@ export class Sim {
     const r = this.dispatchPolice(x, z, n);
     if (!r.ok) return false;
     const slot = this.vips.indexOf(vipIdx) + 1;    // 存"第几个要员"，不能存个体下标（Uint8 会溢出）
-    if (slot > 0) for (const i of (r.ids || [])) this.escortOf[i] = slot;
+    if (slot > 0) for (const i of (r.ids || [])) { this.escortOf[i] = slot; this.boostT[i] = this.time + 30; }
     this.vipGoal[vipIdx] = goalKind;
     this.pushEvent(`派出 ${r.n} 人护送要员（${goalKind === 1 ? '去警局' : '撤离'}）`, 'start');
     return true;
@@ -3646,6 +3650,7 @@ export class Sim {
       const i = pool[k][0];
       this.setGoal(i, GOAL.MOVE_TO, x, z);
       this.decT[i] = 1e9;          // 警察不听"社会决策"，只听调度
+      this.boostT[i] = this.time + 30;   // 出警 30 秒内速度翻倍
       made.push(i);
     }
     this.pushEvent(`出警 ${made.length} 人（${st.dist.toFixed(0)}m 外警局）`, 'start');
