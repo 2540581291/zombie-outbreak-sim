@@ -2461,6 +2461,23 @@ export class Sim {
               this.nav.grid[ci] = 0x03;        // 塌了：变成可走空地
               this.wallHit.delete(ci);
               this.wallsDown = (this.wallsDown || 0) + 1;
+              // 墙没了 → 规划器的路径缓存也失效（缓存键是"起点格→终点格"，
+              // 里面存的是绕这堵墙的路线），顺手清掉
+              if (this.navWorld && this.navWorld.planner && this.navWorld.planner.cache) {
+                if (this.time >= (this._planCacheClearT || 0)) {
+                  this.navWorld.planner.cache.clear();
+                  this._planCacheClearT = this.time + 1.5;   // 最多 1.5 秒清一次，避免连塌时抖动
+                }
+              }
+              // 附近人的旧路径（绕着这堵墙规划的）全部作废，否则他们会继续绕
+              if (this.forEachNear) {
+                this.forEachNear(bx, bz, 18, (j) => {
+                  const sj = this.state[j];
+                  if (sj === ST.CORPSE || sj === ST.SAVED) return;
+                  this.pathN[j] = 0; this.pathIdx[j] = 0;
+                  this.wpT[j] = 0; this.decT[j] = 0;
+                });
+              }
               if (this.wallDownQueue.length < 64) {
                 const cc = ci % this.nav.cols, rr = (ci / this.nav.cols) | 0;
                 this.wallDownQueue.push({ x: bx, z: bz, c: cc, r: rr });
