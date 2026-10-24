@@ -3062,9 +3062,11 @@ export class Sim {
           // 开火冷却每帧递减（原来只有"锁定目标"那条分支递减，
           // 结果回局/驻守/赶路的警察 cool 永远停在初始随机值上 → 一辈子不开枪）
           if (this.cool[i] > 0) this.cool[i] -= cdt;
-          // ---- 弹药打光 → 先回警局补给（不看有没有目标）----
+          // ---- 弹药见底 → 先回警局补给（不看有没有目标）----
+          //   触发条件：**弹匣空了，且备弹连一匣都凑不齐**（这是"弹匣空了就回所"的合理版本；
+          //   以前要弹匣+备弹全打光才回，等于四条弹匣打满才想起来补给）
           //   优先级：有目标逃跑（fleeMode 2）> 补给 > 原地待命
-          if (this.ammo[i] <= 0 && this.mag[i] <= 0 && this.reserve[i] <= 0 && this.fleeMode[i] !== 2) {
+          if (this.needsAmmo(i) && this.fleeMode[i] !== 2) {
             const siR = this.stationOf[i] - 1;
             const stR = siR >= 0 ? (this.poiByKind.police || [])[siR] : null;
             if (stR) {
@@ -3075,19 +3077,7 @@ export class Sim {
                 this.move(i, dxR, dzR, this.spd[i] * 1.05, cdt);
                 break;
               }
-              const wid = this.wpn[i], wR = weaponOf(wid);
-              const avail = stR.store && stR.store.a ? (stR.store.a[wid] || 0) : 0;
-              const got = Math.min(wR.mag * 4, avail);
-              if (got > 0) {
-                stR.store.a[wid] = avail - got;
-                if (!stR.taken) stR.taken = { civ: 0, cop: 0, guns: 0, ammo: 0 };
-                stR.taken.cop += got; stR.taken.ammo += got;
-                this.mag[i] = Math.min(wR.mag, got);
-                this.reserve[i] = Math.min(255, got - this.mag[i]);
-                this.ammo[i] = this.mag[i];
-                this.rlUntil[i] = this.time + wR.reload;
-                break;
-              }
+              if (this.tryRefill(i)) break;
             }
           }
           // ---- 护送任务最高优先级：要员在哪我就在哪（混乱 50% 回局的规则也压不住）----
@@ -3171,9 +3161,8 @@ export class Sim {
             const dx = this.px[z] - this.px[i], dz = this.pz[z] - this.pz[i];
             this.heading[i] = Math.atan2(dz, dx);
             if (this.cool[i] <= 0) {
-              if (this.ammo[i] <= 0 && this.reserve[i] <= 0) {
-                // 没子弹了：先去最近的警局补给（弹药是共用的），
-                // 但"有目标逃跑"的优先级更高 —— 正在逃跑就先跑，不回去拿子弹。
+              if (this.needsAmmo(i)) {
+                // 打不动了：先回警局补给（弹药是共用的），但"有目标逃跑"优先级更高
                 if (this.fleeMode[i] !== 2) {
                   const si2 = this.stationOf[i] - 1;
                   const st2 = si2 >= 0 ? (this.poiByKind.police || [])[si2] : null;
@@ -3185,23 +3174,7 @@ export class Sim {
                       this.move(i, dx2, dz2, this.spd[i] * 1.05, cdt);
                       break;
                     }
-                    // 到局了：从共用弹药池补一个弹匣 + 3 个备弹匣
-                    const wid = this.wpn[i];
-                    const w2 = weaponOf(wid);
-                    const avail = st2.store && st2.store.a ? (st2.store.a[wid] || 0) : 0;
-                    const need = w2.mag * 4;
-                    const got = Math.min(need, avail);
-                    if (got > 0) {
-                      st2.store.a[wid] = avail - got;
-                      if (!st2.taken) st2.taken = { civ: 0, cop: 0, guns: 0, ammo: 0 };
-                      st2.taken.cop += got; st2.taken.ammo += got;
-                      this.reserve[i] = Math.min(255, (this.reserve[i] || 0) + got);
-                      this.mag[i] = Math.min(w2.mag, this.reserve[i]);
-                      this.reserve[i] -= this.mag[i];
-                      this.ammo[i] = this.mag[i];
-                      this.rlUntil[i] = this.time + w2.reload;
-                      break;
-                    }
+                    if (this.tryRefill(i)) break;
                   }
                 }
                 this.state[i] = ST.FLEE; this.panic[i] = 1.4; this.stam[i] = 1; break;
@@ -3789,6 +3762,51 @@ export class Sim {
   //   士兵：从政府大楼门口刷出来，然后走过去
   // 这样"派军队去医院"和"派警察去医院"除了出发点不同，行为链路完全一致。
 
+  // ---------- 弹药：携带上限 / 补给 ----------
+
+  /**
+   * 一个人最多带多少发：**以武器表为准**（mag + reserve）。
+   *   手枪 15+45=60 · 步枪 30+90=120 · 突击步枪 30+120=150 · 轻机枪 100+200=300
+   * 补给时补到这个总数为止，不会越补越多。
+   * （以前第二处补给写的是 `min(255, reserve+got)`，如果哪天放宽触发条件，
+   *   一个人能被堆到 255 备弹 + 满弹匣 = 270+ 发，和出厂值对不上。）
+   */
+  carryCap(i) {
+    const w = weaponOf(this.wpn[i]);
+    return w && w.id ? (w.mag + w.reserve) : 0;
+  }
+
+  /** 还打得动吗：弹匣空、且备弹连一匣都凑不齐 → 该回所补给了 */
+  needsAmmo(i) {
+    const w = weaponOf(this.wpn[i]);
+    if (!w || w.id === 0) return false;
+    return this.mag[i] <= 0 && this.reserve[i] < w.mag;
+  }
+
+  /** 在局里补一次：补到 mag×4 为止，先装满弹匣、剩下进备弹 */
+  tryRefill(i) {
+    const si = this.stationOf[i] - 1;
+    const st = si >= 0 ? (this.poiByKind.police || [])[si] : null;
+    if (!st || !st.store) return false;
+    const wid = this.wpn[i], w = weaponOf(wid);
+    if (!w || !w.id) return false;
+    const cap = this.carryCap(i);
+    const carry = this.mag[i] + this.reserve[i];
+    const want = cap - carry;
+    if (want <= 0) return false;
+    const avail = st.store.a[wid] || 0;
+    const got = Math.min(want, avail);
+    if (got <= 0) return false;
+    st.store.a[wid] = avail - got;
+    if (!st.taken) st.taken = { civ: 0, cop: 0, guns: 0, ammo: 0 };
+    st.taken.cop += got; st.taken.ammo += got;
+    const toMag = Math.min(got, Math.max(0, w.mag - this.mag[i]));
+    this.mag[i] = Math.min(255, this.mag[i] + toMag);
+    this.reserve[i] = Math.min(255, this.reserve[i] + (got - toMag));
+    this.ammo[i] = this.mag[i];
+    this.rlUntil[i] = this.time + w.reload;
+    return true;
+  }
   // ---------- 政府 / 机构：自动决策（玩家没有操作权，只能看）----------
 
   /** 记一条政府/机构的自动决策（面板会显示） */
