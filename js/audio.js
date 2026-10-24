@@ -3,8 +3,7 @@
 //  全部用 WebAudio 合成，不加载任何素材（零包体、零版权）
 // ============================================================
 
-const RANGE = 950;      // 超过这个距离听不到
-const MAX_VOICE = 14;   // 每帧最多同时触发多少个事件音
+const RANGE = 500;      // 超过这个距离听不到
 
 export class AudioEngine {
   constructor() {
@@ -273,22 +272,17 @@ export class AudioEngine {
     if (!this.ok || !sim) return;
     const t = this.ctx.currentTime;
 
-    // ---- 一次性事件：按距离排序，只播最近的若干个 ----
+    // ---- 一次性事件：按发生顺序立刻播，不排序、不滞留 ----
     const ev = sim.audio;
     if (ev.length) {
-      const L = this.listener;
-      for (const e of ev) {
-        const dx = e.x - L.x, dz = e.z - L.z;
-        e.__d = dx * dx + dz * dz;
-      }
-      ev.sort((a, b) => a.__d - b.__d);
-      const n = Math.min(MAX_VOICE, ev.length);
       const nav = sim.nav;
+      const n = Math.min(24, ev.length);
       for (let i = 0; i < n; i++) {
-        const ind = !!(nav && nav.indoor && nav.indoor(ev[i].x, ev[i].z));
-        this.play(ev[i].type, ev[i].x, ev[i].z, ev[i].g, ind);
+        const e = ev[i];
+        const ind = !!(nav && nav.indoor && nav.indoor(e.x, e.z));
+        this.play(e.type, e.x, e.z, e.g, ind);
       }
-      ev.length = 0;
+      ev.length = 0;          // 超出的直接丢，不做延迟补偿
     }
 
     // ---- 警笛：有 siren 效果时响；否则"附近有警察/士兵"时也响（警察在场感）----
