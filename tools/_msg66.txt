@@ -1,0 +1,29 @@
+原版地图拉取与烘焙：整理成一个可重复执行的脚本
+
+新增 tools/pull_original_map.py —— 把之前分散做完的步骤固化成一条命令。
+
+它做的事（全部基于 reference/core/ 里的原始资源）：
+  1) 找瓦片：images/*.jpg 里所有 256x256 的图，共 324 张（文件名是资源 id，不含坐标）
+  2) 定顺序：images/316.jpg 是 250x250 的整图缩略图，把它缩到 288x288（=18x18 个
+     16x16 单元），每张瓦片也缩到 16x16 灰度，做归一化互相关取最大 → 得到 (row, col)
+     （这一步是关键：按 id 排序、边缘匹配、碰撞表逐块匹配全都拼不对，只有缩略图能定准）
+  3) 拼图：按顺序拼成 4608x4608
+  4) 碰撞表：binaryData/355_...bin 是 zlib 压缩的 1152x1152（4px/格），
+     值映射 0→0x00 3→0x03 7→0x07 15→0x0f 22→0x16 31→0x1f 66→0x42 35→0x43，
+     然后**上下翻转**（影像第 0 行是北，引擎 row 0 是南）
+  5) 建筑：对"室内"格做连通域，≥25 格取包围盒成矩形
+  6) 写出 data/cities/leicester/{city.json, sat.jpg, sat.json}
+
+实测（--check 与正式运行结果一致）：
+  瓦片 324 张
+  缩略图定位最高相似度 252.1
+  碰撞值分布 0x03 63.1% / 0x07 14.9% / 0x1f 11.9% / 0x00 7.7% / 0x42 1.0% / 0x16 0.8% / 0x0f 0.6% / 0x43 37格
+  图 4608x4608，建筑 396 栋，格 0.44m，世界 506.9m
+  重新生成后游戏加载正常：Leicester | 建筑 396 | nav 10ms
+
+用法：
+  python tools/pull_original_map.py --check   # 只校验不写盘
+  python tools/pull_original_map.py           # 生成到 data/cities/leicester
+
+注意：data/cities/index.json 里的条目不在脚本里改（那是城市列表），
+      新城市要手动加一条 {id, name, bbox, size, buildings, cell, cells}。
