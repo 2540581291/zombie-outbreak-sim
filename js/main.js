@@ -1012,8 +1012,10 @@ el.addEventListener('wheel', (e) => {
   e.preventDefault();
   // 2D 的可缩范围比 3D 宽得多（300 ~ 40000），每格滚幅也要更大，否则滚三十几下才到头
   const f = Math.exp(e.deltaY * (retroMode ? 0.0017 : 0.0011));
-  // 2D 最小视距 300（视高约 28 m）——再拉近就只剩空地面，看不到单位
-  const lo = retroMode ? 300 : 26;
+  // 2D 最近视距按地图大小自适应：小图（莱斯特 507m）能拉到 90，视高约 8.5m
+  //   大图（柏林 2401m）仍是 300（视高 28m）
+  const zoomLoMap = Math.max(90, Math.min(300, ((nav && nav.H) || 900) / 6));
+  const lo = retroMode ? zoomLoMap : 26;
   const hi = retroMode ? maxDist2d : MAX_DIST;
   rig.dist = Math.max(lo, Math.min(hi, rig.dist * f));
 }, { passive: false });
