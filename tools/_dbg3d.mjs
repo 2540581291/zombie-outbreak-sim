@@ -16,6 +16,8 @@ await new Promise((r) => { ws.onopen = r; });
 await send('Page.enable'); await send('Runtime.enable');
 await send('Page.navigate', { url: URL0 });
 await sleeps(50000);
+await ev("document.dispatchEvent(new KeyboardEvent('keydown',{code:'Tab',key:'Tab',bubbles:true}))");
+await sleeps(1200);
 await ev("document.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyB',key:'b',bubbles:true}))");
 await sleeps(600);
 await ev(`window.dispatchEvent(new CustomEvent('zos:focus',{detail:{x:${FX},z:${FZ}}}))`);

@@ -93,7 +93,8 @@ for mid in ("map01", "map02", "map03", "map04", "map05"):
                           "b64": base64.b64encode(zlib.compress(grid.tobytes(), 9)).decode()}}
     io.open(os.path.join(outp, "city.json"), "w", encoding="utf-8").write(json.dumps(city, ensure_ascii=False, separators=(",", ":")))
     meta = {"provider": "mobile-original", "image": "sat.jpg", "size": list(img.size),
-            "cell": img.size[0] / n, "citySize": [world, world]}
+            "cell": img.size[0] / n, "citySize": [world, world],
+            "bounds": [-half_lon, -half_lat, half_lon, half_lat]}
     io.open(os.path.join(outp, "sat.json"), "w", encoding="utf-8").write(json.dumps(meta, ensure_ascii=False, indent=1))
     img.resize((420, 420), Image.LANCZOS).save(os.path.join(ROOT, "shots", f"mob_{mid}.jpg"), quality=85)
     print(f"{mid}: 图 {img.size} 格 {n}x{n} cell={cell:.3f}m 世界 {world:.0f}m 建筑 {len(bl)} 栋")

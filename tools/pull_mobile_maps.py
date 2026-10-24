@@ -154,8 +154,11 @@ def convert(apk, map_entry, bin_entry, cid, name):
     }
     io.open(os.path.join(outp, "city.json"), "w", encoding="utf-8").write(
         json.dumps(city, ensure_ascii=False, separators=(",", ":")))
+    half_lon = (world / 2) / 111320.0
+    half_lat = (world / 2) / 110540.0
     meta = {"provider": "mobile-original", "image": "sat.jpg",
-            "size": list(img.size), "cell": px_per_cell, "citySize": [world, world]}
+            "size": list(img.size), "cell": px_per_cell, "citySize": [world, world],
+            "bounds": [-half_lon, -half_lat, half_lon, half_lat]}
     io.open(os.path.join(outp, "sat.json"), "w", encoding="utf-8").write(json.dumps(meta, ensure_ascii=False, indent=1))
     print(f"已转换 {cid}：图 {img.size}，格 {cell:.3f}m，世界 {world:.1f}m，建筑 {len(buildings)} 栋 → {outp}")
 

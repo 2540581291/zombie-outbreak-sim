@@ -184,6 +184,7 @@ def main():
     world = GRID * CELL
     meta = {"provider": "original-2009", "image": "sat.jpg", "size": [S * PX, S * PX],
             "cell": 4, "citySize": [world, world],
+            "bounds": [-half_lon, -half_lat, half_lon, half_lat],
             "note": "Zombie Outbreak Simulator 2009 (Leicester): 324 tiles stitched via minimap"}
     io.open(os.path.join(OUT, "sat.json"), "w", encoding="utf-8").write(json.dumps(meta, ensure_ascii=False, indent=1))
     half_lon = (world / 2) / 111320.0
