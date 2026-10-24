@@ -88,8 +88,11 @@ export function buildHierarchy(ng, opts = {}) {
   // ---------- L1：8 邻接边校验 ----------
   //  关键：判"两格能不能通"不能只看格心连线 —— 城市里相邻两格中间常常
   //  正好是一个楼角，格心连线擦角就判死，整张图会碎成两千多个孤岛。
-  //  标准做法是看**共享边**：只要共享边上有一点（这里取边中点）站得下人，
-  //  并且两侧格心都能走到这个点，这条边就通（路径允许在边中点折一下）。
+  //  标准做法是看**共享边**：只要共享边上有一点站得下人、且两侧格心都能
+  //  走到这个点，这条边就通（路径允许在这个点折一下）。
+  //
+  //  共享边是一条 8 m 的线段，只试中点太苛刻（中点正好是墙就很常见）。
+  //  所以先试中点（多数边一次就过），不过再试 1/4、3/4、1/8、7/8 各点。
   const adj = new Uint8Array(N);
   let edgeN = 0;
   for (let rr = 0; rr < rows; rr++) {
@@ -101,14 +104,10 @@ export function buildHierarchy(ng, opts = {}) {
         if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue;
         const nk = nr * cols + nc;
         if (!walk[nk]) continue;
-        if (DDc[d] !== 0 && DDr[d] !== 0) {
-          if (!walk[rr * cols + nc] || !walk[nr * cols + cc]) continue;   // 不许切墙角
-        }
-        const mx = (repX[k] + repX[nk]) * 0.5;
-        const mz = (repZ[k] + repZ[nk]) * 0.5;
-        if (!ng.walkableR(mx, mz, radius)) continue;
-        if (!ng.losClear(repX[k], repZ[k], mx, mz, radius)) continue;
-        if (!ng.losClear(mx, mz, repX[nk], repZ[nk], radius)) continue;
+        const diag = DDc[d] !== 0 && DDr[d] !== 0;
+        if (diag && (!walk[rr * cols + nc] || !walk[nr * cols + cc])) continue;   // 不许切墙角
+        // 共享边上找连接点（中点 → 偏移），建图与还原共用同一套规则
+        if (!ng.connectPoint(repX[k], repZ[k], repX[nk], repZ[nk], radius)) continue;
         adj[k] |= 1 << d;
         edgeN++;
       }

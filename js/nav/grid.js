@@ -44,6 +44,9 @@ function dt1d(f, n, d, v, z) {
   }
 }
 
+// 共享边上的连接点偏移（相对两点间距离的比例）。0 = 中点，其余是沿法向的偏移。
+export const CONNECT_OFFSETS = [0, -0.25, 0.25, -0.375, 0.375];
+
 export class NavGrid {
   /**
    * @param {{grid:Uint8Array|ArrayLike<number>, cols:number, rows:number, cell:number, halfW:number, halfH:number}} nav
@@ -101,6 +104,32 @@ export class NavGrid {
   indoor(x, z) {
     const i = this.idx(x, z);
     return i >= 0 && (this.grid[i] & 0x18) === 0x18;
+  }
+
+  /**
+   * 两点之间的"连接点"：在两点连线的法向上找几个位置，取第一个"能站人、
+   * 且两侧都走得到"的点。
+   *
+   * 这是 L1 边校验与路径还原**共用的同一套几何规则** —— 建图时用哪一点判通，
+   * 还原时就必须走那一点，否则会出现"图上是通的、折线却穿墙"。
+   *
+   * @returns {[number, number] | null}
+   */
+  connectPoint(ax, az, bx, bz, r = 0) {
+    const ex = bx - ax, ez = bz - az;
+    const len = Math.hypot(ex, ez);
+    if (len < 1e-6) return [ax, az];
+    const nx = -ez / len, nz = ex / len;
+    const mx0 = (ax + bx) * 0.5, mz0 = (az + bz) * 0.5;
+    for (let t = 0; t < CONNECT_OFFSETS.length; t++) {
+      const off = CONNECT_OFFSETS[t] * len;
+      const mx = mx0 + nx * off, mz = mz0 + nz * off;
+      if (!this.walkableR(mx, mz, r)) continue;
+      if (!this.losClear(ax, az, mx, mz, r)) continue;
+      if (!this.losClear(mx, mz, bx, bz, r)) continue;
+      return [mx, mz];
+    }
+    return null;
   }
 
   /**

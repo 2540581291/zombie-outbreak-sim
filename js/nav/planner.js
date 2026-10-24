@@ -16,6 +16,7 @@
 // ============================================================
 
 import { DIRS } from './sectors.js';
+import { Portals } from './portal.js';
 
 const DDc = DIRS.map((d) => d[0]);
 const DDr = DIRS.map((d) => d[1]);
@@ -34,7 +35,7 @@ export class Planner {
     this.prune = true;
     this.weight = 1.3;
     this.debug = false;
-    this.stats = { queries: 0, fails: 0, losShortcut: 0, intraAstar: 0, cacheHits: 0 };
+    this.stats = { queries: 0, fails: 0, losShortcut: 0, intraAstar: 0, cacheHits: 0, indoor: 0 };
 
     const N = hier.N;
     // 簇内 A*
@@ -72,6 +73,9 @@ export class Planner {
     this.sectorClosed = new Uint8Array(SN);
     this.sectorHeap = new Int32Array(SN * 4 + 8);
     this.sectorStamp = 0;
+
+    // 门/室内（S3）：门 = 显式 portal，替掉旧的 56 MB 门场
+    this.portals = opts.portals || new Portals(ng, { radius: this.radius });
 
     this.cache = new Map();
     this.cacheCap = opts.cacheCap || 40000;
@@ -138,8 +142,10 @@ export class Planner {
     return rr * h.cols + cc;
   }
 
-  /** 吸附到最近的可走 L1 格（优先挑代表点"看得见"的格） */
-  snap(x, z, maxR = 3, preferVisible = true) {
+  /** 吸附到最近的可走 L1 格（优先挑代表点"看得见"的格）。
+   *  wantComp >= 0 时只接受该连通分量里的格子 —— 门口那一格常常落在
+   *  楼与楼之间的"口袋"里，和街面根本不是一张图，需要往外多找几格。 */
+  snap(x, z, maxR = 3, preferVisible = true, wantComp = -1) {
     const h = this.h;
     const cc0 = Math.floor((x + this.ng.halfW) / h.cs);
     const rr0 = Math.floor((this.ng.halfH - z) / h.cs);
@@ -154,6 +160,7 @@ export class Planner {
         if (cc < 0 || cc >= h.cols) continue;
         const k = rr * h.cols + cc;
         if (!h.walk[k]) continue;
+        if (wantComp >= 0 && h.compOf[k] !== wantComp) continue;
         const dx = h.repX[k] - x, dz = h.repZ[k] - z;
         const d = dx * dx + dz * dz;
         if (d < bdAny) { bdAny = d; bestAny = k; }
@@ -331,20 +338,110 @@ export class Planner {
 
   // ---------------- 主查询 ----------------
 
+  /**
+   * 对外唯一入口：自动处理"起点/终点在室内"的情况。
+   * 室内段走门 portal（BFS 出折线），室外段走 HPA*。
+   */
   plan(fromX, fromZ, toX, toZ) {
     this.stats.queries++;
+    const ng = this.ng;
+    const P = this.portals;
+    const sIn = ng.indoor(fromX, fromZ);
+    const tIn = ng.indoor(toX, toZ);
+
+    // 全室外：直通
+    if (!sIn && !tIn) return this.planOutdoor(fromX, fromZ, toX, toZ);
+    if (!P) { this.stats.fails++; this.lastFail = 'no-portals'; return null; }
+
+    // 都在室内：同一间房就直接室内直达
+    if (sIn && tIn) {
+      const same = P.roomRoute(fromX, fromZ, toX, toZ);
+      if (same) { this.stats.indoor++; return this.finishRaw(same, 'indoor', 0); }
+    }
+
+    // 起点出口候选（室外端点则只有一个"零长度出口"）
+    const sEx = sIn ? P.exitsFrom(fromX, fromZ, 3) : [{ points: [], outdoor: [fromX, fromZ] }];
+    const tEx = tIn ? P.exitsFrom(toX, toZ, 3) : [{ points: [], outdoor: [toX, toZ] }];
+    if (!sEx.length) { this.stats.fails++; this.lastFail = 'start-sealed'; return null; }
+    if (!tEx.length) { this.stats.fails++; this.lastFail = 'goal-sealed'; return null; }
+
+    // 逐个组合试：门可能通向另一个院子之类的不连通区域
+    let best = null, bestCost = Infinity;
+    for (const a of sEx) {
+      for (const b of tEx) {
+        const core = this.planOutdoor(a.outdoor[0], a.outdoor[1], b.outdoor[0], b.outdoor[1]);
+        if (!core) continue;
+        const cost = (a.cost || 0) + core.cost + (b.cost || 0);
+        if (cost < bestCost) { bestCost = cost; best = { a, b, core }; }
+      }
+    }
+    if (!best) { this.stats.fails++; this.lastFail = 'indoor-exit'; return null; }
+    this.stats.indoor++;
+
+    // 拼接：起点 → 门 → （室外段）→ 门 → 终点
+    const raw = [[fromX, fromZ]];
+    for (const p of best.a.points) raw.push(p);
+    for (const p of best.core.pts) raw.push(p);
+    for (let i = best.b.points.length - 1; i >= 0; i--) raw.push(best.b.points[i]);
+    raw.push([toX, toZ]);
+    return this.finishRaw(raw, 'indoor+hpa', best.core.expanded);
+  }
+
+  /** 纯室外查询（原来的 plan 主体） */
+  planOutdoor(fromX, fromZ, toX, toZ) {
     const h = this.h;
-    const s = this.snap(fromX, fromZ);
-    const t = this.snap(toX, toZ);
+    const ng = this.ng;
+    let s = this.snap(fromX, fromZ);
+    let t = this.snap(toX, toZ);
     if (s < 0 || t < 0) { this.stats.fails++; this.lastFail = 'snap'; return null; }
-    if (h.compOf[s] !== h.compOf[t]) { this.stats.fails++; this.lastFail = 'unreachable'; return null; }
+
+    let prePts = null, postPts = null;
+    let planFromX = fromX, planFromZ = fromZ;
+    let planToX = toX, planToZ = toZ;
+
+    if (h.compOf[s] !== h.compOf[t]) {
+      // 两侧不在一张 8 m 连通图里：多半是门口/楼缝那一格落在"口袋"里。
+      // 在 1 m 网格上走一小段，接到对方所在的分量上（这才是真的走得过去的路）。
+      // accept 还要检查"这一格能看见它所在 8 m 格的代表点"，
+      // 这样连接段的最后一步和粗网格路径的第一段就是同一段可走的路。
+      let hit8 = -1;
+      const acceptFor = (wantComp) => (cell) => {
+        const r = (cell / ng.cols) | 0, c = cell - r * ng.cols;
+        const k = ((r / h.cellSize) | 0) * h.cols + ((c / h.cellSize) | 0);
+        if (h.walk[k] !== 1 || h.compOf[k] !== wantComp) return false;
+        // 收尾条件：走到代表点 2.2 m 以内（这样最后一跳一定在同一个 8 m 格里）
+        const ctr = ng.center(cell);
+        const dd = Math.hypot(ctr[0] - h.repX[k], ctr[1] - h.repZ[k]);
+        if (dd > 1.2 && !this.losOk(ctr[0], ctr[1], h.repX[k], h.repZ[k])) return false;
+        hit8 = k;
+        return true;
+      };
+      const w1 = this.portals.fineWalk(fromX, fromZ, acceptFor(h.compOf[t]), 12000);
+      if (w1 && w1.length > 1 && hit8 >= 0) {
+        prePts = w1;
+        s = hit8;
+        this.stats.fineWalk = (this.stats.fineWalk || 0) + 1;
+      } else {
+        hit8 = -1;
+        const w2 = this.portals.fineWalk(toX, toZ, acceptFor(h.compOf[s]), 12000);
+        if (w2 && w2.length > 1 && hit8 >= 0) {
+          const rev = [...w2].reverse();
+          postPts = rev;
+          t = hit8;
+          this.stats.fineWalk = (this.stats.fineWalk || 0) + 1;
+        }
+      }
+      if (s < 0 || t < 0 || h.compOf[s] !== h.compOf[t]) {
+        this.stats.fails++; this.lastFail = 'unreachable'; return null;
+      }
+    }
     const sSid = h.sectorOf[s], tSid = h.sectorOf[t];
 
-    if (s === t) return this.finish([s], fromX, fromZ, toX, toZ, 'same-cell', 0);
+    if (s === t) return this.finish([s], fromX, fromZ, toX, toZ, 'same-cell', 0, prePts, postPts);
     if (sSid === tSid) {
       const cells = this.intraPath(sSid, s, t);
       if (!cells) { this.stats.fails++; this.lastFail = 'intra'; return null; }
-      return this.finish(cells, fromX, fromZ, toX, toZ, 'intra', cells.length);
+      return this.finish(cells, fromX, fromZ, toX, toZ, 'intra', cells.length, prePts, postPts);
     }
 
     let chain = this.abstractSearch(s, t, sSid, tSid);
@@ -352,7 +449,6 @@ export class Planner {
       this.prune = false;
       chain = this.abstractSearch(s, t, sSid, tSid);
       this.prune = true;
-    this.weight = 1.3;
     }
     if (!chain) { this.stats.fails++; return null; }
 
@@ -379,7 +475,7 @@ export class Planner {
     if (!pushAll(this.intraPath(tSid, chain[chain.length - 1], t))) {
       this.stats.fails++; this.lastFail = 'leg-goal'; return null;
     }
-    return this.finish(cells, fromX, fromZ, toX, toZ, 'hpa', chain.length);
+    return this.finish(cells, fromX, fromZ, toX, toZ, 'hpa', chain.length, prePts, postPts);
   }
 
   abstractSearch(s, t, sSid, tSid) {
@@ -512,12 +608,27 @@ export class Planner {
 
   // ---------------- 收尾：格链 → 世界折线（string pulling） ----------------
 
-  finish(cells, fromX, fromZ, toX, toZ, kind, expanded) {
+  finish(cells, fromX, fromZ, toX, toZ, kind, expanded, prePts, postPts) {
     const h = this.h;
     const raw = [[fromX, fromZ]];
-    for (let i = 0; i < cells.length; i++) raw.push([h.repX[cells[i]], h.repZ[cells[i]]]);
+    if (prePts) for (const p of prePts) raw.push(p);
+    for (let i = 0; i < cells.length; i++) {
+      const c = cells[i];
+      // 相邻两格之间插"共享边连接点"：建图时用哪一点判通，还原就必须走那一点
+      if (i > 0) {
+        const a = cells[i - 1];
+        const cp = this.ng.connectPoint(h.repX[a], h.repZ[a], h.repX[c], h.repZ[c], this.radius);
+        if (cp) raw.push(cp);
+      }
+      raw.push([h.repX[c], h.repZ[c]]);
+    }
+    if (postPts) for (const p of postPts) raw.push(p);
     raw.push([toX, toZ]);
+    return this.finishRaw(raw, kind, expanded);
+  }
 
+  /** 已经是世界折线（含室内段）时的收尾：string pulling + 代价 */
+  finishRaw(raw, kind, expanded) {
     if (this.debug) {
       for (let k = 1; k < raw.length; k++) {
         if (!this.losOk(raw[k - 1][0], raw[k - 1][1], raw[k][0], raw[k][1])) {
@@ -526,7 +637,6 @@ export class Planner {
         }
       }
     }
-
     const out = [raw[0]];
     let i = 0;
     while (i < raw.length - 1) {
