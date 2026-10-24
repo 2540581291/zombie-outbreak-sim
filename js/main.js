@@ -544,6 +544,14 @@ let lastCardT = 0;           // 上次刷新卡片的时间戳（节流到 200ms
 
 /** 城市选择弹窗：缩略图网格 + 按国家分栏 */
 const COUNTRY_ORDER = ['中国', '德国', '日本', '英国', '美国', '巴西', '加拿大', '澳大利亚', '其他'];
+/** 城市面积（km²），size 是米 */
+function areaKm2(c) {
+  const s = c && c.size;
+  if (!s || s.length < 2) return '—';
+  const a = (s[0] * s[1]) / 1e6;
+  return a >= 10 ? a.toFixed(1) : a >= 1 ? a.toFixed(2) : a.toFixed(3);
+}
+
 function openCityPicker() {
   const cityIndex = window.__cityIndex || [];   // cityIndex / CID 都是 boot() 里的局部变量
   const CID = window.__CID || '';
@@ -566,17 +574,16 @@ function openCityPicker() {
     const ia = COUNTRY_ORDER.indexOf(a), ib = COUNTRY_ORDER.indexOf(b);
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
   });
-  const tabs = [];
-  if (official.length) tabs.push({ key: '官方', list: official, special: true });
-  tabs.push({ key: '全部', list: local });
+  const tabs = [{ key: '全部', list: local }];
   for (const c of countries) tabs.push({ key: c, list: groups.get(c) });
+  if (official.length) tabs.push({ key: '官方', list: official, special: true });   // 官方放最右
   const cardHtml = (c) => {
     const info = cityInfo(c.id, c.name);
     const on = c.id === CID ? ' on' : '';
     return `<button class="cp-card${on}${c.official ? ' official' : ''}" data-city="${c.id}" title="${cityFull(c.id, c.name)}">
       <img src="data/cities/${c.id}/thumb.jpg" alt="" loading="lazy">
       <span class="cp-name">${cityShort(c.id, c.name)}</span>
-      <span class="cp-meta">${(c.buildings || 0).toLocaleString()} 栋 · ${(c.cell || 1).toFixed(2)}m</span>
+      <span class="cp-meta">${areaKm2(c)} km² · ${(c.buildings || 0).toLocaleString()} 栋 · ${(c.cell || 1).toFixed(2)}m</span>
       <span class="cp-flag">${info.country || ''}</span>
     </button>`;
   };

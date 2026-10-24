@@ -21,6 +21,30 @@ export const CITY_INFO = {
   zhenping_town:     { country: '中国', city: '镇平', district: '县城' },
   zhenping_tangying: { country: '中国', city: '镇平', district: '唐营村' },
   leicester: { country: '英国', city: '莱斯特', district: '' },   // 原版 2009 的那张图
+
+  // ===== 原版手游内嵌的 5 张（买断影像，坐标未知，按影像内容命名）=====
+  map01: { country: '原版', city: '英国郊区', district: '' },
+  map02: { country: '原版', city: '机场',     district: '' },
+  map03: { country: '原版', city: '海滨商业区', district: '' },
+  map04: { country: '原版', city: '密集城区', district: '' },
+  map05: { country: '原版', city: '热带度假区', district: '' },
+
+  // ===== 原版手游的 15 张 Google 图（坐标来自 3DS MapConfig，精确到小数点后两位）=====
+  g17:     { country: '澳大利亚', city: '珀斯',       district: '' },
+  g752:    { country: '日本',     city: '广岛',       district: '' },
+  g11171:  { country: '美国',     city: '斯托克顿堡', district: '' },
+  g13021:  { country: '美国',     city: '迈阿密',     district: '' },
+  g14016:  { country: '南非',     city: '德班',       district: '' },
+  g15961:  { country: '德国',     city: '基尔',       district: '' },
+  g56601:  { country: '巴西',     city: '桑托斯',     district: '' },
+  g66032:  { country: '巴西',     city: '萨尔瓦多',   district: '' },
+  g79478:  { country: '加拿大',   city: '里贾纳',     district: '' },
+  g79818:  { country: '奥地利',   city: '萨尔茨堡',   district: '' },
+  g85014:  { country: '加拿大',   city: '里贾纳',     district: '东' },
+  g94544:  { country: '荷兰',     city: '吕伐登',     district: '' },
+  g111850: { country: '波兰',     city: '耶莱尼亚古拉', district: '' },
+  g114009: { country: '菲律宾',   city: '碧瑶',       district: '' },
+  g115885: { country: '美国',     city: '泽西城',     district: '' },
 };
 
 /** 取结构化信息：id 允许带后缀（比如 "berlin-v2"），按包含匹配 */
