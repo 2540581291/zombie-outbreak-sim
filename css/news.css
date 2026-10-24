@@ -1,0 +1,57 @@
+/* ===== 新闻跑马灯（风味文字） ===== */
+#news{
+  position: fixed;
+  top: calc(8.7 * clamp(9.5px, 0.625vw, 24px) + 8px);   /* 紧贴顶栏下方，跟着等比缩放 */
+  left: 14px;
+  right: calc(14px + 262px + 14px);                      /* 避开右侧「爆发参数」面板 */
+  height: 26px;
+  z-index: 18;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,.06);
+  background: linear-gradient(90deg, rgba(8,10,13,.84), rgba(8,10,13,.30));
+  backdrop-filter: blur(2px);
+  font-size: 12px;
+  color: #c8d2de;
+}
+
+#news .news-tag{
+  flex: 0 0 auto;
+  font-size: 10px;
+  letter-spacing: .18em;
+  color: #ff6b52;
+  border: 1px solid rgba(255,107,82,.42);
+  border-radius: 4px;
+  padding: 1px 6px;
+  background: rgba(255,107,82,.08);
+}
+
+#news .news-view{
+  position: relative;
+  flex: 1 1 auto;
+  height: 100%;
+  overflow: hidden;
+}
+
+#news .news-view > span{
+  position: absolute;
+  left: 0;
+  top: 50%;
+  margin-top: -8px;
+  display: inline-block;
+  white-space: nowrap;
+  will-change: transform;
+  color: #d6dfe9;
+  text-shadow: 0 1px 2px rgba(0,0,0,.6);
+}
+
+/* 窄屏：参数面板折叠时这条会显得太长，右边留白收一点 */
+@media (max-width: 1200px){
+  #news{ right: 120px; }
+}

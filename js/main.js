@@ -18,6 +18,7 @@ import { AudioEngine } from './audio.js';
 import { openReport, closeReport, isReportOpen } from './report.js';
 import { openForce, openSanit, openChaosInfo, openInfectInfo, openAwareInfo } from './status.js';
 import { openGov, closeGov, isGovOpen } from './gov.js';
+import { initNews, resetNews } from './news.js';
 import { openOverview, close as closeOverview, toggle as toggleOverview, isOpen as overviewIsOpen } from './overview.js';
 import { SpriteView } from '../src/sprite/index.js';
 import { TerrainOverlay } from './overlay.js';
@@ -1244,6 +1245,7 @@ $('btn-restart').onclick = () => {
   deselectAgent();
   restoreNavBase();          // 墙壁/门窗的运行时改动在这里丢掉，回到开局的碰撞层
   sim.reset(readParams());
+  resetNews(sim);
   hideBanner();
 };
 $('btn-report').onclick = () => {
@@ -1287,8 +1289,8 @@ function restoreNavBase() {
   if (nav.buildDoorField) nav.buildDoorField();
   return true;
 }
-window.__zosRestart = () => { clearLink(); deselectAgent(); restoreNavBase(); sim.reset(readParams()); buildEscapeMarker(); buildPoiLabels(); hideBanner(); };
-$('btn-seed').onclick = () => { clearLink(); deselectAgent(); restoreNavBase(); seed = (Math.random() * 1e9) | 0; sim.reset(readParams()); buildEscapeMarker(); buildPoiLabels(); hideBanner(); };
+window.__zosRestart = () => { clearLink(); deselectAgent(); restoreNavBase(); sim.reset(readParams()); resetNews(sim); buildEscapeMarker(); buildPoiLabels(); hideBanner(); };
+$('btn-seed').onclick = () => { clearLink(); deselectAgent(); restoreNavBase(); seed = (Math.random() * 1e9) | 0; sim.reset(readParams()); resetNews(sim); buildEscapeMarker(); buildPoiLabels(); hideBanner(); };
 $('p-toggle').onclick = () => {
   const b = $('p-body');
   b.classList.toggle('hide');
@@ -1802,6 +1804,7 @@ async function boot() {
   sim = new Sim(nav, city);   // city 里有 POI（工作地分配用）
   sim.reset(readParams());
   buildEscapeMarker();
+  initNews(sim);
 
   agents = new AgentRenderer(scene, 160000);
 
