@@ -3,7 +3,7 @@
    所以 4K 上就是等比放大、小窗口等比缩小，内容与窗口的宽度比例恒定，
    不会出现"某个宽度下把最左边那块挤掉"的问题。 */
 #topbar{display:flex;align-items:center;gap:1.1em;flex-wrap:nowrap;overflow:hidden;
-  font-size:clamp(9.5px, 0.625vw, 24px);      /* 1920 → 12px；4K → 24px */
+  font-size:0.75em;   /* 相对根字号：根字号已随窗口缩放，这里不能再叠加 vw */
   height:8.7em;padding:0 1.1em;box-sizing:border-box;
   justify-content:flex-start}
 #topbar .tb-left{display:flex;align-items:center;gap:0.7em;flex:0 0 auto}
@@ -59,36 +59,36 @@
 #statuspanel{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.55);
   display:flex;align-items:center;justify-content:center}
 #statuspanel.hidden{display:none}
-.sp-card{width:440px;max-height:82vh;display:flex;flex-direction:column;
-  background:#0e1218;border:1px solid rgba(255,255,255,.12);border-radius:12px;
-  box-shadow:0 18px 50px rgba(0,0,0,.6);overflow:hidden}
-.sp-head{display:flex;align-items:center;gap:8px;padding:12px 14px;
-  border-bottom:1px solid rgba(255,255,255,.08);font-size:14px}
+.sp-card{width:27.5rem;max-height:82vh;display:flex;flex-direction:column;
+  background:#0e1218;border:1px solid rgba(255,255,255,.12);border-radius:0.75rem;
+  box-shadow:0 1.125rem 3.125rem rgba(0,0,0,.6);overflow:hidden}
+.sp-head{display:flex;align-items:center;gap:0.5rem;padding:0.75rem 0.875rem;
+  border-bottom:1px solid rgba(255,255,255,.08);font-size:0.875rem}
 .sp-head b{flex:1 1 auto}
-.sp-head button{width:24px;height:24px;border:0;border-radius:6px;background:rgba(255,255,255,.06);
+.sp-head button{width:1.5rem;height:1.5rem;border:0;border-radius:0.375rem;background:rgba(255,255,255,.06);
   color:#c8d2de;cursor:pointer}
-.sp-body{padding:8px 14px 14px;overflow-y:auto}
-.sp-big{font-size:30px;font-weight:700;color:#eaf1f8;line-height:1.1;margin:6px 0 4px}
-.sp-big small{font-size:12px;color:#7d8b99;margin-left:2px}
-.sp-bar{height:6px;border-radius:3px;background:rgba(255,255,255,.10);overflow:hidden;margin-bottom:10px}
-.sp-bar>i{display:block;height:100%;border-radius:3px}
-.sp-sec{margin:14px 0 6px;font-size:11px;letter-spacing:.08em;color:#7d8b99}
-.sp-row{display:flex;align-items:baseline;gap:8px;padding:4px 0;font-size:12.5px;
+.sp-body{padding:0.5rem 0.875rem 0.875rem;overflow-y:auto}
+.sp-big{font-size:1.875rem;font-weight:700;color:#eaf1f8;line-height:1.1;margin:0.375rem 0 0.25rem}
+.sp-big small{font-size:0.75rem;color:#7d8b99;margin-left:0.125rem}
+.sp-bar{height:0.375rem;border-radius:0.1875rem;background:rgba(255,255,255,.10);overflow:hidden;margin-bottom:0.625rem}
+.sp-bar>i{display:block;height:100%;border-radius:0.1875rem}
+.sp-sec{margin:0.875rem 0 0.375rem;font-size:0.6875rem;letter-spacing:.08em;color:#7d8b99}
+.sp-row{display:flex;align-items:baseline;gap:0.5rem;padding:0.25rem 0;font-size:0.7812rem;
   border-bottom:1px solid rgba(255,255,255,.04)}
 .sp-row span{flex:0 0 46%;color:#93a2b3}
 .sp-row b{margin-left:auto;color:#e6edf5;font-weight:600;text-align:right}
 
-#topbar .tb-gauge.clickable{cursor:pointer;border-radius:5px;padding:2px 3px;margin:-2px -3px}
+#topbar .tb-gauge.clickable{cursor:pointer;border-radius:0.3125rem;padding:0.125rem 0.1875rem;margin:-2px -3px}
 #topbar .tb-gauge.clickable:hover{background:rgba(255,255,255,.07)}
 #bar-infect{background:#e0b23c}
 
 /* 标签页 */
-.sp-tabs{display:flex;gap:4px;padding:8px 12px 0;border-bottom:1px solid rgba(255,255,255,.07)}
-.sp-tab{padding:5px 11px;border:0;border-radius:7px 7px 0 0;background:transparent;
-  color:#8b98a8;font-size:12px;cursor:pointer}
+.sp-tabs{display:flex;gap:0.25rem;padding:0.5rem 0.75rem 0;border-bottom:1px solid rgba(255,255,255,.07)}
+.sp-tab{padding:0.3125rem 0.6875rem;border:0;border-radius:0.4375rem 0.4375rem 0 0;background:transparent;
+  color:#8b98a8;font-size:0.75rem;cursor:pointer}
 .sp-tab:hover{background:rgba(255,255,255,.06);color:#cfd8e3}
 .sp-tab.on{background:rgba(255,255,255,.10);color:#eef4fa;font-weight:600}
-.sp-card{width:470px}
+.sp-card{width:29.375rem}
 
 /* 城市选择器：跟顶栏一起等比缩放 */
 #topbar .tb-sel{box-sizing:border-box;padding:0.5em 0.5em;border-radius:0.55em;

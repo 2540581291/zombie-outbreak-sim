@@ -1,51 +1,51 @@
 /* ============ 左侧信息面板（角色 / 地点） ============ */
-#agentcard{position:fixed;left:14px;top:50%;bottom:auto;right:auto;transform:translateY(-50%);
-  width:318px;max-height:76vh;z-index:23;
-  background:rgba(12,15,19,.95);border:1px solid rgba(255,255,255,.11);border-radius:12px;
-  backdrop-filter:blur(14px);box-shadow:0 18px 50px rgba(0,0,0,.62);
+#agentcard{position:fixed;left:0.875rem;top:50%;bottom:auto;right:auto;transform:translateY(-50%);
+  width:19.875rem;max-height:76vh;z-index:23;
+  background:rgba(12,15,19,.95);border:1px solid rgba(255,255,255,.11);border-radius:0.75rem;
+  backdrop-filter:blur(0.875rem);box-shadow:0 1.125rem 3.125rem rgba(0,0,0,.62);
   display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden}
-#agentcard::-webkit-scrollbar{width:6px}
-#agentcard::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:3px}
+#agentcard::-webkit-scrollbar{width:0.375rem}
+#agentcard::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:0.1875rem}
 #agentcard.hidden{opacity:0;transform:translateY(-46%) scale(.98);pointer-events:none}
-.ac-head{display:flex;align-items:center;gap:6px;padding:10px 10px 4px;flex:0 0 auto;
+.ac-head{display:flex;align-items:center;gap:0.375rem;padding:0.625rem 0.625rem 0.25rem;flex:0 0 auto;
   position:sticky;top:0;background:rgba(12,15,19,.98);z-index:2;border-bottom:1px solid rgba(255,255,255,.05)}
-.ac-nav{width:20px;height:20px;line-height:1;border-radius:5px;border:1px solid rgba(255,255,255,.14);
-  background:rgba(255,255,255,.06);color:#9fb0c0;font-size:13px;cursor:pointer;padding:0}
+.ac-nav{width:1.25rem;height:1.25rem;line-height:1;border-radius:0.3125rem;border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.06);color:#9fb0c0;font-size:0.8125rem;cursor:pointer;padding:0}
 .ac-nav:hover{background:rgba(255,255,255,.14);color:#fff}
-.ac-name{font-size:15px;font-weight:800;color:#f2f5f8;letter-spacing:.04em;flex:1;
+.ac-name{font-size:0.9375rem;font-weight:800;color:#f2f5f8;letter-spacing:.04em;flex:1;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ac-sub{font-size:11px;color:#8794a3;padding:0 12px 8px;flex:0 0 auto;
-  position:sticky;top:36px;background:rgba(12,15,19,.98);z-index:2}
-#ac-body{padding:0 10px 8px;flex:0 0 auto}
-#ac-body::-webkit-scrollbar{width:6px}
-#ac-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:3px}
-.ac-sec{margin:8px 0 2px;font-size:10px;font-weight:700;color:#5f6b79;letter-spacing:.16em}
-.ac-row{display:flex;gap:8px;align-items:baseline;padding:3px 2px;border-bottom:1px dashed rgba(255,255,255,.055);
-  font-size:11.5px;line-height:1.5}
+.ac-sub{font-size:0.6875rem;color:#8794a3;padding:0 0.75rem 0.5rem;flex:0 0 auto;
+  position:sticky;top:2.25rem;background:rgba(12,15,19,.98);z-index:2}
+#ac-body{padding:0 0.625rem 0.5rem;flex:0 0 auto}
+#ac-body::-webkit-scrollbar{width:0.375rem}
+#ac-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:0.1875rem}
+.ac-sec{margin:0.5rem 0 0.125rem;font-size:0.625rem;font-weight:700;color:#5f6b79;letter-spacing:.16em}
+.ac-row{display:flex;gap:0.5rem;align-items:baseline;padding:0.1875rem 0.125rem;border-bottom:1px dashed rgba(255,255,255,.055);
+  font-size:0.7188rem;line-height:1.5}
 .ac-row:last-child{border-bottom:none}
-.ac-row>span{color:#7d8b99;flex:0 0 52px}
+.ac-row>span{color:#7d8b99;flex:0 0 3.25rem}
 .ac-row>em{color:#d6dee6;font-style:normal;flex:1;word-break:break-word}
 .ac-row>em.link{color:#6fb4ff;cursor:pointer;text-decoration:underline dotted}
 .ac-row>em.link:hover{color:#a5d2ff}
-.ac-bar{position:relative;height:5px;border-radius:3px;background:rgba(255,255,255,.09);
-  margin:4px 0 2px;overflow:hidden}
+.ac-bar{position:relative;height:0.3125rem;border-radius:0.1875rem;background:rgba(255,255,255,.09);
+  margin:0.25rem 0 0.125rem;overflow:hidden}
 .ac-bar>i{position:absolute;left:0;top:0;bottom:0;background:#4a5663;transition:width .3s}
 .ac-bar.on>i{background:linear-gradient(90deg,#e2542b,#ffb03a)}
-.ac-rule{padding:5px 2px;border-bottom:1px dashed rgba(255,255,255,.055)}
+.ac-rule{padding:0.3125rem 0.125rem;border-bottom:1px dashed rgba(255,255,255,.055)}
 .ac-rule.on .ar-t{color:#ffb03a}
-.ac-rule .ar-t{display:flex;justify-content:space-between;font-size:11.5px;color:#9fb0c0}
+.ac-rule .ar-t{display:flex;justify-content:space-between;font-size:0.7188rem;color:#9fb0c0}
 .ac-rule .ar-t b{font-weight:700}
-.ac-rule .ar-d{font-size:10.5px;color:#66727f;margin-top:1px}
+.ac-rule .ar-d{font-size:0.6562rem;color:#66727f;margin-top:1px}
 .ac-rule.on .ar-d{color:#8d7a5c}
-.ac-foot{display:flex;gap:6px;padding:8px 10px;border-top:1px solid rgba(255,255,255,.07);flex:0 0 auto;
+.ac-foot{display:flex;gap:0.375rem;padding:0.5rem 0.625rem;border-top:1px solid rgba(255,255,255,.07);flex:0 0 auto;
   position:sticky;bottom:0;background:rgba(12,15,19,.98);z-index:2}
-.ac-foot button{flex:1;padding:5px 0;border-radius:6px;border:1px solid rgba(255,255,255,.14);
-  background:rgba(255,255,255,.06);color:#cfd6dd;font-size:11px;cursor:pointer}
+.ac-foot button{flex:1;padding:0.3125rem 0;border-radius:0.375rem;border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.06);color:#cfd6dd;font-size:0.6875rem;cursor:pointer}
 .ac-foot button:hover{background:rgba(255,255,255,.14)}
 
 /* 状态标签（替代长条） */
-.ac-chip{display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;border-radius:10px;
-  font-size:11px;line-height:16px;background:rgba(255,255,255,.07);color:#c8d3df;
+.ac-chip{display:inline-block;margin:0.125rem 0.25rem 0.125rem 0;padding:0.125rem 0.5rem;border-radius:0.625rem;
+  font-size:0.6875rem;line-height:1rem;background:rgba(255,255,255,.07);color:#c8d3df;
   border:1px solid rgba(255,255,255,.08)}
 .ac-chip.vip{background:rgba(255,205,80,.14);color:#ffd257;border-color:rgba(255,205,80,.3)}
 .ac-chip.pol{background:rgba(90,150,255,.14);color:#8fb8ff;border-color:rgba(90,150,255,.28)}
@@ -59,10 +59,10 @@
 .p-cityrow>span:first-child{color:#8b97a3}
 #city-slot{flex:1;display:flex;justify-content:flex-end}
 #sel-city{
-  max-width:150px;width:100%;
+  max-width:9.375rem;width:100%;
   background:rgba(255,255,255,.06);color:#e8eef4;
-  border:1px solid rgba(255,255,255,.14);border-radius:7px;
-  font-size:12px;padding:4px 6px;outline:none;cursor:pointer;
+  border:1px solid rgba(255,255,255,.14);border-radius:0.4375rem;
+  font-size:0.75rem;padding:0.25rem 0.375rem;outline:none;cursor:pointer;
 }
 #sel-city:hover{border-color:rgba(255,255,255,.28)}
 #p-body .p-sec:first-child{margin-top:0}
