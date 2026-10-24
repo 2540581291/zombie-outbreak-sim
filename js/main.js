@@ -2071,6 +2071,10 @@ function loop(t) {
   if (agents && sim) {
     // 视距越大，显示模型的半径也越大（连续，避免整片突变）
     agents.nearRadius = Math.min(1400, Math.max(110, rig.dist * 0.9));
+    // 但缩小到"俯瞰全城"时，近处的 3D 人物会变成亚像素的小黑点，
+    // 而它们的**绿点是被 hide 掉的** —— 所以那一片人会看起来消失了。
+    // 因此视距超过阈值就整片退回点阵。
+    if (!retroMode) agents.unitsVisible = rig.dist < 700;
     agents.update(sim, camera.position);
   }
   updateTracers();
