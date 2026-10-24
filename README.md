@@ -236,11 +236,44 @@ python pipeline\drone_to_city.py --city zhenping_town ^
 `drone_to_city.py` 会打印刷掉了多少格、`sat.jpg` / `sat_mask.png` 多大。
 底图宽度建议 ≤ 16384（和柏林一致），再大会顶到 GPU 纹理上限。
 
+### 建筑从 DSM 提（没有 OSM 数据的地方）
+
+镇平的 OSM 几乎是空的（县城 7.8 km² 只有 43 栋），所以建筑改用**航测 DSM 反推**：
+
+```bat
+python pipeline\dsm_buildings.py --dsm "F:\zpx\data\map\dsm.tif" --tfw "F:\zpx\data\map\dsm.tfw" ^
+  --minlon 112.170410 --minlat 33.010967 --maxlon 112.254181 --maxlat 33.045508 ^
+  --out data\cities\zhenping_town\buildings_dsm.json
+
+python pipeline\bake_pbf.py --pbf pipeline\raw\zhenping_town.osm ^
+  --buildings data\cities\zhenping_town\buildings_dsm.json ^
+  --name "镇平 县城" --minlat 33.010967 --minlon 112.170410 --maxlat 33.045508 --maxlon 112.254181 ^
+  --out data\cities\zhenping_town\city.json
+```
+
+做法（`pipeline/dsm_buildings.py`）：
+
+1. `tifffile` + `zarr` 从 BigTIFF 里**按窗口懒读** DSM（不整包解压），3 倍降采样到 0.47 m/px；
+2. 中值滤波去掉立体匹配的散斑（DSM 有 ±5 m 级的噪声）；
+3. `erode`（10 m 窗口）取局部最低当"地面"，`DSM − 地面` 就是高差；
+4. 高差 > 4 m 的连通块 = 建筑候选，按面积（≥25 m²）过滤；
+5. `findContours` + `approxPolyDP` 简化轮廓，高度取块内 90 分位；
+6. 像素 → UTM 49N → WGS84，输出 `[{"p": [[lon,lat]...], "h": 米}]`。
+
+`bake_pbf.py --buildings` 接过这份 JSON，转成本地米后**取代** OSM 建筑，
+后面的门/窗/连通性/碰撞层全部照常走。
+
+| 城市 | OSM 建筑 | DSM 建筑 | 高度中位 | 碰撞层室内占比 |
+|---|---:|---:|---:|---:|
+| 镇平·县城 | 43 | **6,873** | 7.2 m | 23.4% |
+| 镇平·唐营村 | 0 | **537** | 7.4 m | 1.8% |
+
+> ⚠ 这是"形状对、高度大致对"的程度：DSM 反推会把连着的大院/厂房合成一整块，
+> 高度是 90 分位（坡屋顶会略偏高）。要更准得上倾斜摄影的单体化（3D Tiles）或人工修。
+
 ### 已知限制
 
-- **OSM 在镇平非常稀疏**：县城 7.8 km² 只有 43 栋建筑、唐营村 0 栋。
-  地图看起来是"照片 + 路网"，建筑体块基本没有 —— 想要真正的城市体量，
-  得从 DSM 提建筑轮廓（下一步）。
+- **建筑是 DSM 反推的**：形状对、高度大致对，但连片的大院/厂房会合成一块（见上一节）。
 - 航测无 RTK，绝对定位约 30 m 量级，和 OSM 叠加可能有偏移。
 - `mission.json` 是加密的，Cesium 场景配置还原不出来（不影响影像）。
 
