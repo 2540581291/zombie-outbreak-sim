@@ -152,6 +152,21 @@ let drag = null;
 // 右键拖拽的位移先攒在 panPending 里，每帧按指数衰减地消化掉 ——
 // 直接 add 到 target 上会跟着鼠标事件一跳一跳（尤其高刷新率鼠标），加了这个就变成顺滑滑动+收尾减速
 const panPending = new THREE.Vector3();
+
+// 别处（比如武力面板里的警局卡片）请求把镜头移过去：
+// 复用右键拖拽那套"攒位移 + 主循环衰减消化"的做法，镜头是滑过去的，不是瞬移。
+addEventListener('zos:focus', (e) => {
+  const d = (e && e.detail) || {};
+  if (typeof d.x !== 'number' || typeof d.z !== 'number') return;
+  followSelected = false;                       // 别让"跟随选中"把镜头拽回去
+  panPending.x += d.x - rig.target.x;
+  panPending.z += d.z - rig.target.z;
+  // 只在"离得太远"时拉近，不把已经放大过的镜头拉远。
+  // 2D 的 dist 语义和 3D 完全不同（2D: 视高 ≈ 0.095×dist，3D: 视高 ≈ 0.975×dist）
+  const near = retroMode ? 2600 : 320;
+  if (rig.dist > near) rig.dist = near;
+  applyCamera();
+});
 // 左键框选：只框"可指挥单位"（士兵/重装兵/装甲车），框住的一起下命令
 function updateGroupBadge() {
   let b = document.getElementById('selgroup');

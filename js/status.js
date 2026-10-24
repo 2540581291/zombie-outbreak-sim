@@ -49,7 +49,12 @@ function stationCard(s) {
     ? s.rows.map((r) => `<div class="st-row"><span>${r.name}</span>`
         + `<b>${r.n} 支</b><em>${fmt(r.ammo)} 发</em></div>`).join('')
     : '<div class="st-row"><span>仓库已空</span></div>';
-  return `<div class="st-card">
+  const takenRow = s.taken && s.taken.ammo > 0
+    ? `<div class="st-meta"><span class="st-taken">被取走 ${fmt(s.taken.ammo)} 发（警员 ${fmt(s.taken.cop)} · 平民 ${fmt(s.taken.civ)}）</span><span>枪 ${s.taken.guns} 支</span></div>`
+    : '';
+  const curve = (s.hist && s.hist.length >= 2)
+    ? `<div class="st-curve">${spark(s.hist, col)}</div>` : '';
+  return `<div class="st-card" data-x="${Math.round(s.x)}" data-z="${Math.round(s.z)}" title="点击把镜头移到这个警局">
     <div class="st-head"><b>${s.name}</b>
       <span class="st-people">驻 ${s.idle} · 巡 ${s.patrol} · 勤 ${s.onDuty} · 护 ${s.escort}${s.dead ? ' · 亡 ' + s.dead : ''}</span>
     </div>
@@ -60,6 +65,7 @@ function stationCard(s) {
     <div class="fw-part-bar"><i style="width:${Math.round(s.ammoLeft * 100)}%;background:${col}"></i></div>
     <div class="st-meta"><span>枪 ${s.guns} / ${s.initGuns} 支</span><span>≈ ${Math.round(s.ammo / 15)} 个弹匣（按 15 发算）</span></div>
     <div class="st-rows">${rows}</div>
+    ${takenRow}${curve}
   </div>`;
 }
 
@@ -306,6 +312,18 @@ function sanitView(sim) {
   return `<div class="fw-grid"><div class="fw-col">${left}</div><div class="fw-col">${right}</div></div>`;
 }
 
+/** 点警局卡片 → 关闭面板 + 镜头飞过去（main.js 监听 zos:focus） */
+function bindStationClicks(body) {
+  body.querySelectorAll('.st-card').forEach((c) => {
+    c.onclick = () => {
+      const x = +c.dataset.x, z = +c.dataset.z;
+      if (!Number.isFinite(x) || !Number.isFinite(z)) return;
+      root.classList.add('hidden');
+      window.dispatchEvent(new CustomEvent('zos:focus', { detail: { x, z, dist: 260 } }));
+    };
+  });
+}
+
 function render() {
   if (!curSim) return;
   const el = ensure();
@@ -319,6 +337,7 @@ function render() {
     el.querySelector('#sp-title').textContent = '武力状态';
     body.className = 'sp-body sp-body-force';
     body.innerHTML = forceView(curSim);
+    bindStationClicks(body);
     return;
   }
 

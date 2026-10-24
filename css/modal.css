@@ -165,3 +165,11 @@
   padding:2px 0;border-top:1px solid rgba(255,255,255,.03)}
 .st-row b{margin-left:auto;color:#cfd8e3;font-weight:600;min-width:3.2em;text-align:right}
 .st-row em{font-style:normal;color:#9aa8b8;min-width:4.6em;text-align:right;font-variant-numeric:tabular-nums}
+
+/* ---- 警局卡片：可点 + 消耗曲线 ---- */
+.st-card{cursor:pointer;transition:background .15s,border-color .15s}
+.st-card:hover{background:rgba(255,255,255,.055);border-color:rgba(255,255,255,.16)}
+.st-card:hover .st-head b{color:#fff}
+.st-taken{color:#e0b23c !important}
+.st-curve{margin-top:6px}
+.st-curve .fw-spark{height:28px;margin-top:0}

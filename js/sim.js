@@ -413,6 +413,7 @@ export class Sim {
     this.govLog = [];          // 政府/机构的自动决策日志（面板显示）
     this.govHist = [];         // 每 10 秒采样一次局势曲线（面板显示趋势）
     this.govHistT = 0;
+    this.stationHist = [];      // 每个警局的弹药存量采样（军械库曲线）
     this.govT = 0;             // 下一次评估的倒计时
     this.duties = new Map();   // 在外执行的派遣：id -> { x, z, what, dest, why, t }
     this.anchorT.fill(0);
@@ -1619,6 +1620,9 @@ export class Sim {
       if (!this.armed[i] && this.chaos >= 50 && poi && poi.store) {
         const got = takeWeapon(poi.store, this.rng);
         if (got) {
+          // 记账：这个所的枪是被平民拿走的（面板要显示"哪个所被掏空、被谁掏空"）
+          if (!poi.taken) poi.taken = { civ: 0, cop: 0, guns: 0, ammo: 0 };
+          poi.taken.civ += got.rounds; poi.taken.guns += 1; poi.taken.ammo += got.rounds;
           this.giveWeapon(i, got.id, skillFor('civilian') + (this.rng() - 0.5) * 0.2);
           const w = weaponOf(got.id);
           this.mag[i] = Math.min(w.mag, got.rounds);
@@ -3076,6 +3080,8 @@ export class Sim {
               const got = Math.min(wR.mag * 4, avail);
               if (got > 0) {
                 stR.store.a[wid] = avail - got;
+                if (!stR.taken) stR.taken = { civ: 0, cop: 0, guns: 0, ammo: 0 };
+                stR.taken.cop += got; stR.taken.ammo += got;
                 this.mag[i] = Math.min(wR.mag, got);
                 this.reserve[i] = Math.min(255, got - this.mag[i]);
                 this.ammo[i] = this.mag[i];
@@ -3187,6 +3193,8 @@ export class Sim {
                     const got = Math.min(need, avail);
                     if (got > 0) {
                       st2.store.a[wid] = avail - got;
+                      if (!st2.taken) st2.taken = { civ: 0, cop: 0, guns: 0, ammo: 0 };
+                      st2.taken.cop += got; st2.taken.ammo += got;
                       this.reserve[i] = Math.min(255, (this.reserve[i] || 0) + got);
                       this.mag[i] = Math.min(w2.mag, this.reserve[i]);
                       this.reserve[i] -= this.mag[i];
@@ -3818,6 +3826,16 @@ export class Sim {
     this.govHistT += 2;
     if (this.govHistT >= 10) {
       this.govHistT = 0;
+      // 每个警局的弹药存量（军械库消耗曲线）
+      const stAmt = (this.poiByKind.police || []).map((p) => {
+        const st = p.store;
+        let a = 0;
+        if (st) for (let id = 1; id < st.a.length; id++) a += st.a[id] || 0;
+        return a;
+      });
+      this.stationHist.push({ t, ammo: stAmt });
+      if (this.stationHist.length > 40) this.stationHist.shift();
+
       // 顺带把武力相关的也采样：击杀 / 开枪 / 持枪 / 弹药（武力面板的趋势用）
       let aN = 0, aAmmo = 0;
       for (let k = 0; k < this.n; k++) {
@@ -4661,9 +4679,13 @@ export class Sim {
       const initAmmo = p.initAmmo || Math.max(1, ammo);
       const initGuns = p.initGuns || Math.max(1, guns);
       const crew = idle + patrol + onDuty + escort;
+      const taken = p.taken || { civ: 0, cop: 0, guns: 0, ammo: 0 };
       stations.push({
         name: p.n || '警察局',
+        x: p.x, z: p.z,
         stock: st ? stockText(st) : '—',
+        taken,
+        hist: (this.stationHist || []).map((h) => (h.ammo && h.ammo[k]) || 0),
         idle, patrol, onDuty, escort, dead, idleIds,
         idleAt: this.idleAt ? this.idleAt(k) : 0,
         rows, guns, ammo,
