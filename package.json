@@ -6,6 +6,9 @@
   "description": "Zombie Outbreak Simulator - Remake (personal nostalgia project)",
   "scripts": {
     "test": "node tools/test_sim.mjs",
+    "test:nav": "node tools/test_nav.mjs",
+    "test:navgrid": "node tools/test_navgrid.mjs",
+    "bench": "node tools/bench_nav.mjs",
     "serve": "python -m http.server 8777"
   }
 }
