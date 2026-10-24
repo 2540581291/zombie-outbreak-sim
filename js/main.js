@@ -605,24 +605,14 @@ function updateLink() {
  */
 let uiFitTimer = 0;
 function fitUiScale() {
+  // 顶栏已允许换行（css/topbar.css），所以不需要把界面压缩到"一行装下"，
+  // 这里只按窗口宽给一个可读的根字号：1600 → 13.3px，1100 → 11px，2560 → 21px。
   const root = document.documentElement;
-  const bar = document.getElementById('topbar');
-  const panel = document.getElementById('panel');
-  // 基准：顶栏内容宽 ≈ 145 × 根字号（实测），所以用 宽/150 起步，
-  // 再按实际 scrollWidth 微调，保证单行顶栏的所有按钮都可见。
-  const base = Math.max(9, Math.min(24, window.innerWidth / 150));
-  root.style.fontSize = base.toFixed(2) + 'px';
-  // 量一次（布局已按 base 生效）
-  let k = 1;
-  if (bar) {
-    const need = bar.scrollWidth, have = bar.clientWidth;
-    if (need > 0 && have > 0) k = Math.min(k, (have - 2) / need);
-  }
-  k = Math.max(0.5, Math.min(1.6, k));
-  root.style.fontSize = (base * k).toFixed(2) + 'px';
-  root.dataset.uiscale = k.toFixed(3);
-  if (bar) root.dataset.barFit = (bar.scrollWidth <= bar.clientWidth + 1) ? '1' : '0';
+  const px = Math.max(10, Math.min(22, window.innerWidth / 120));
+  root.style.fontSize = px.toFixed(2) + 'px';
+  root.dataset.uipx = px.toFixed(2);
 }
+
 function scheduleFitUi() {
   if (uiFitTimer) return;
   uiFitTimer = setTimeout(() => { uiFitTimer = 0; fitUiScale(); }, 120);

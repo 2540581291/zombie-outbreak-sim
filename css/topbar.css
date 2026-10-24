@@ -95,3 +95,9 @@
   border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);
   color:#cfd6dd;font-family:inherit;font-size:1em;cursor:pointer;flex:0 0 auto;max-width:13em}
 #topbar .tb-sel option{background:#12171d;color:#cfd6dd}
+
+/* ---- 顶栏允许换行：窄窗口下按钮换到第二行，而不是被裁掉 ----
+   这样"所有内容都可见"不依赖把整个界面缩小。 */
+#topbar{flex-wrap:wrap;height:auto;min-height:4.2em;padding:0.5em 1em;
+  row-gap:0.35em;overflow:visible;align-items:center}
+#topbar .tb-mid{margin-left:0}
