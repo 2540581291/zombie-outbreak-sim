@@ -95,3 +95,26 @@
   border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);
   color:#cfd6dd;font-family:inherit;font-size:1em;cursor:pointer;flex:0 0 auto;max-width:9em}
 #topbar .tb-sel option{background:#12171d;color:#cfd6dd}
+/* 速度组移到最右 */
+#topbar .tb-mid{margin-left:auto;margin-right:8px}
+
+/* ---- 顶栏收窄：右侧留出「爆发参数」面板的宽度，速度组才不会被挡住 ---- */
+#topbar{width:calc(100% - 272px)}
+/* 速度组贴到可见区域的右端 */
+#topbar .tb-mid{margin-left:auto;margin-right:0}
+/* 塌墙计数太占地方，移到战报里看（顶栏不显示） */
+#topbar #tb-wall{display:none}
+
+/* ---- 窄屏压缩：让"左信息 + 6 个计数 + 3 个仪表 + 速度组"在 ~930px 内排得下 ---- */
+#topbar{font-size:clamp(8.2px, 0.56vw, 22px);gap:0.8em;padding:0 0.9em}
+#topbar .tb-stat{min-width:5.6em;padding:0.42em 0.6em}
+#topbar .tb-stat b{font-size:1.5em}
+#topbar .tb-gauge{width:6.6em;padding:0.36em 0.55em}
+#topbar .tb-pops{gap:0.45em}
+#topbar .tb-gauges{gap:0.45em}
+#topbar .tb-mid{margin-left:auto}
+
+/* 左块限制宽度并省略，避免和计数块重叠 */
+#topbar .tb-city{max-width:9em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#topbar .tb-left{min-width:0;max-width:26em;overflow:hidden;white-space:nowrap}
+#topbar .tb-clock{white-space:nowrap}

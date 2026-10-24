@@ -53,3 +53,23 @@
 .ac-chip.bad{background:rgba(220,70,60,.16);color:#f08a80;border-color:rgba(220,70,60,.3)}
 .ac-chip.warm{background:rgba(255,160,60,.14);color:#ffb45c;border-color:rgba(255,160,60,.28)}
 .ac-chip.step{background:rgba(120,210,150,.14);color:#84d6a2;border-color:rgba(120,210,150,.28)}
+
+/* ---- 参数面板：城市选择行 + 下拉框样式（城市选择从顶栏移到这里） ---- */
+.p-cityrow{align-items:center}
+.p-cityrow>span:first-child{color:#8b97a3}
+#city-slot{flex:1;display:flex;justify-content:flex-end}
+#sel-city{
+  max-width:150px;width:100%;
+  background:rgba(255,255,255,.06);color:#e8eef4;
+  border:1px solid rgba(255,255,255,.14);border-radius:7px;
+  font-size:12px;padding:4px 6px;outline:none;cursor:pointer;
+}
+#sel-city:hover{border-color:rgba(255,255,255,.28)}
+#p-body .p-sec:first-child{margin-top:0}
+/* 顶栏：速度组靠到最右 */
+#topbar .tb-mid{margin-left:auto}
+
+/* 原本在顶栏的 5 个按钮（政府/武力/卫生/总览/战报）挪到面板里 */
+.p-tools{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 10px}
+.p-tools-inner{display:flex;flex-wrap:wrap;gap:6px}
+.p-tools .tb-btn{font-size:12px;padding:5px 10px;border-radius:7px}

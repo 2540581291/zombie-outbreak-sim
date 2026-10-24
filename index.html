@@ -50,18 +50,12 @@
     <span class="tb-sep">·</span>
     <span class="tb-clock" id="tb-clock">00:00:00</span>
   </div>
-  <div class="tb-mid">
-    <button class="spd" data-spd="0">⏸</button>
-    <button class="spd on" data-spd="1">1×</button>
-    <button class="spd" data-spd="4">4×</button>
-    <button class="spd" data-spd="16">16×</button>
-  </div>
   <div class="tb-group tb-pops">
     <span class="tb-stat" title="还活着的平民"><span class="tb-cap"><i class="dot civ"></i><em>平民</em></span><b id="n-civ">0</b></span>
     <span class="tb-stat" title="已感染、还没尸变的人"><span class="tb-cap"><i class="dot inf"></i><em>感染</em></span><b id="n-inf">0</b></span>
     <span class="tb-stat" title="丧尸"><span class="tb-cap"><i class="dot zomb"></i><em>丧尸</em></span><b id="n-zomb">0</b></span>
     <span class="tb-stat" title="死亡人数"><span class="tb-cap"><i class="dot dead"></i><em>死亡</em></span><b id="n-dead">0</b></span>
-      <span class="tb-stat" title="被撞塌的墙格数（同一格被撞 10 次就塌）"><span class="tb-cap"><i class="dot dead" style="background:#bfa77a"></i><em>塌墙</em></span><b id="n-wall">0</b></span>
+      <span class="tb-stat" id="tb-wall" title="被撞塌的墙格数（同一格被撞 10 次就塌）"><span class="tb-cap"><i class="dot dead" style="background:#bfa77a"></i><em>塌墙</em></span><b id="n-wall">0</b></span>
     <span class="tb-stat" id="tb-saved" title="已从撤离口撤离出城的人"><span class="tb-cap"><i class="dot saved"></i><em>撤离</em></span><b id="n-saved">0</b></span>
     <span class="tb-stat" id="tb-flee" title="正在逃跑的人"><span class="tb-cap"><i class="dot inf"></i><em>逃跑</em></span><b id="n-flee">0</b></span>
   </div>
@@ -81,12 +75,11 @@
     </span>
   </div>
   <span class="tb-div"></span>
-  <div class="tb-tools" id="tb-tools">
-    <button class="tb-btn" id="btn-gov" title="政府行动：政府 / 警察 / 医院 / 学校">政府行动</button>
-    <button class="tb-btn" id="btn-force" title="武力状态明细">武力</button>
-    <button class="tb-btn" id="btn-sanit" title="卫生状态明细">卫生</button>
-    <button class="tb-btn" id="btn-overview" title="全体人员总览（O）">总览</button>
-    <button class="tb-btn" id="btn-report" title="结算本局">战报</button>
+  <div class="tb-mid">
+    <button class="spd" data-spd="0">⏸</button>
+    <button class="spd on" data-spd="1">1×</button>
+    <button class="spd" data-spd="4">4×</button>
+    <button class="spd" data-spd="16">16×</button>
   </div>
   <span class="tb-fps" id="fps">—</span>
 </div>
@@ -98,10 +91,14 @@
     <button id="p-toggle">—</button>
   </div>
   <div class="p-body" id="p-body">
+    <div class="p-sec">城市</div>
+    <div class="p-row p-cityrow"><span>城市</span><span id="city-slot"></span></div>
+    <div class="p-sec">爆发规模</div>
     <label class="p-row"><span>平民人口</span><input type="range" id="s-pop" min="200" max="100000" step="1" value="20000"><b id="v-pop">20,000</b></label>
     <label class="p-row"><span>初始丧尸</span><input type="range" id="s-z0" min="1" max="10000" step="1" value="1000"><b id="v-z0">120</b></label>
     <label class="p-row"><span>家庭持枪率</span><input type="range" id="s-arm" min="0" max="100" step="1" value="10"><b id="v-arm">10%</b></label>
     <label class="p-row"><span>警察数量</span><input type="range" id="s-pol" min="0" max="10000" step="1" value="1000"><b id="v-pol">60</b></label>
+    <div class="p-sec">显示</div>
     <div class="p-row p-segrow">
       <span>地图</span>
       <div class="seg" id="seg-map">
@@ -130,6 +127,15 @@
         <option value="apocalypse">末日降临（全城）</option>
       </select></label>
     <div id="mode-opts"></div>
+    <div class="p-sec">面板 / 菜单</div>
+    <div class="p-tools"><div class="p-tools-inner" id="tb-tools">
+    <button class="tb-btn" id="btn-gov" title="政府行动：政府 / 警察 / 医院 / 学校">政府行动</button>
+    <button class="tb-btn" id="btn-force" title="武力状态明细">武力</button>
+    <button class="tb-btn" id="btn-sanit" title="卫生状态明细">卫生</button>
+    <button class="tb-btn" id="btn-overview" title="全体人员总览（O）">总览</button>
+    <button class="tb-btn" id="btn-report" title="结算本局">战报</button>
+  </div>
+    </div>
     <div class="p-sec">操作</div>
     <div class="p-btns">
       <button id="btn-restart" class="primary">重新爆发</button>

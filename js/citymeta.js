@@ -17,13 +17,18 @@ export const CITY_INFO = {
   zhengzhou: { country: '中国', city: '郑州',   district: '二七' },
   nanyang:   { country: '中国', city: '南阳',   district: '卧龙' },
   zhenping:  { country: '中国', city: '南阳',   district: '镇平' },
+  // 无人机航测烘焙的两座城（镇平县）：注意 id 更长，匹配时要优先于 zhenping
+  zhenping_town:     { country: '中国', city: '镇平', district: '县城' },
+  zhenping_tangying: { country: '中国', city: '镇平', district: '唐营村' },
   leicester: { country: '英国', city: '莱斯特', district: '' },   // 原版 2009 的那张图
 };
 
 /** 取结构化信息：id 允许带后缀（比如 "berlin-v2"），按包含匹配 */
 export function cityInfo(id, fallback) {
   const k = String(id || '').toLowerCase();
-  for (const key of Object.keys(CITY_INFO)) {
+  // 长 key 优先：zhenping_town 必须先于 zhenping 命中
+  const keys = Object.keys(CITY_INFO).sort((a, b) => b.length - a.length);
+  for (const key of keys) {
     if (k.includes(key)) return CITY_INFO[key];
   }
   // 没登记过的城市：把 fallback 当成城市名，国家留空

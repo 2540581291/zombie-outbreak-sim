@@ -171,7 +171,7 @@ def snap_pois_to_buildings(buildings, pois, max_dist=160, verbose=True):
       · 附近连楼都没有 → 丢掉（宁可少一个 POI，也不要一个假的）
     """
     if not pois:
-        return 0, 0
+        return [], 0, 0
     bl = []
     for b in buildings:
         pts = [tuple(p) for p in b["p"]]
@@ -194,7 +194,7 @@ def snap_pois_to_buildings(buildings, pois, max_dist=160, verbose=True):
         cy = sum(p[1] for p in pts) / len(pts)
         bl.append({"pts": pts, "x": x, "y": y, "cx": cx, "cy": cy, "a": a})
     if not bl:
-        return 0, 0
+        return [], 0, 0
 
     kept, moved, dropped = [], 0, 0
     for p in pois:

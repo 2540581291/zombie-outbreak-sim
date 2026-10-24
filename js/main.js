@@ -1785,9 +1785,17 @@ async function boot() {
       const sr = await fetch(CDIR + '/sat.json');
       if (sr.ok) {
         const meta = await sr.json();
-        const tex = await new THREE.TextureLoader().loadAsync(CDIR + '/' + meta.image);
-        satMesh = buildSatelliteGround(city, meta, tex);
+        const tl = new THREE.TextureLoader();
+        const tex = await tl.loadAsync(CDIR + '/' + meta.image);
+        // 航测图带镂空：额外加载一张灰度遮罩，交给 alphaTest 丢弃范围外的像素
+        let maskTex = null;
+        if (meta.mask) {
+          try { maskTex = await tl.loadAsync(CDIR + '/' + meta.mask); }
+          catch (e) { console.warn('[ZOS-R] 遮罩加载失败，底图按矩形铺：', e); }
+        }
+        satMesh = buildSatelliteGround(city, meta, tex, maskTex);
         scene.add(satMesh);
+        if (maskTex) console.log('[ZOS-R] 底图镂空已启用（' + meta.mask + '）');
       }
     }
   } catch (e) {
@@ -2089,7 +2097,10 @@ async function boot() {
         u.searchParams.set('city', sel.value);
         location.href = u.toString();
       };
-      tb && tb.appendChild(sel);
+      // 城市选择器放在右侧「爆发参数」面板顶部的「城市」分区里
+      const slot = document.getElementById('city-slot');
+      if (slot) slot.appendChild(sel);
+      else tb && tb.appendChild(sel);
     }
   }
   if (Q.get('retro')) setRetro(true);

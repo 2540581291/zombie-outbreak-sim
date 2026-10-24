@@ -353,7 +353,7 @@ export function buildCity(city) {
 // ============================================================
 //  卫星影像地面（按 sat.json 的经纬度边界铺到世界坐标）
 // ============================================================
-export function buildSatelliteGround(city, meta, tex) {
+export function buildSatelliteGround(city, meta, tex, maskTex) {
   const [lon0, lat0] = city.origin;
   const [W, H] = city.size;
   const kx = Math.cos(lat0 * Math.PI / 180) * 111320;
@@ -391,8 +391,21 @@ export function buildSatelliteGround(city, meta, tex) {
   tex.generateMipmaps = true;
   tex.needsUpdate = true;
 
+  // 不规则底图（航测正射）：用 alphaMap + alphaTest 镂空。
+  // 遮罩外的像素直接丢弃，露出 buildCity 那张深灰底板 —— 不是双图混合。
+  if (maskTex) {
+    maskTex.colorSpace = THREE.NoColorSpace;
+    maskTex.generateMipmaps = false;     // 遮罩不 mipmap，避免边界发灰
+    maskTex.minFilter = THREE.LinearFilter;
+    maskTex.magFilter = THREE.LinearFilter;
+    maskTex.anisotropy = 1;
+    maskTex.needsUpdate = true;
+  }
+
   const m = new THREE.MeshBasicMaterial({
     map: tex,
+    alphaMap: maskTex || null,
+    alphaTest: maskTex ? 0.5 : 0,
     toneMapped: false,      // 卫星图保持原色，不被 ACES 压暗
     polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -3,
     side: THREE.DoubleSide,
