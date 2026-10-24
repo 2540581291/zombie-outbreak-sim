@@ -49,6 +49,7 @@ def main():
     ap.add_argument('--width', type=int, default=16384, help='底图宽度像素')
     ap.add_argument('--mask-div', type=int, default=2, help='遮罩相对底图的缩小倍数')
     ap.add_argument('--jpeg-quality', type=int, default=88)
+    ap.add_argument('--skip-sat', action='store_true', help='底图已生成，只重刷碰撞遮罩')
     args = ap.parse_args()
 
     cdir = os.path.join(os.path.dirname(__file__), '..', 'data', 'cities', args.city)
@@ -56,26 +57,34 @@ def main():
     cj = json.load(open(os.path.join(cdir, 'city.json'), encoding='utf-8'))
     s, w, n, e = cj['bbox']          # bbox = [minlat, minlon, maxlat, maxlon]
 
-    src = Image.open(args.mosaic).convert('RGBA')
-    gw = read_pgw(args.mosaic.rsplit('.', 1)[0] + '.pgw')
-    part = crop_merc(src, gw, w, s, e, n)
+    if args.skip_sat and os.path.exists(os.path.join(cdir, 'sat_mask.png')):
+        mask = Image.open(os.path.join(cdir, 'sat_mask.png')).convert('L')
+        print(f'[{args.city}] 跳过底图生成，复用 sat_mask.png {mask.size}')
+        img = None
+    else:
+        src = Image.open(args.mosaic).convert('RGBA')
+        gw = read_pgw(args.mosaic.rsplit('.', 1)[0] + '.pgw')
+        part = crop_merc(src, gw, w, s, e, n)
+        img = True
 
     # 按城市长宽比定尺寸
     cw, ch = cj['size']
     W = args.width
     H = max(64, int(round(W * ch / cw)))
-    print(f'[{args.city}] 裁切 {part.size} → 输出 {W}×{H}  ({cw:.0f}×{ch:.0f} m)')
-
-    img = part.resize((W, H), Image.LANCZOS)
-    rgb = img.convert('RGB')
-    rgb.save(os.path.join(cdir, 'sat.jpg'), quality=args.jpeg_quality, optimize=True,
-             progressive=True)
-
     md = max(1, args.mask_div)
-    mask = img.getchannel('A').resize((max(1, W // md), max(1, H // md)), Image.BOX)
-    m = np.asarray(mask)
-    m = np.where(m > 110, 255, 0).astype(np.uint8)
-    Image.fromarray(m, 'L').save(os.path.join(cdir, 'sat_mask.png'), optimize=True)
+    if img is not None:
+        print(f'[{args.city}] 裁切 {part.size} → 输出 {W}×{H}  ({cw:.0f}×{ch:.0f} m)')
+        img = part.resize((W, H), Image.LANCZOS)
+        rgb = img.convert('RGB')
+        rgb.save(os.path.join(cdir, 'sat.jpg'), quality=args.jpeg_quality, optimize=True,
+                 progressive=True)
+        mask = img.getchannel('A').resize((max(1, W // md), max(1, H // md)), Image.BOX)
+        m = np.asarray(mask)
+        m = np.where(m > 110, 255, 0).astype(np.uint8)
+        Image.fromarray(m, 'L').save(os.path.join(cdir, 'sat_mask.png'), optimize=True)
+    else:
+        m = np.asarray(mask)
+        m = np.where(m > 110, 255, 0).astype(np.uint8)
 
     meta = {
         'provider': 'drone',

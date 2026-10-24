@@ -603,22 +603,6 @@ function updateLink() {
  * 顶栏是单行不换行布局，内容宽度随根字号线性变化，所以量一次 scrollWidth
  * 就能算出需要的比例；面板高度同理。
  */
-let uiFitTimer = 0;
-function fitUiScale() {
-  // 顶栏已允许换行（css/topbar.css），所以不需要把界面压缩到"一行装下"，
-  // 这里只按窗口宽给一个可读的根字号：1600 → 13.3px，1100 → 11px，2560 → 21px。
-  const root = document.documentElement;
-  const px = Math.max(10, Math.min(22, window.innerWidth / 120));
-  root.style.fontSize = px.toFixed(2) + 'px';
-  root.dataset.uipx = px.toFixed(2);
-}
-
-function scheduleFitUi() {
-  if (uiFitTimer) return;
-  uiFitTimer = setTimeout(() => { uiFitTimer = 0; fitUiScale(); }, 120);
-}
-addEventListener('resize', scheduleFitUi);
-addEventListener('orientationchange', scheduleFitUi);
 
 function setFollow(on) {
   followSelected = !!on;
@@ -2163,8 +2147,6 @@ async function boot() {
   } else {
     renderer.render(scene, camera);
   }
-  fitUiScale();
-  setTimeout(fitUiScale, 300);
   document.title = '生化危机模拟器 · ' + cityFull(CID, city.name);
   startLoop();
 }

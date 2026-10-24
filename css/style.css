@@ -5,7 +5,7 @@
 *{box-sizing:border-box}
 html,/* ---- UI 整体缩放：根字号 = 视口宽 / 100（1600px → 16px）----
    所有 UI 尺寸已改成 rem，所以整块界面会随窗口等比缩放。 */
-html{font-size:clamp(10px, 1vw, 26px)}
+html{font-size:clamp(5.5px, calc(100vw / 118), 22px)}
 body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--txt);
   font-family:"Noto Sans SC","Microsoft YaHei",system-ui,-apple-system,Segoe UI,sans-serif;
   -webkit-font-smoothing:antialiased;user-select:none}
