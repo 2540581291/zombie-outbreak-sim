@@ -3,7 +3,7 @@
 // ============================================================
 import * as THREE from 'three';
 import { buildCity, buildSatelliteGround, localizeCityNames } from './city.js';
-import { cityFull, cityShort, cityNewspaper } from './citymeta.js';
+import { cityFull, cityShort, cityNewspaper, cityInfo } from './citymeta.js';
 import { TiledGround } from './ground.js';
 import { buildNav, Sim, ST, GOAL } from './sim.js';
 import { loadCollision, collisionStats } from './collision.js';
@@ -541,6 +541,78 @@ function buildEscapeMarker() {
 
 let lastCardHtml = '';       // 卡片内容缓存：内容没变就不重建 DOM
 let lastCardT = 0;           // 上次刷新卡片的时间戳（节流到 200ms）
+
+/** 城市选择弹窗：缩略图网格 + 按国家分栏 */
+const COUNTRY_ORDER = ['中国', '德国', '日本', '英国', '美国', '巴西', '加拿大', '澳大利亚', '其他'];
+function openCityPicker() {
+  const cityIndex = window.__cityIndex || [];   // cityIndex / CID 都是 boot() 里的局部变量
+  const CID = window.__CID || '';
+  if (!cityIndex.length) return;
+  let box = document.getElementById('citypicker');
+  if (box) { box.remove(); return; }               // 再点一次关闭
+  box = document.createElement('div');
+  box.id = 'citypicker';
+  const groups = new Map();
+  for (const c of cityIndex) {
+    const info = cityInfo(c.id, c.name);
+    const country = info.country || '其他';
+    if (!groups.has(country)) groups.set(country, []);
+    groups.get(country).push(c);
+  }
+  const countries = [...groups.keys()].sort((a, b) => {
+    const ia = COUNTRY_ORDER.indexOf(a), ib = COUNTRY_ORDER.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+  const tabs = ['全部', ...countries];
+  const cardHtml = (c) => {
+    const info = cityInfo(c.id, c.name);
+    const on = c.id === CID ? ' on' : '';
+    return `<button class="cp-card${on}" data-city="${c.id}" title="${cityFull(c.id, c.name)}">
+      <img src="data/cities/${c.id}/thumb.jpg" alt="" loading="lazy">
+      <span class="cp-name">${cityShort(c.id, c.name)}</span>
+      <span class="cp-meta">${(c.buildings || 0).toLocaleString()} 栋 · ${(c.cell || 1).toFixed(2)}m</span>
+      <span class="cp-flag">${info.country || ''}</span>
+    </button>`;
+  };
+  const body = tabs.map((t, idx) => {
+    const list = t === '全部' ? cityIndex : groups.get(t);
+    return `<div class="cp-pane${idx === 0 ? ' on' : ''}" data-tab="${t}">
+      <div class="cp-grid">${list.map(cardHtml).join('')}</div>
+    </div>`;
+  }).join('');
+  box.innerHTML = `
+    <div class="cp-mask"></div>
+    <div class="cp-panel">
+      <div class="cp-head">
+        <b>切换地图</b>
+        <span class="cp-count">${cityIndex.length} 张</span>
+        <button class="cp-close">✕</button>
+      </div>
+      <div class="cp-tabs">${tabs.map((t, i) => `<button class="cp-tab${i === 0 ? ' on' : ''}" data-tab="${t}">${t}${t === '全部' ? '' : ' ' + groups.get(t).length}</button>`).join('')}</div>
+      <div class="cp-body">${body}</div>
+    </div>`;
+  document.body.appendChild(box);
+  box.querySelector('.cp-mask').onclick = () => box.remove();
+  box.querySelector('.cp-close').onclick = () => box.remove();
+  box.querySelectorAll('.cp-tab').forEach((b) => {
+    b.onclick = () => {
+      box.querySelectorAll('.cp-tab').forEach(x => x.classList.toggle('on', x === b));
+      box.querySelectorAll('.cp-pane').forEach(p => p.classList.toggle('on', p.dataset.tab === b.dataset.tab));
+    };
+  });
+  box.querySelectorAll('.cp-card').forEach((el) => {
+    el.onclick = () => {
+      const id = el.dataset.city;
+      if (id === CID) { box.remove(); return; }
+      const u = new URL(location.href);
+      u.searchParams.set('city', id);
+      location.href = u.toString();
+    };
+  });
+  addEventListener('keydown', function esc(e) {
+    if (e.key === 'Escape') { box.remove(); removeEventListener('keydown', esc); }
+  });
+}
 
 function selectAgent(i) {
   if (multiSel.size) { multiSel.clear(); updateGroupBadge(); }
@@ -1700,10 +1772,11 @@ async function boot() {
   // ---------- 多城市：?city=<id>，默认 berlin ----------
   const CID = (Q.get('city') || 'berlin').replace(/[^a-z0-9_-]/gi, '');
   const CDIR = 'data/cities/' + CID;
+  window.__CID = CID;   // 供模块级函数（城市选择弹窗）读取
   let cityIndex = [];
   try {
     const ir = await fetch('data/cities/index.json');
-    if (ir.ok) cityIndex = await ir.json();
+    if (ir.ok) { cityIndex = await ir.json(); window.__cityIndex = cityIndex; }
   } catch (e) { /* 没有索引就只跑默认城市 */ }
 
   const res = await fetch(CDIR + '/city.json');
@@ -2086,28 +2159,20 @@ async function boot() {
     b2.onclick = () => setOverlay(!overlayOn);
     tb && tb.appendChild(b2);
 
-    // 城市选择器（data/cities/index.json 里有多个城市才显示）
+    // 城市选择：面板里一个按钮 → 打开大弹窗（缩略图网格 + 按国家分栏）
     if (cityIndex && cityIndex.length > 1) {
-      const sel = document.createElement('select');
-      sel.id = 'sel-city';
-      sel.className = 'tb-sel';
-      sel.title = '切换城市';
-      for (const c of cityIndex) {
-        const o = document.createElement('option');
-        o.value = c.id;
-        o.textContent = cityFull(c.id, c.name);
-        if (c.id === CID) o.selected = true;
-        sel.appendChild(o);
-      }
-      sel.onchange = () => {
-        const u = new URL(location.href);
-        u.searchParams.set('city', sel.value);
-        location.href = u.toString();
-      };
-      // 城市选择器放在右侧「爆发参数」面板顶部的「城市」分区里
       const slot = document.getElementById('city-slot');
-      if (slot) slot.appendChild(sel);
-      else tb && tb.appendChild(sel);
+      if (slot) {
+        const btn = document.createElement('button');
+        btn.id = 'btn-citypick';
+        btn.className = 'citypick';
+        btn.title = '切换城市';
+        const cur = cityIndex.find(c => c.id === CID);
+        btn.innerHTML = '<span>' + (cur ? cityFull(CID, cur.name) : cityFull(CID, city.name)) +
+          '</span><i>▾</i>';
+        btn.onclick = openCityPicker;
+        slot.appendChild(btn);
+      }
     }
   }
   if (Q.get('selftest')) {
@@ -2116,6 +2181,7 @@ async function boot() {
       catch (e) { console.log('[TEST] restart FAIL ' + (e && e.message)); }
     }, 2500);
   }
+  if (Q.get('citypick')) setTimeout(openCityPicker, 1200);   // 调试：直接打开地图选择弹窗
   if (Q.get('retro')) setRetro(true);
   if (Q.get('overlay')) setOverlay(true);
   if (Q.get('edit') && layerEdit) layerEdit.enable();   // ?edit=1 直接进编辑模式
