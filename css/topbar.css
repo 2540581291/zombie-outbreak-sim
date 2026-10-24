@@ -1,64 +1,60 @@
-/* ===== 顶栏重排（v5 · 双倍高度，数值带两字说明）===== */
-#topbar{display:flex;align-items:center;gap:14px;flex-wrap:nowrap;overflow:hidden;
-  padding:10px 16px;height:104px;box-sizing:border-box}
-#topbar .tb-left{display:flex;align-items:center;gap:10px;flex:0 0 auto}
-#topbar .tb-mid{display:flex;align-items:center;gap:5px;flex:0 0 auto}
-#topbar .tb-right{display:flex;align-items:center;gap:12px;flex:1 1 auto;
-  justify-content:flex-end;flex-wrap:nowrap;min-width:0;overflow:hidden}
+/* ===== 顶栏（v7 · 单行，整栏按窗口宽度等比缩放，数值带两字说明）=====
+   所有尺寸都用 em，基准 font-size 跟随窗口宽度（clamp 兜底），
+   所以 4K 上就是等比放大、小窗口等比缩小，内容与窗口的宽度比例恒定，
+   不会出现"某个宽度下把最左边那块挤掉"的问题。 */
+#topbar{display:flex;align-items:center;gap:1.1em;flex-wrap:nowrap;overflow:hidden;
+  font-size:clamp(9.5px, 0.625vw, 24px);      /* 1920 → 12px；4K → 24px */
+  height:8.7em;padding:0 1.1em;box-sizing:border-box;
+  justify-content:flex-start}
+#topbar .tb-left{display:flex;align-items:center;gap:0.7em;flex:0 0 auto}
+#topbar .tb-mid{display:flex;align-items:center;gap:0.25em;flex:0 0 auto;padding:0.22em;border-radius:0.6em;background:rgba(255,255,255,.045)}
+#topbar .tb-tools{display:flex;align-items:center;gap:0.5em;flex:0 0 auto;min-width:0}
 
-.tb-group{display:flex;flex-direction:row;align-items:center;gap:7px;flex:0 0 auto}
-.tb-div{width:1px;height:46px;background:rgba(255,255,255,.10);flex:0 0 auto}
+.tb-group{display:flex;flex-direction:row;align-items:center;gap:0.6em;flex:0 0 auto}
+.tb-pops{gap:0.7em}
+.tb-div{width:1px;height:4.4em;background:rgba(255,255,255,.10);flex:0 0 auto;margin:0 0.15em}
 
 /* 计数块：上面两个字的说明（圆点 + 文案），下面大数字 */
-#topbar .tb-stat{display:flex;flex-direction:column;align-items:flex-start;gap:6px;
-  padding:9px 12px;border-radius:9px;background:rgba(255,255,255,.045);
-  white-space:nowrap;flex:0 0 auto;min-width:74px}
-#topbar .tb-cap{display:flex;align-items:center;gap:6px;line-height:1;
-  font-size:12px;color:#8492a3;letter-spacing:.10em}
+#topbar .tb-stat{display:flex;flex-direction:column;align-items:flex-start;gap:0.33em;
+  padding:0.5em 0.85em;border-radius:0.7em;background:rgba(255,255,255,.045);
+  box-sizing:border-box;white-space:nowrap;flex:0 0 auto;min-width:6.6em}
+#topbar .tb-cap{display:flex;align-items:center;gap:0.5em;line-height:1;
+  font-size:0.95em;color:#8492a3;letter-spacing:.08em}
 #topbar .tb-cap em{font-style:normal}
-#topbar .tb-stat b{font-size:23px;font-weight:700;line-height:1;
+#topbar .tb-stat b{font-size:1.75em;font-weight:700;line-height:1;
   font-variant-numeric:tabular-nums;color:#eaf1f8;letter-spacing:.01em}
 #topbar .tb-stat:hover{background:rgba(255,255,255,.075)}
 
-#topbar .dot{width:9px;height:9px;border-radius:50%;display:block;flex:0 0 auto}
+#topbar .dot{width:0.72em;height:0.72em;border-radius:50%;display:block;flex:0 0 auto}
 .dot.civ{background:#57d98a} .dot.inf{background:#e0b23c}
 .dot.zomb{background:#c8452f} .dot.dead{background:#7a7a86}
 .dot.info{background:#4aa8ff} .dot.chaos{background:#ff8a3d}
 .dot.force{background:#7ed07e} .dot.sanit{background:#c8a6ff}
 
 /* 百分比块：说明 + 数值一行，下面一条进度条 */
-.tb-gauges{display:flex;flex-direction:row;align-items:center;gap:12px}
-#topbar .tb-gauge{display:flex;flex-direction:column;gap:7px;width:98px;flex:0 0 auto;
-  padding:9px 10px;border-radius:9px;background:rgba(255,255,255,.03)}
-#topbar .tg-top{display:flex;align-items:center;gap:5px;line-height:1}
-#topbar .tg-top em{font-size:12px;color:#8492a3;font-style:normal;letter-spacing:.10em}
-#topbar .tg-top b{font-size:17px;font-weight:700;margin-left:auto;line-height:1;
+.tb-gauges{display:flex;flex-direction:row;align-items:center;gap:0.7em}
+#topbar .tb-gauge{display:flex;flex-direction:column;gap:0.4em;width:7.7em;flex:0 0 auto;
+  box-sizing:border-box;padding:0.42em 0.7em;border-radius:0.6em;background:rgba(255,255,255,.03)}
+#topbar .tg-top{display:flex;align-items:center;gap:0.4em;line-height:1}
+#topbar .tg-top em{font-size:0.95em;color:#8492a3;font-style:normal;letter-spacing:.08em}
+#topbar .tg-top b{font-size:1.25em;font-weight:700;margin-left:auto;line-height:1;
   font-variant-numeric:tabular-nums;color:#dfe7f0}
-#topbar .tg-bar{height:7px;border-radius:4px;background:rgba(255,255,255,.10);overflow:hidden}
-#topbar .tg-bar>i{display:block;height:100%;width:0;border-radius:4px;transition:width .25s}
+#topbar .tg-bar{height:0.5em;border-radius:0.25em;background:rgba(255,255,255,.10);overflow:hidden}
+#topbar .tg-bar>i{display:block;height:100%;width:0;border-radius:0.25em;transition:width .25s}
 #bar-aware{background:#4aa8ff} #bar-chaos{background:#ff8a3d}
 #bar-force{background:#7ed07e} #bar-sanit{background:#c8a6ff}
 
-#topbar .tb-btn{padding:9px 13px;border-radius:8px;border:1px solid rgba(255,255,255,.10);
-  background:rgba(255,255,255,.04);color:#cfd8e3;font-size:12px;cursor:pointer;white-space:nowrap;flex:0 0 auto}
+#topbar .tb-btn{box-sizing:border-box;padding:0.58em 0.9em;border-radius:0.55em;
+  border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04);
+  color:#cfd8e3;font-family:inherit;font-size:1em;cursor:pointer;white-space:nowrap;flex:0 0 auto}
 #topbar .tb-btn:hover{background:rgba(255,255,255,.09)}
-#topbar .spd{padding:7px 12px;font-size:12.5px}
+#topbar .spd{padding:0.42em 0.85em;font-size:1em}
 
-/* 左侧城市/时钟放大一号 */
-#topbar .tb-city{font-size:18px}
-#topbar .tb-sep{font-size:16px;margin:0 4px}
-#topbar .tb-clock{font-size:14px}
+/* 左侧城市/时钟 */
+#topbar .tb-city{font-size:1.42em;max-width:11em}
+#topbar .tb-sep{font-size:1.2em;margin:0 0.2em}
+#topbar .tb-clock{font-size:1.08em}
 #fps,#heat{display:none}
-
-/* 窄屏：等比收一点，避免右侧按钮被裁掉 */
-@media (max-width:1720px){
-  #topbar{gap:10px;padding:9px 12px}
-  #topbar .tb-stat{min-width:64px;padding:8px 9px}
-  #topbar .tb-stat b{font-size:20px}
-  #topbar .tb-gauge{width:86px;padding:8px 9px}
-  #topbar .tb-btn{padding:8px 10px;font-size:11.5px}
-  #topbar .tb-city{font-size:16px}
-}
 /* ===== 武力 / 卫生 信息面板 ===== */
 #statuspanel{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.55);
   display:flex;align-items:center;justify-content:center}
@@ -93,3 +89,9 @@
 .sp-tab:hover{background:rgba(255,255,255,.06);color:#cfd8e3}
 .sp-tab.on{background:rgba(255,255,255,.10);color:#eef4fa;font-weight:600}
 .sp-card{width:470px}
+
+/* 城市选择器：跟顶栏一起等比缩放 */
+#topbar .tb-sel{box-sizing:border-box;padding:0.5em 0.5em;border-radius:0.55em;
+  border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);
+  color:#cfd6dd;font-family:inherit;font-size:1em;cursor:pointer;flex:0 0 auto;max-width:9em}
+#topbar .tb-sel option{background:#12171d;color:#cfd6dd}

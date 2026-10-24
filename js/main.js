@@ -2083,21 +2083,20 @@ async function boot() {
 
   $('tb-city').textContent = cnCity(CID, city.name);
   {
-    const tb = $('topbar');
+    const tb = $('tb-tools') || $('topbar');   // 顶栏右侧的工具区
     const b = document.createElement('button');
     b.id = 'btn-retro';
+    b.className = 'tb-btn';                    // 尺寸/配色交给 CSS，跟着顶栏等比缩放
     b.textContent = retroMode ? '🕹 2D 模式' : '🧊 3D 模式';   // 按钮显示当前模式
     b.title = '切换 2D / 3D 模式（Tab）';
-    b.style.cssText = 'margin-left:10px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);' +
-      'color:#cfd6dd;font:inherit;font-size:11px;padding:3px 9px;border-radius:5px;cursor:pointer';
     b.onclick = () => setRetro(!retroMode);
     tb && tb.appendChild(b);
 
     const b2 = document.createElement('button');
     b2.id = 'btn-overlay';
+    b2.className = 'tb-btn';
     b2.textContent = '🗺 地形';
     b2.title = '叠加地形图层（C）：显示每格能不能走';
-    b2.style.cssText = b.style.cssText + ';margin-left:6px';
     b2.onclick = () => setOverlay(!overlayOn);
     tb && tb.appendChild(b2);
 
@@ -2105,9 +2104,8 @@ async function boot() {
     if (cityIndex && cityIndex.length > 1) {
       const sel = document.createElement('select');
       sel.id = 'sel-city';
+      sel.className = 'tb-sel';
       sel.title = '切换城市';
-      sel.style.cssText = 'margin-left:6px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);' +
-        'color:#cfd6dd;font:inherit;font-size:11px;padding:3px 6px;border-radius:5px;cursor:pointer';
       for (const c of cityIndex) {
         const o = document.createElement('option');
         o.value = c.id;

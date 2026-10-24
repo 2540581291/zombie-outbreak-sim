@@ -40,7 +40,7 @@
   </div>
 </div>
 
-<!-- 顶栏 -->
+<!-- 顶栏（单行；所有尺寸用 em 跟随窗口宽度等比缩放） -->
 <div id="topbar">
   <div class="tb-left">
     <span class="tb-city" id="tb-city">—</span>
@@ -53,39 +53,37 @@
     <button class="spd" data-spd="4">4×</button>
     <button class="spd" data-spd="16">16×</button>
   </div>
-  <div class="tb-right">
-    <!-- 人口（计数）：上面两字说明，下面数字 -->
-    <span class="tb-group">
-      <span class="tb-stat" title="还活着的平民"><span class="tb-cap"><i class="dot civ"></i><em>平民</em></span><b id="n-civ">0</b></span>
-      <span class="tb-stat" title="已感染、还没尸变的人"><span class="tb-cap"><i class="dot inf"></i><em>感染</em></span><b id="n-inf">0</b></span>
-      <span class="tb-stat" title="丧尸"><span class="tb-cap"><i class="dot zomb"></i><em>丧尸</em></span><b id="n-zomb">0</b></span>
-      <span class="tb-stat" title="死亡人数"><span class="tb-cap"><i class="dot dead"></i><em>死亡</em></span><b id="n-dead">0</b></span>
-      <span class="tb-stat" id="tb-saved" title="已从撤离口撤离出城的人"><span class="tb-cap"><i class="dot saved"></i><em>撤离</em></span><b id="n-saved">0</b></span>
-      <span class="tb-stat" id="tb-flee" title="正在逃跑的人"><span class="tb-cap"><i class="dot inf"></i><em>逃跑</em></span><b id="n-flee">0</b></span>
+  <div class="tb-group tb-pops">
+    <span class="tb-stat" title="还活着的平民"><span class="tb-cap"><i class="dot civ"></i><em>平民</em></span><b id="n-civ">0</b></span>
+    <span class="tb-stat" title="已感染、还没尸变的人"><span class="tb-cap"><i class="dot inf"></i><em>感染</em></span><b id="n-inf">0</b></span>
+    <span class="tb-stat" title="丧尸"><span class="tb-cap"><i class="dot zomb"></i><em>丧尸</em></span><b id="n-zomb">0</b></span>
+    <span class="tb-stat" title="死亡人数"><span class="tb-cap"><i class="dot dead"></i><em>死亡</em></span><b id="n-dead">0</b></span>
+    <span class="tb-stat" id="tb-saved" title="已从撤离口撤离出城的人"><span class="tb-cap"><i class="dot saved"></i><em>撤离</em></span><b id="n-saved">0</b></span>
+    <span class="tb-stat" id="tb-flee" title="正在逃跑的人"><span class="tb-cap"><i class="dot inf"></i><em>逃跑</em></span><b id="n-flee">0</b></span>
+  </div>
+  <span class="tb-div"></span>
+  <div class="tb-group tb-gauges">
+    <span class="tb-gauge clickable" id="g-chaos" title="混乱度 = 知情值×0.5 + 感染值×2（上限 100）· 点击查看明细">
+      <span class="tg-top"><i class="dot chaos"></i><em>混乱</em><b id="n-chaos">0</b></span>
+      <span class="tg-bar"><i id="bar-chaos"></i></span>
     </span>
-    <span class="tb-div"></span>
-    <!-- 状态（百分比条）：混乱 → 感染 → 知情，点一下看明细 -->
-    <span class="tb-group tb-gauges">
-      <span class="tb-gauge clickable" id="g-chaos" title="混乱度 = 知情值×0.5 + 感染值×2（上限 100）· 点击查看明细">
-        <span class="tg-top"><i class="dot chaos"></i><em>混乱</em><b id="n-chaos">0</b></span>
-        <span class="tg-bar"><i id="bar-chaos"></i></span>
-      </span>
-      <span class="tb-gauge clickable" id="g-infect" title="感染率 = 已感染人数 / 总人口 · 点击查看明细">
-        <span class="tg-top"><i class="dot inf"></i><em>感染</em><b id="n-infect">0%</b></span>
-        <span class="tg-bar"><i id="bar-infect"></i></span>
-      </span>
-      <span class="tb-gauge clickable" id="g-aware" title="知道出事了的人 · 点击查看明细">
-        <span class="tg-top"><i class="dot info"></i><em>知情</em><b id="n-aware">0%</b></span>
-        <span class="tg-bar"><i id="bar-aware"></i></span>
-      </span>
+    <span class="tb-gauge clickable" id="g-infect" title="感染率 = 已感染人数 / 总人口 · 点击查看明细">
+      <span class="tg-top"><i class="dot inf"></i><em>感染</em><b id="n-infect">0%</b></span>
+      <span class="tg-bar"><i id="bar-infect"></i></span>
     </span>
-    <span class="tb-div"></span>
+    <span class="tb-gauge clickable" id="g-aware" title="知道出事了的人 · 点击查看明细">
+      <span class="tg-top"><i class="dot info"></i><em>知情</em><b id="n-aware">0%</b></span>
+      <span class="tg-bar"><i id="bar-aware"></i></span>
+    </span>
+  </div>
+  <span class="tb-div"></span>
+  <div class="tb-tools" id="tb-tools">
     <button class="tb-btn" id="btn-force" title="武力状态明细">武力</button>
     <button class="tb-btn" id="btn-sanit" title="卫生状态明细">卫生</button>
     <button class="tb-btn" id="btn-overview" title="全体人员总览（O）">总览</button>
     <button class="tb-btn" id="btn-report" title="结算本局">战报</button>
-    <span class="tb-fps" id="fps">—</span>
   </div>
+  <span class="tb-fps" id="fps">—</span>
 </div>
 
 <!-- 参数面板 -->
