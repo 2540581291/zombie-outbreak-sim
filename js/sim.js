@@ -1371,7 +1371,7 @@ export class Sim {
     add(GOAL.WORK, '基线', 0.30);
     // 政府命令：学校停课 → 学生/教职工不用去学校；医院停止收治 → 别再往医院跑
     if (this.govOrders.schoolClosed && this.jobKind[i] === INST.SCHOOL) add(GOAL.WORK, '学校停课', -1.20);
-    if (this.govOrders.curfew) {
+    if (this.govOrders.curfew && this.fleeMode[i] === 0) {   // 逃跑优先：逃跑中的人不受宵禁影响
       add(GOAL.HOME, '宵禁', 0.55);
       add(GOAL.NONE, '宵禁', -0.80);
       add(GOAL.FOLLOW, '宵禁', -0.60);
@@ -3933,7 +3933,7 @@ export class Sim {
       for (let i = 0; i < this.n; i++) {
         const s = this.state[i];
         if (s !== ST.CIV && s !== ST.FLEE && s !== ST.FIGHT) continue;
-        if (this.fleeMode[i] === 2) continue;   // 有目标逃跑（回家/去警局/出城）不受宵禁打扰
+        if (this.fleeMode[i] !== 0) continue;   // 逃跑优先于宵禁：即时逃跑 / 有目标逃跑 都不被宵禁改动
         if (this.goal[i] === GOAL.NONE || this.goal[i] === GOAL.FOLLOW) {
           this.setGoal(i, GOAL.HOME, this.homeX[i], this.homeZ[i]);
           n++;
