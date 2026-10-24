@@ -252,8 +252,11 @@ export class AudioEngine {
     if (ev.length) {
       const nav = sim.nav;
       const n = Math.min(24, ev.length);
+      const now = sim.time;
       for (let i = 0; i < n; i++) {
         const e = ev[i];
+        // 超过 0.35 秒的旧事件直接丢：避免卡顿/掉帧后把历史枪声一次性重放出来
+        if (e.t != null && now - e.t > 0.35) continue;
         const ind = !!(nav && nav.indoor && nav.indoor(e.x, e.z));
         this.play(e.type, e.x, e.z, e.g, ind);
       }

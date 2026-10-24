@@ -3307,7 +3307,7 @@ export class Sim {
   // ============================================================
   pushAudio(type, x, z, g) {
     const ev = this.audio;
-    const e = { type, x, z, g: g || 1 };
+    const e = { type, x, z, g: g || 1, t: this.time };   // 打时间戳：太老的事件不播
     if (ev.length < 40) { ev.push(e); return; }
     // 队列满了：丢掉"离玩家（或地图中心）最远"的那条，而不是丢掉刚发生的事件
     const cx = this.playerX != null ? this.playerX : 0;
