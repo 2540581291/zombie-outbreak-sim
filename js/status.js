@@ -59,7 +59,7 @@ function stationCard(s) {
       <span class="st-people">驻 ${s.idle} · 巡 ${s.patrol} · 勤 ${s.onDuty} · 护 ${s.escort}${s.dead ? ' · 亡 ' + s.dead : ''}</span>
     </div>
     <div class="st-ammo">
-      <span>弹药 ${fmt(s.ammo)} / ${fmt(s.initAmmo)}</span>
+      <span>弹药 ${fmt(s.ammo)} / ${fmt(s.initAmmo)}${s.dry ? ' <em class="st-dry">· 已耗尽</em>' : ''}</span>
       <b>${Math.round(s.ammoLeft * 100)}%</b>
     </div>
     <div class="fw-part-bar"><i style="width:${Math.round(s.ammoLeft * 100)}%;background:${col}"></i></div>
@@ -145,6 +145,7 @@ function forceView(sim) {
       <div class="fw-kv"><span>每分钟消耗</span><b>${t ? d.burnPerMin.toFixed(1) + ' 发' : '—'}</b></div>
       <div class="fw-kv"><span>还能撑</span><b>${Number.isFinite(d.ammoMinutes) ? d.ammoMinutes > 999 ? '很久' : d.ammoMinutes.toFixed(0) + ' 分钟' : '—'}</b></div>
       <div class="fw-kv"><span>命中率</span><b>${d.accuracy === null ? '还没开过枪' : (d.accuracy * 100).toFixed(0) + '%（实算 ' + fmt(d.hits) + '/' + fmt(d.shots) + '）'}</b></div>
+      <div class="fw-kv"><span>无弹警员</span><b class="${d.dryNoStock ? 'down' : ''}">${fmt(d.dryOfficers)} 人${d.dryNoStock ? '（其中 ' + d.dryNoStock + ' 人回所也补不到：库房已空）' : ''}</b></div>
       <div class="fw-kv"><span>单人携带上限</span><b>手枪 60 发 · 步枪 120 发 · 轻机枪 300 发（弹匣 + 备弹）</b></div>
       <div class="fw-note">弹匣打空、且备弹凑不满一匣 → 回本所补给；补给上限就是这一列的数。</div>
     </div>

@@ -3078,6 +3078,10 @@ export class Sim {
                 break;
               }
               if (this.tryRefill(i)) break;
+              // 库房空了：这个所没这种子弹了 → 就地待命，别来回跑
+              this.idle[i] = 1;
+              this.actT[i] = 6 + this.rng() * 10;
+              break;
             }
           }
           // ---- 护送任务最高优先级：要员在哪我就在哪（混乱 50% 回局的规则也压不住）----
@@ -4664,6 +4668,19 @@ export class Sim {
     const burnPerMin = trend ? trend.shotsPerMin : 0;
     const ammoMinutes = burnPerMin > 0.5 ? ammoN / burnPerMin : Infinity;
 
+    // ---- 无弹警员：身上一发没有、回所也补不到（库房空了）----
+    let dryOfficers = 0, dryNoStock = 0;
+    for (let i = 0; i < this.n; i++) {
+      const st2 = this.state[i];
+      if (st2 !== ST.POLICE && st2 !== ST.SOLDIER) continue;
+      if ((this.mag[i] || 0) + (this.reserve[i] || 0) > 0) continue;
+      dryOfficers++;
+      const si = this.stationOf[i] - 1;
+      const sp = si >= 0 ? (this.poiByKind.police || [])[si] : null;
+      const avail = sp && sp.store && sp.store.a ? (sp.store.a[this.wpn[i]] || 0) : 0;
+      if (avail <= 0) dryNoStock++;
+    }
+
     // ---- 每个警局：人员分布 + 军械库明细 ----
     const stations = [];
     const P0 = this.poiByKind.police || [];
@@ -4707,6 +4724,7 @@ export class Sim {
         idle, patrol, onDuty, escort, dead, idleIds,
         idleAt: this.idleAt ? this.idleAt(k) : 0,
         rows, guns, ammo,
+        dry: ammo <= 0,
         initGuns, initAmmo,
         ammoLeft: initAmmo > 0 ? ammo / initAmmo : 0,
         gunsLeft: initGuns > 0 ? guns / initGuns : 0,
@@ -4722,6 +4740,7 @@ export class Sim {
       armedRate: armedN / popAlive,
       ammoPer: ammoN / Math.max(1, armedN),
       weaponRows, police, soldiers, idle, patrol, onDuty, escort, policeDead,
+      dryOfficers, dryNoStock,
       stations,
       kills: this.kills || 0,
       civKilled: this.civDeaths || 0,
