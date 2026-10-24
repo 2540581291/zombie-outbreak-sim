@@ -382,13 +382,16 @@ el.addEventListener('pointerup', (e) => {
     if (rc.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit)) {
       const t = TOOL_BY_ID[activeTool];
       if (!t || t.kind === 'select') {
-        const cand = pickAgents(e.clientX, e.clientY);
+        let cand = pickAgents(e.clientX, e.clientY, 22);
+        if (!cand.length) cand = pickAgents(e.clientX, e.clientY, 44);   // 拉远时点得更虚，放宽一倍
+        const prev = selected;
         if (cand.length) {
           // 人群中几个个体可能重叠在同一个像素上：优先切到"不是当前选中"的那个，
           // 否则点旁边的人会一直返回到原来那位（这就是"点了没反应"的原因）
           const pick = cand.find((c) => c.i !== selected) || cand[0];
           selectAgent(pick.i);
-        } else deselectAgent();
+          console.log('[SEL] ' + prev + ' -> ' + pick.i + '（候选 ' + cand.length + '）');
+        } else { deselectAgent(); console.log('[SEL] 空点击（候选 0）'); }
       } else {
         useToolAt(hit.x, hit.z);
       }
