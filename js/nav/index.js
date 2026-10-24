@@ -36,12 +36,64 @@ export class NavWorld {
     this.portals = new Portals(this.ng, { radius: this.radius });
     this.planner = new Planner(this.ng, this.hier, { portals: this.portals });
     this.flows = new FlowFieldCache(this.hier, { maxFields: opts.maxFields || 48 });
+    this.doorFieldMs = 0;
+    this.buildDoorAnchorField();
     this.portalMs = performance.now() - t2;
     this.buildMs = performance.now() - t0;
     this.opts = opts;
   }
 
   get radius() { return this.hier.radius; }
+
+  /**
+   * 门锚点场：8 m 格 → "最近那扇门的室外出口格"。
+   *
+   * 这是旧 `doorDist/doorOf`（1 m 格、56 MB）的替代品：
+   * 只回答"这栋楼的室外落脚点在哪儿"，在 8 m 格上做一次多源 BFS，
+   * **476 KB / 5 ms**，而且是几何近邻（穿不穿墙都无所谓，要的就是最近的门）。
+   */
+  buildDoorAnchorField() {
+    const t0 = performance.now();
+    const h = this.hier, ng = this.ng;
+    const N = h.N, cols = h.cols, cs = h.cellSize;
+    const anchor = new Int32Array(N).fill(-1);
+    const q = new Int32Array(N);
+    let head = 0, tail = 0;
+    for (const [cell, outdoor] of this.portals.doorOutdoor) {
+      const c = cell % ng.cols, r = (cell / ng.cols) | 0;
+      const k = ((r / cs) | 0) * cols + ((c / cs) | 0);
+      if (anchor[k] === -1) { anchor[k] = outdoor; q[tail++] = k; }
+    }
+    while (head < tail) {
+      const cur = q[head++];
+      const src = anchor[cur];
+      const cr = (cur / cols) | 0, cc = cur - cr * cols;
+      for (let d = 0; d < 8; d++) {
+        const nr = cr + (d === 1 || d === 2 || d === 3 ? 1 : d === 5 || d === 6 || d === 7 ? -1 : 0);
+        const nc = cc + (d === 0 || d === 1 || d === 7 ? 1 : d === 3 || d === 4 || d === 5 ? -1 : 0);
+        if (nr < 0 || nc < 0 || nr >= h.rows || nc >= cols) continue;
+        const nk = nr * cols + nc;
+        if (anchor[nk] !== -1) continue;
+        anchor[nk] = src;
+        q[tail++] = nk;
+      }
+    }
+    this.doorAnchorField = anchor;
+    this.doorFieldMs = performance.now() - t0;
+  }
+
+  /**
+   * 室内点 → 这栋楼最近那扇门的室外落脚点（世界坐标）；找不到返回 null。
+   * 旧实现是 1 m 全图门场；这里是 8 m 格上的锚点场，O(1)。
+   */
+  doorAnchor(x, z) {
+    const h = this.hier, ng = this.ng;
+    const cc = Math.floor((x + ng.halfW) / h.cs);
+    const rr = Math.floor((ng.halfH - z) / h.cs);
+    if (cc < 0 || rr < 0 || cc >= h.cols || rr >= h.rows) return null;
+    const a = this.doorAnchorField[rr * h.cols + cc];
+    return a >= 0 ? ng.center(a) : null;
+  }
 
   /** 给 sim 做局部跟随用（数组由 sim 提供，避免多一份状态） */
   makeSteering(arrays) {

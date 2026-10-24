@@ -1884,10 +1884,13 @@ async function boot() {
   layerEdit = new LayerEditor({
     scene, renderer, getCamera: activeCamera, nav, overlay,
     cityId: CID, fileOps: layerFileOps, baseGrid: nav.grid.slice(),
-    // 手绘墙之后：门场要重建（否则出门路线是旧的），被墙盖住的人要挪出来
+    // 手绘墙之后：导航层整体重建（clearance + 8m 图 + 门 portal + 缓存），被墙盖住的人要挪出来
     onChange: () => {
       try {
-        nav.buildDoorField();
+        if (nav.__navWorld) {
+          const ms = nav.__navWorld.rebuildAll();
+          console.log('[ZOS-R] 手绘后导航图重建 ' + ms.toFixed(0) + ' ms');
+        }
         const n = sim ? sim.evictFromWalls() : 0;
         if (n) console.log('[ZOS-R] 手绘后挪出墙体 ' + n + ' 人');
       } catch (err) { console.warn('[ZOS-R] 手绘后处理失败：', err); }

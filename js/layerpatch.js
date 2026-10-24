@@ -145,7 +145,7 @@ export function applyLayerPatch(nav, patch) {
     try { applyOpacity(nav, op, stat); stat.ops++; }
     catch (e) { console.warn('[layerpatch] 跳过一条 op：', e.message, op); }
   }
-  if (stat.changed) nav.doorDist = null;     // 门的位置变了 → 门场重建
+  // 门的位置变了：旧门场已删除；导航图由 main.js 的 onChange 统一 rebuildAll()
   return stat;
 }
 

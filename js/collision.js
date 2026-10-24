@@ -91,89 +91,10 @@ export async function loadCollision(city) {
       return true;
     },
 
-    /**
-     * 门场：每个可走格到"最近的门"的步数。
-     * 多源 BFS，从所有 0x0f 出发。用来让被墙挡住的人/尸朝门口走，
-     * 而不是贴着墙蹭 —— 这是让建筑真正"能进出"的关键。
-     */
-    buildDoorField() {
-      const n = this.cols * this.rows;
-      // 门场要开 3 个 Int32 数组（dist/queue/doorOf）= 12 字节/格。
-      // 0.4m 格的 3km 城市会到 4750 万格 → 570MB，直接 OOM。
-      // 超过 2000 万格就先不建门场（大图退化：屋内寻路靠 doorGradient/exitProbe）。
-      if (n > 20000000) {
-        this.doorDist = null;
-        if (typeof window === "undefined") {
-          console.log(`[ZOS-R] 门场跳过：${(n / 1e6).toFixed(1)}M 格太多（>20M），已降级`);
-        }
-        return 0;
-      }
-      const dist = new Int32Array(n).fill(-1);
-      const queue = new Int32Array(n);
-      let head = 0, tail = 0;
-      for (let i = 0; i < n; i++) {
-        if (this.grid[i] === CL.DOOR) { dist[i] = 0; queue[tail++] = i; }
-      }
-      if (tail === 0) { this.doorDist = null; return 0; }
-      const cols = this.cols, rows = this.rows, grid = this.grid;
-      // doorOf[cell] = 离这个格子最近的"门"的格子号（BFS 传播，O(1) 查询门的位置）
-      const doorOf = new Int32Array(n).fill(-1);
-      for (let i = 0; i < n; i++) if (dist[i] === 0) doorOf[i] = i;
-      while (head < tail) {
-        const k = queue[head++];
-        const d = dist[k] + 1;
-        const src = doorOf[k];
-        const x = k % cols, y = (k / cols) | 0;
-        if (x > 0) { const j = k - 1; if (dist[j] < 0 && (grid[j] & CL.WALK)) { dist[j] = d; doorOf[j] = src; queue[tail++] = j; } }
-        if (x + 1 < cols) { const j = k + 1; if (dist[j] < 0 && (grid[j] & CL.WALK)) { dist[j] = d; doorOf[j] = src; queue[tail++] = j; } }
-        if (y > 0) { const j = k - cols; if (dist[j] < 0 && (grid[j] & CL.WALK)) { dist[j] = d; doorOf[j] = src; queue[tail++] = j; } }
-        if (y + 1 < rows) { const j = k + cols; if (dist[j] < 0 && (grid[j] & CL.WALK)) { dist[j] = d; doorOf[j] = src; queue[tail++] = j; } }
-      }
-      this.doorDist = dist;
-      this.doorOf = doorOf;
-      return tail;
-    },
-
-    /** 离我最近的那扇门在哪（世界坐标）；已经在门口或查不到就返回 null */
-    doorPoint(x, z) {
-      const of = this.doorOf;
-      if (!of) return null;
-      const c = this.idx(x, z);
-      if (c < 0) return null;
-      const k = of[c];
-      if (k < 0) return null;
-      if (this.doorDist && this.doorDist[c] === 0) return null;   // 已经站在门上
-      const cols = this.cols, cell = this.cell, halfW = this.halfW, halfH = this.halfH;
-      const cx = k % cols, cy = (k / cols) | 0;
-      return { x: -halfW + (cx + 0.5) * cell, z: halfH - (cy + 0.5) * cell };
-    },
-
-    /** 门场梯度：朝邻居里距离更小的方向走；没有更小的就返回 null */
-    doorGradient(x, z) {
-      const dist = this.doorDist;
-      if (!dist) return null;
-      const c = this.idx(x, z);
-      if (c < 0) return null;
-      const d0 = dist[c];
-      if (d0 <= 0) return null;          // 已经在门口/走不到
-      const cols = this.cols, grid = this.grid;
-      const cx = c % cols, cy = (c / cols) | 0;
-      let best = d0, bx = 0, bz = 0;
-      for (let dy = -1; dy <= 1; dy++) {
-        const yy = cy + dy;
-        if (yy < 0 || yy >= this.rows) continue;
-        for (let dx = -1; dx <= 1; dx++) {
-          if (dx === 0 && dy === 0) continue;
-          const xx = cx + dx;
-          if (xx < 0 || xx >= cols) continue;
-          const j = yy * cols + xx;
-          if (!(grid[j] & CL.WALK)) continue;
-          const dj = dist[j];
-          if (dj >= 0 && dj < best) { best = dj; bx = dx; bz = dy; }
-        }
-      }
-      return best < d0 ? { x: bx, z: bz } : null;
-    },
+    // 门场（doorDist/doorOf/doorPoint/doorGradient）已在 S7 删除：
+    //   全图 1 m 多源 BFS = 56 MB，只回答"最近的门在哪"。
+    //   现在由 js/nav/index.js 的 8 m 门锚点场（476 KB / 5 ms）和
+    //   js/nav/portal.js 的门洞图接管。
   };
   return nav;
 }

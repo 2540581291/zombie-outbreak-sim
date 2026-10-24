@@ -163,15 +163,8 @@ export class Sim {
     this.poiSnapped = snapped;
     this.poiDropped = dropped;
     this.poiCount = this.pois.length;   // 现在用的是生成出来的 POI，不是 city.json 里那批
-    // 一次性预处理：每个可走格到最近门的步数（让被墙挡住的人会找门）
-    if (typeof nav.buildDoorField === 'function' && !nav.doorDist) {
-      const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
-      const reached = nav.buildDoorField();
-      const t1 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
-      if (reached) {
-        console.log('[ZOS-R] 门场 ' + reached.toLocaleString() + ' 格  ' + (t1 - t0).toFixed(0) + 'ms');
-      }
-    }
+    // 导航世界按需建（第一次移动时）：EDT + 8 m 分层 + 门 portal ≈ 0.8 s，不能每局重建
+    this._navTried = false;
     this.tick = 0;
     this.time = 0;
     this.n = 0;
@@ -1329,13 +1322,21 @@ export class Sim {
 
   /** 目标 → 世界坐标（没有目标点就返回 null，表示"原地/按通勤逻辑"） */
   /** 室内点 → 它最近的门（门口空地）。室内目标一律"走到门口就算到"，
-   *  这样人不会为了穿到楼对面而贴墙、也不会钻进去出不来。 */
+   *  这样人不会为了穿到楼对面而贴墙、也不会钻进去出不来。
+   *
+   *  S7：不再依赖 56 MB 的 1 m 门场，改用 NavCore 的 8 m 门锚点场（476 KB, O(1)）。 */
   doorOf(x, z) {
     const nav = this.nav;
-    if (!nav || !nav.indoor || !nav.doorPoint) return null;
-    if (!nav.indoor(x, z)) return null;          // 本来就在户外，不用找门
-    const dp = nav.doorPoint(x, z);
-    return dp ? [dp.x, dp.z] : null;
+    if (!nav || !nav.indoor || !nav.indoor(x, z)) return null;   // 本来就在户外
+    if (this.ensureNav()) {
+      const a = this.navWorld.doorAnchor(x, z);
+      if (a) return a;
+    }
+    if (nav.doorPoint) {                        // 兜底（NavCore 没起来时）
+      const dp = nav.doorPoint(x, z);
+      return dp ? [dp.x, dp.z] : null;
+    }
+    return null;
   }
 
   /**
@@ -2565,13 +2566,8 @@ export class Sim {
       }
       return this.move(i, dx, dz, speed, dt);
     }
-    const nav = this.nav;
-    if (nav.indoor && nav.indoor(this.px[i], this.pz[i])) {
-      // 首选：直接朝"离我最近的那扇门"走（门的位置是烘焙好的，不用自己找）
-      const dp = nav.doorPoint ? nav.doorPoint(this.px[i], this.pz[i]) : null;
-      if (dp) { this.move(i, dp.x - this.px[i], dp.z - this.pz[i], speed, dt); return true; }
-      const g = nav.doorGradient ? nav.doorGradient(this.px[i], this.pz[i]) : null;
-      if (g) { this.move(i, g.x, g.z, speed, dt); return true; }
+    // NavCore 没起来（极端兜底）：室内就自己探最近的出口，否则直走
+    if (this.nav.indoor && this.nav.indoor(this.px[i], this.pz[i])) {
       const e = this.exitProbe(i);
       if (e) { this.move(i, e[0], e[1], speed, dt); return true; }
     }
@@ -2938,22 +2934,13 @@ export class Sim {
               const atGoal = (gdx * gdx + gdz * gdz) < 144;
               if (!atGoal && adx * adx + adz * adz > 30) {     // 还没到 → 往目标走
                 this.idle[i] = 0;
-                // 自己在屋里、目标又还远 → 先沿"门场"找门出去。
-                //  注意：不能要求"目标在屋外"，回家时目标也在（另一栋）屋里，
-                //  以前这条件一挡，人就在自家墙上原地打转（56% 的"卡住"都是这个）
-                const nav = this.nav;
-                if (nav.doorGradient && nav.indoor) {
-                  const meIn = nav.indoor(this.px[i], this.pz[i]);
-                  // 刚跨出门的 3 秒里不要再看门场 —— 否则会"出门→直线→又被吸回门口"，
-                  // 每秒只挪 0.15m，看起来就是原地卡住（这是实测抓到的）
-                  if (meIn) this.freeT[i] = 0;
-                  else if (this.freeT[i] === 0) this.freeT[i] = this.time + 3;
-                  const tgtIn = nav.indoor(ax, az);
-                  const d2g = adx * adx + adz * adz;
-                  const useGrad = (meIn || (tgtIn && d2g < 3600)) && this.time > this.freeT[i];
-                  if (useGrad) {
-                    const g = nav.doorGradient(this.px[i], this.pz[i]);
-                    if (g) { this.move(i, g.x, g.z, this.spd[i], cdt); break; }
+                // 室内出门：S7 起由 moveSmart 里的 portal 引导负责（旧的 1 m 门场已删除），
+                // 这里只需要记住"刚出门的 3 秒别再被门口吸回去"。
+                {
+                  const ng2 = this.navWorld ? this.navWorld.ng : null;
+                  if (ng2) {
+                    if (ng2.indoor(this.px[i], this.pz[i])) this.freeT[i] = 0;
+                    else if (this.freeT[i] === 0) this.freeT[i] = this.time + 3;
                   }
                 }
                 // 逃命是跑，不是散步
