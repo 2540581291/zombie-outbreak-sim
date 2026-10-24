@@ -8,6 +8,7 @@
     "test": "node tools/test_sim.mjs",
     "test:nav": "node tools/test_nav.mjs",
     "test:navgrid": "node tools/test_navgrid.mjs",
+    "test:navplanner": "node tools/test_navplanner.mjs",
     "bench": "node tools/bench_nav.mjs",
     "serve": "python -m http.server 8777"
   }
