@@ -167,11 +167,17 @@ def do_one(m, z=19):
     os.makedirs(outp, exist_ok=True)
     img.save(os.path.join(outp, "sat.jpg"), quality=90)
     # 左下角经纬度（引擎用 origin+bbox 定位贴图）
+    # 引擎用 origin + bbox 只为"把贴图铺满城市范围"，不需要真实经纬度。
+    # 之前写成 origin=西北角 + bbox=[lat2,lon,lat,lon2]，经度两值相同 →
+    # u0==u1，地面平面宽度为 0，卫星图完全看不见。改成和莱斯特一样：
+    # origin=[0,0]、bbox 以 0 为中心对称。
+    half_lon = (world / 2) / 111320.0
+    half_lat = (world / 2) / 110540.0
     lon2, lat2 = merc_to_lonlat(m["worldX"], m["worldY"] + m["height"])
     city = {"name": NAMES.get(m["id"], cid),
             "size": [round(world, 1), round(world, 1)], "cell": round(cell, 4),
-            "origin": [lon, lat],
-            "bbox": [lat2, lon, lat, lon2],      # minLat,minLon,maxLat,maxLon
+            "origin": [0.0, 0.0],
+            "bbox": [-half_lat, -half_lon, half_lat, half_lon],
             "buildings": bl, "roads": [], "pois": [], "entrances": [], "water": [],
             "collision": {"cell": round(cell, 4), "cols": n, "rows": n,
                           "b64": base64.b64encode(zlib.compress(grid.tobytes(), 9)).decode()}}
@@ -179,7 +185,7 @@ def do_one(m, z=19):
         json.dumps(city, ensure_ascii=False, separators=(",", ":")))
     meta = {"provider": "esri-world-imagery", "image": "sat.jpg", "size": list(img.size),
             "cell": m["width"] / n, "citySize": [world, world],
-            "bounds": [lon, lat2, lon2, lat]}
+            "bounds": [-half_lon, -half_lat, half_lon, half_lat]}
     io.open(os.path.join(outp, "sat.json"), "w", encoding="utf-8").write(
         json.dumps(meta, ensure_ascii=False, indent=1))
     print(f"    → {outp}  建筑 {len(bl)} 栋")
