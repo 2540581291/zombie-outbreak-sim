@@ -552,8 +552,11 @@ function openCityPicker() {
   if (box) { box.remove(); return; }               // 再点一次关闭
   box = document.createElement('div');
   box.id = 'citypicker';
+  // 官方地图单独一栏（不参与国家分组，也不出现在「全部」里）
+  const official = cityIndex.filter(c => c.official);
+  const local = cityIndex.filter(c => !c.official);
   const groups = new Map();
-  for (const c of cityIndex) {
+  for (const c of local) {
     const info = cityInfo(c.id, c.name);
     const country = info.country || '其他';
     if (!groups.has(country)) groups.set(country, []);
@@ -563,23 +566,24 @@ function openCityPicker() {
     const ia = COUNTRY_ORDER.indexOf(a), ib = COUNTRY_ORDER.indexOf(b);
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
   });
-  const tabs = ['全部', ...countries];
+  const tabs = [];
+  if (official.length) tabs.push({ key: '官方', list: official, special: true });
+  tabs.push({ key: '全部', list: local });
+  for (const c of countries) tabs.push({ key: c, list: groups.get(c) });
   const cardHtml = (c) => {
     const info = cityInfo(c.id, c.name);
     const on = c.id === CID ? ' on' : '';
-    return `<button class="cp-card${on}" data-city="${c.id}" title="${cityFull(c.id, c.name)}">
+    return `<button class="cp-card${on}${c.official ? ' official' : ''}" data-city="${c.id}" title="${cityFull(c.id, c.name)}">
       <img src="data/cities/${c.id}/thumb.jpg" alt="" loading="lazy">
       <span class="cp-name">${cityShort(c.id, c.name)}</span>
       <span class="cp-meta">${(c.buildings || 0).toLocaleString()} 栋 · ${(c.cell || 1).toFixed(2)}m</span>
       <span class="cp-flag">${info.country || ''}</span>
     </button>`;
   };
-  const body = tabs.map((t, idx) => {
-    const list = t === '全部' ? cityIndex : groups.get(t);
-    return `<div class="cp-pane${idx === 0 ? ' on' : ''}" data-tab="${t}">
-      <div class="cp-grid">${list.map(cardHtml).join('')}</div>
-    </div>`;
-  }).join('');
+  const body = tabs.map((t, idx) => `
+    <div class="cp-pane${idx === 0 ? ' on' : ''}" data-tab="${t.key}">
+      <div class="cp-grid">${t.list.map(cardHtml).join('')}</div>
+    </div>`).join('');
   box.innerHTML = `
     <div class="cp-mask"></div>
     <div class="cp-panel">
@@ -588,7 +592,7 @@ function openCityPicker() {
         <span class="cp-count">${cityIndex.length} 张</span>
         <button class="cp-close">✕</button>
       </div>
-      <div class="cp-tabs">${tabs.map((t, i) => `<button class="cp-tab${i === 0 ? ' on' : ''}" data-tab="${t}">${t}${t === '全部' ? '' : ' ' + groups.get(t).length}</button>`).join('')}</div>
+      <div class="cp-tabs">${tabs.map((t, i) => `<button class="cp-tab${t.special ? ' official' : ''}${i === 0 ? ' on' : ''}" data-tab="${t.key}">${t.key} <em>${t.list.length}</em></button>`).join('')}</div>
       <div class="cp-body">${body}</div>
     </div>`;
   document.body.appendChild(box);

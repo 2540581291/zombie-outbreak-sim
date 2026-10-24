@@ -261,3 +261,20 @@
 .cp-meta{padding:0 0.5rem 0.5rem;color:#7b8794;font-size:0.6875rem}
 .cp-flag{position:absolute;top:0.375rem;left:0.375rem;background:rgba(0,0,0,.6);color:#cfd6dd;
   font-size:0.625rem;padding:0.0625rem 0.3125rem;border-radius:0.25rem}
+
+/* 官方地图分栏：金色渐变 + 呼吸光，作为"官方"的区分 */
+.cp-tab.official{
+  background:linear-gradient(100deg,#8a6a12,#c9a227 35%,#f2d86b 55%,#c9a227 75%,#8a6a12);
+  background-size:220% 100%;
+  border-color:#f2d86b;color:#231b00;font-weight:800;letter-spacing:.06em;
+  animation:cp-gold 3.2s linear infinite;
+  box-shadow:0 0 0.625rem rgba(242,216,107,.45),0 0 1.25rem rgba(201,162,39,.25) inset;
+}
+.cp-tab.official:hover{filter:brightness(1.1)}
+.cp-tab.official.on{box-shadow:0 0 0.875rem rgba(242,216,107,.8),0 0 1.5rem rgba(201,162,39,.45) inset}
+@keyframes cp-gold{0%{background-position:0% 50%}100%{background-position:200% 50%}}
+.cp-tab em{font-style:normal;opacity:.75;font-weight:600}
+.cp-card.official{border-color:rgba(242,216,107,.45)}
+.cp-card.official::after{content:'官方';position:absolute;top:0.375rem;right:0.375rem;
+  background:linear-gradient(100deg,#c9a227,#f2d86b);color:#231b00;font-size:0.625rem;font-weight:800;
+  padding:0.0625rem 0.375rem;border-radius:0.25rem;box-shadow:0 0 0.5rem rgba(242,216,107,.5)}
