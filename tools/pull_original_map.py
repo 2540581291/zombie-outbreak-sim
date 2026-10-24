@@ -34,14 +34,23 @@ BIN = os.path.join(ROOT, "reference", "core", "binaryData", "355_src._ov276__rr2
 MINI = os.path.join(IMG, "316.jpg")
 OUT = os.path.join(ROOT, "data", "cities", "leicester")
 
-S = 18                      # 18x18 = 324 张瓦片
-P = 16                      # 缩略图上每张瓦片占 16x16
-PX = 256                    # 瓦片边长
-CELL = 4 * 0.11             # 4px × 0.11m/px = 0.44m
+# 尺寸都不写死：从资源本身推出来
+#   PX   = 瓦片边长（读第一张 256x256 的图）
+#   S    = sqrt(瓦片数)（324 → 18）
+#   P    = 缩略图上每张瓦片占的像素（缩略图边长 / S，向下取整）
+#   GRID = sqrt(碰撞表字节数)（1,327,104 → 1152）
+#   CELL = PX / GRID * METER_PER_PX（原版 4px/格，0.11m/px → 0.44m）
+METER_PER_PX = 0.11
+PX = 256
+S = 18
+P = 16
+CELL = 0.44
+GRID = 1152
 VALUE_MAP = {0: 0x00, 3: 0x03, 7: 0x07, 15: 0x0f, 22: 0x16, 31: 0x1f, 66: 0x42, 35: 0x43}
 
 
 def load_tiles():
+    global S, P, PX
     tiles = []
     for p in os.listdir(IMG):
         if not p.lower().endswith(".jpg"):
@@ -56,6 +65,11 @@ def load_tiles():
         if im.size == (PX, PX):
             tiles.append((int(m.group(1)), os.path.join(IMG, p)))
     tiles.sort()
+    # 按实际瓦片数推出 S（324 → 18），以及缩略图上每块占多少像素
+    if tiles:
+        PX = Image.open(tiles[0][1]).size[0]
+        S = int(round(len(tiles) ** 0.5))
+        P = max(1, 288 // S)
     return tiles
 
 
@@ -95,9 +109,13 @@ def stitch(tiles, assign):
 
 
 def convert_collision():
+    global GRID, CELL
     raw = zlib.decompress(open(BIN, "rb").read())
-    assert len(raw) == 1152 * 1152, len(raw)
-    g = np.frombuffer(raw, dtype=np.uint8).reshape(1152, 1152)[::-1]   # 上下翻转
+    grid = int(round(len(raw) ** 0.5))
+    assert grid * grid == len(raw), f"碰撞表不是正方形：{len(raw)} 字节"
+    GRID = grid
+    CELL = GRID and ((S * PX) / GRID) * METER_PER_PX or 0.44   # 每格像素数 = 整图宽/网格宽
+    g = np.frombuffer(raw, dtype=np.uint8).reshape(grid, grid)[::-1]   # 上下翻转
     grid = np.zeros_like(g)
     for k, v in VALUE_MAP.items():
         grid[g == k] = v
@@ -106,7 +124,7 @@ def convert_collision():
 
 def make_buildings(grid):
     inside = (grid & 0x1f) == 0x1f
-    R = C = 1152
+    R = C = GRID
     half = R * CELL / 2
     seen = np.zeros_like(inside)
     out = []
@@ -163,7 +181,7 @@ def main():
         return
     os.makedirs(OUT, exist_ok=True)
     canvas.save(os.path.join(OUT, "sat.jpg"), quality=90)
-    world = 1152 * CELL
+    world = GRID * CELL
     meta = {"provider": "original-2009", "image": "sat.jpg", "size": [S * PX, S * PX],
             "cell": 4, "citySize": [world, world],
             "note": "Zombie Outbreak Simulator 2009 (Leicester): 324 tiles stitched via minimap"}
@@ -178,7 +196,7 @@ def main():
         "bbox": [-half_lat, -half_lon, half_lat, half_lon],
         "buildings": buildings,
         "roads": [], "pois": [], "entrances": [], "water": [],
-        "collision": {"cell": CELL, "cols": 1152, "rows": 1152,
+        "collision": {"cell": CELL, "cols": GRID, "rows": GRID,
                       "b64": base64.b64encode(zlib.compress(grid.tobytes(), 9)).decode()},
     }
     io.open(os.path.join(OUT, "city.json"), "w", encoding="utf-8").write(json.dumps(city, ensure_ascii=False, separators=(",", ":")))
