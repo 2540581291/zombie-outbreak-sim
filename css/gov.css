@@ -15,12 +15,14 @@
   color:#c8d2de;cursor:pointer;font-size:13px}
 .gv-head button:hover{background:rgba(255,255,255,.12)}
 
-.gv-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px 16px;
-  overflow-y:auto;min-height:0}
-@media (max-width:980px){ .gv-grid{grid-template-columns:1fr} }
+/* 2×2 固定版面：四栏始终都在，超出部分各自在栏内滚动 */
+.gv-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;
+  gap:10px;padding:12px 14px;min-height:0;flex:1 1 auto;overflow:hidden}
+@media (max-width:980px){ .gv-grid{grid-template-columns:1fr;grid-template-rows:auto;overflow-y:auto} }
 
 .gv-sec{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
-  border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+  border-radius:10px;padding:10px 13px;display:flex;flex-direction:column;gap:8px;
+  min-height:0;overflow-y:auto}
 .gv-title{display:flex;align-items:center;gap:7px;font-size:14px;font-weight:700;color:#eef3f9}
 .gv-title em{margin-left:auto;font-size:11px;font-weight:400;color:#66727f;font-style:normal}
 
@@ -61,3 +63,50 @@
 .gv-pip.pol{background:#4aa8ff}
 .gv-pip.sol{background:#ff8a3d}
 .gv-empty{font-size:11.5px;color:#5f6b78;padding:3px 2px}
+
+/* ---- 顶部局势条 ---- */
+.gv-banner{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:9px 16px;border-bottom:1px solid rgba(255,255,255,.07);
+  background:rgba(255,255,255,.02);font-size:12px;color:#94a2b3}
+.gv-kv{display:flex;align-items:baseline;gap:5px}
+.gv-kv b{color:#eaf1f8;font-size:13.5px;font-variant-numeric:tabular-nums}
+.gv-d{font-style:normal;font-size:11px;color:#7f8b99}
+.gv-d.up{color:#ff7b62}
+.gv-d.down{color:#57d98a}
+.gv-chips{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+.gv-chip{font-style:normal;font-size:11px;padding:2px 8px;border-radius:6px;
+  border:1px solid rgba(255,255,255,.12);color:#cfd8e3;background:rgba(255,255,255,.05)}
+.gv-chip.ok{border-color:rgba(87,217,138,.3);color:#9ff0be;background:rgba(87,217,138,.08)}
+.gv-chip.warn{border-color:rgba(232,189,83,.35);color:#f0d18a;background:rgba(232,189,83,.10)}
+.gv-chip.danger{border-color:rgba(255,90,70,.4);color:#ff9a86;background:rgba(255,80,60,.12)}
+
+/* ---- 设施明细表 ---- */
+.gv-fac{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+.gv-fac li{display:flex;align-items:baseline;gap:10px;font-size:11.5px;color:#8b98a8;
+  padding:3px 6px;border-radius:5px}
+.gv-fac li:nth-child(odd){background:rgba(255,255,255,.025)}
+.gv-fac li b{color:#cfd8e3;font-weight:600;flex:0 0 auto;min-width:5.5em}
+.gv-fac li span{font-variant-numeric:tabular-nums;color:#94a2b3}
+
+/* ---- 底部日志 ---- */
+.gv-foot{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.gv-ft{font-size:11px;color:#66727f;letter-spacing:.06em;flex:0 0 auto}
+.gv-log{font-size:11.5px;color:#9aa8b8}
+.gv-log b{color:#cfd8e3;font-variant-numeric:tabular-nums;margin-right:4px}
+
+/* ---- 政策状态 ---- */
+.gv-pol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.gv-pol li{display:flex;align-items:baseline;gap:8px;font-size:11.5px;color:#7d8b99;
+  padding:3px 6px;border-radius:5px}
+.gv-pol li.on{background:rgba(232,189,83,.08)}
+.gv-pol li b{color:#8b98a8;font-weight:600;min-width:4.6em;flex:0 0 auto}
+.gv-pol li.on b{color:#f0d18a}
+.gv-pol li span{color:#9aa8b8;font-variant-numeric:tabular-nums}
+.gv-pol li em{margin-left:auto;font-style:normal;color:#5f6b78;font-size:10.5px}
+
+/* ---- 迷你曲线 ---- */
+.gv-sparks{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.gv-spark{display:flex;align-items:flex-end;gap:1px;height:34px;padding:3px 4px;
+  background:rgba(0,0,0,.25);border-radius:6px;overflow:hidden}
+.gv-spark i{flex:1 1 auto;min-width:1px;border-radius:1px 1px 0 0;opacity:.85}
+.gv-spark-empty{height:34px}
