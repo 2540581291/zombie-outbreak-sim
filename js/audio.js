@@ -295,6 +295,25 @@ export class AudioEngine {
       ev.length = 0;
     }
 
+    // ---- 环境呻吟：附近丧尸密度越高，补得越勤（原来只有"变丧尸/起身"才有一声）----
+    if (t >= (this.groanT || 0)) {
+      const L2 = this.listener;
+      let picked = -1, best = 0, cnt = 0;
+      for (let i = 0; i < sim.n; i++) {
+        if (sim.state[i] !== 4) continue;               // ST.ZOMBIE
+        const dx = sim.px[i] - L2.x, dz = sim.pz[i] - L2.z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 > 160 * 160) continue;
+        cnt++;
+        if (Math.random() < 0.02) { picked = i; best = d2; }   // 随机挑一个
+      }
+      if (picked >= 0) {
+        this.play('groan', sim.px[picked], sim.pz[picked], 0.45 + Math.random() * 0.3);
+      }
+      // 密度映射：0 只 → 2.6 s 一次；50 只 → 约 0.35 s 一次
+      this.groanT = t + Math.max(0.35, 2.6 / (1 + cnt * 0.06));
+    }
+
     // ---- 旋翼：跟随最近的一架 ----
     if (this.rotorNode) {
       let best = null, bd = Infinity;
