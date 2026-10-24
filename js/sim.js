@@ -1680,7 +1680,8 @@ export class Sim {
           }
         }
       } else {
-        const p = this.fleePoint(i);
+        // 统一走撤离线：fleePoint 是"背离丧尸随便找条边"，会和绿线不一致
+        const p = this.escapePoint(i);
         this.setGoal(i, GOAL.FLEE, p[0], p[1]);
       }
       this.idle[i] = 1;
