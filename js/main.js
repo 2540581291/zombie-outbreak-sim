@@ -1866,6 +1866,13 @@ async function boot() {
       if (!retro || !retro.stats) { pre.textContent = 'sprite: 未就绪'; return; }
       const s = retro.stats;
       retro.watchSel = selected;
+      // 2D 精灵层有同屏上限（SpriteView 的 CAP）：超了就会有人画不出来，
+      // 这里直接显式标出来，免得又出现"10 个人只画 5 个"的困惑
+      const capTxt = sim
+        ? (sim.n > 60000
+            ? `\n⚠ 同屏上限 60000 < 总人数 ${sim.n}，多出的部分 2D 下不画`
+            : `\n同屏：${sim.n} / 上限 60000`)
+        : '';
       const selTxt = selected >= 0
         ? ('sel #' + selected + '  state=' + sim.state[selected] +
            '  stage=' + (sim.aStage ? sim.aStage[selected] : '-') +
@@ -1885,6 +1892,7 @@ async function boot() {
         }
       }
       pre.textContent =
+        capTxt + '\n' +
         'sprite v2  atlas ' + s.w + 'x' + s.h + '  clips ' + s.clips + '\n' +
         'actor ' + s.actor + '  decal ' + s.decal + '  shadow ' + s.shadow + '  dots ' + s.dots + '\n' +
         'silhouette ' + s.sil + '  (civ ' + s.silCiv + ' / police ' + s.silPolice + ' / zombie ' + s.silZombie + ')\n' +

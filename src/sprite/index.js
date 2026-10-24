@@ -21,7 +21,10 @@ import { bodyFor, animFor, silColorFor, SIL } from './bodies.js';
 import { makeSpriteMesh, makeShadowMesh, makeDotMesh } from './layers.js';
 
 const M_PER_PX = 0.11;      // 主角 15×14 px ≈ 1.65 m
-const CAP = 20000;          // 同屏上限（远看时全城 2 万人）
+// 同屏上限：必须 ≥ 人口上限（10 万平民 + 1 万丧尸 + 1 万警察），
+// 否则 2D 下只有前 CAP 个人会被画出来 —— 实测默认 5 万人口时
+// 只画了 2 万，剩下的 60% 直接消失（"10 个人只有 4~5 个点"就是这个）
+const CAP = 60000;
 const MIN_SCREEN_PX = 6.0;  // 精灵至少占这么多屏幕像素
 const DOT_BELOW_PX = 2.2;   // 自然尺寸低于这个 → 画圆点
 const DOT_PX = 5.0;
