@@ -42,6 +42,27 @@ function spark(series, color) {
   }).join('') + '</div>';
 }
 
+/** 一个警局：人员分布 + 军械库（弹药条 + 按枪种明细） */
+function stationCard(s) {
+  const col = s.ammoLeft >= 0.6 ? '#7ed07e' : s.ammoLeft >= 0.25 ? '#e0b23c' : '#e8503a';
+  const rows = s.rows.length
+    ? s.rows.map((r) => `<div class="st-row"><span>${r.name}</span>`
+        + `<b>${r.n} 支</b><em>${fmt(r.ammo)} 发</em></div>`).join('')
+    : '<div class="st-row"><span>仓库已空</span></div>';
+  return `<div class="st-card">
+    <div class="st-head"><b>${s.name}</b>
+      <span class="st-people">驻 ${s.idle} · 巡 ${s.patrol} · 勤 ${s.onDuty} · 护 ${s.escort}${s.dead ? ' · 亡 ' + s.dead : ''}</span>
+    </div>
+    <div class="st-ammo">
+      <span>弹药 ${fmt(s.ammo)} / ${fmt(s.initAmmo)}</span>
+      <b>${Math.round(s.ammoLeft * 100)}%</b>
+    </div>
+    <div class="fw-part-bar"><i style="width:${Math.round(s.ammoLeft * 100)}%;background:${col}"></i></div>
+    <div class="st-meta"><span>枪 ${s.guns} / ${s.initGuns} 支</span><span>≈ ${Math.round(s.ammo / 15)} 个弹匣（按 15 发算）</span></div>
+    <div class="st-rows">${rows}</div>
+  </div>`;
+}
+
 function forceView(sim) {
   const d = sim.forceDetail();
   const st = sim.stats || {};
@@ -132,8 +153,11 @@ function forceView(sim) {
       <div class="fw-kv"><span>在位</span><b>${fmt(d.police)} 人（警 ${fmt(d.police - d.soldiers)} · 军 ${fmt(d.soldiers)}）</b></div>
       <div class="fw-kv"><span>驻局 / 巡逻</span><b>${fmt(d.idle)} / ${fmt(d.patrol)} 人</b></div>
       <div class="fw-kv"><span>出勤 / 护送</span><b>${fmt(d.onDuty)} / ${fmt(d.escort)} 人</b></div>
-      <div class="fw-sub2">各警局</div>
-      ${d.stations.map((s) => `<div class="fw-kv"><span>${s.name}</span><b>驻 ${s.idle} 人</b></div>`).join('')}
+    </div>
+
+    <div class="fw-card">
+      <div class="fw-sub">各警局军械库</div>
+      ${d.stations.map(stationCard).join('')}
     </div>`;
 
   return `<div class="fw-grid"><div class="fw-col">${left}</div><div class="fw-col">${right}</div></div>`;
@@ -193,6 +217,95 @@ function sanitTabs(sim) {
   ];
 }
 
+/** 卫生面板：和武力一样的「分数拆解 + 两栏 + 趋势」结构 */
+function sanitView(sim) {
+  const d = sim.sanitDetail();
+  const st = sim.stats || {};
+  const hist = (sim.govHist || []).slice(-40);
+  const tr = hist.length >= 2 ? (() => {
+    const last = hist[hist.length - 1];
+    let base = hist[0];
+    for (let k = hist.length - 1; k >= 0; k--) if (last.t - hist[k].t >= 60) { base = hist[k]; break; }
+    return {
+      dt: Math.max(1, last.t - base.t),
+      dead: (last.dead || 0) - (base.dead || 0),
+      zombies: (last.zombies || 0) - (base.zombies || 0),
+      patients: (last.patients || 0) - (base.patients || 0),
+      inf: (last.inf || 0) - (base.inf || 0),
+    };
+  })() : null;
+
+  // 分数拆解：sanit = 100 − 尸体扣分 − 感染扣分（两项各封顶 45）
+  const parts = [
+    { name: '尸体扣分', score: d.penaltyDead, max: 45, col: '#c8452f',
+      detail: `${fmt(d.dead)} 具尸体 / 总人口 ${fmt(sim.pop0 || 0)}` },
+    { name: '感染扣分', score: d.penaltyInfect, max: 45, col: '#e0b23c',
+      detail: `感染率 ${(d.infectRate * 100).toFixed(2)}%` },
+  ].map((p) => `<div class="fw-part">
+      <div class="fw-part-top"><span>${p.name}</span><b>−${p.score}<i>/${p.max}</i></b></div>
+      <div class="fw-part-bar"><i style="width:${(p.score / p.max * 100).toFixed(0)}%;background:${p.col}"></i></div>
+      <div class="fw-part-detail">${p.detail}</div>
+    </div>`).join('');
+
+  const deadSeries = hist.map((h) => h.zombies || 0);
+  const left = `
+    <div class="fw-card">
+      <div class="fw-title">卫生 <em>${d.level}</em></div>
+      <div class="fw-score"><b>${Math.round(d.sanit)}</b><small>/100</small></div>
+      <div class="fw-bar"><i style="width:${d.sanit}%;background:${d.sanit >= 65 ? '#c8a6ff' : d.sanit >= 35 ? '#e0b23c' : '#e8503a'}"></i></div>
+      <div class="fw-parts">${parts}</div>
+      <div class="fw-note">卫生分 = 100 − 尸体扣分 − 感染扣分；两项各封顶 45。</div>
+    </div>
+
+    <div class="fw-card">
+      <div class="fw-sub">判断</div>
+      <div class="fw-kv"><span>状态</span><b>${d.level}</b></div>
+      <div class="fw-kv"><span>主要压力</span><b>${d.mainPressure}</b></div>
+      <div class="fw-kv"><span>判断</span><b>${d.sanit >= 65 ? '还能运转' : d.sanit >= 35 ? '正在恶化' : '已经失控'}</b></div>
+      <div class="fw-kv"><span>等级门槛</span><b>85 良好 / 65 尚可 / 45 恶化 / 20 糟糕 / 0 灾难</b></div>
+    </div>
+
+    <div class="fw-card">
+      <div class="fw-sub">最近 60 秒</div>
+      <div class="fw-metrics">
+        <div><span>新增死亡</span><b class="down">${tr ? '+' + fmt(tr.dead) : '—'}</b></div>
+        <div><span>新增丧尸</span><b class="down">${tr ? '+' + fmt(tr.zombies) : '—'}</b></div>
+        <div><span>病人变化</span><b>${tr ? (tr.patients >= 0 ? '+' : '') + fmt(tr.patients) : '—'}</b></div>
+        <div><span>感染率变化</span><b>${tr ? (tr.inf >= 0 ? '+' : '') + tr.inf.toFixed(2) + '%' : '—'}</b></div>
+      </div>
+      ${spark(deadSeries, '#c8452f')}
+      <div class="fw-note">${tr ? (tr.zombies > 0 ? '尸变还在增加' : '尸变已经停滞') : '还在采样（每 10 秒一个点）'}</div>
+    </div>`;
+
+  const hosp = (d.hospitals || []);
+  const right = `
+    <div class="fw-card">
+      <div class="fw-sub">总量</div>
+      <div class="fw-kv"><span>死亡</span><b>${fmt(d.dead)} 人（占人口 ${(d.dead / Math.max(1, sim.pop0) * 100).toFixed(1)}%）</b></div>
+      <div class="fw-kv"><span>已尸变</span><b>${fmt(d.zombies)} 只</b></div>
+      <div class="fw-kv"><span>潜伏 / 发病</span><b>${fmt(d.infected)} / ${fmt(d.sick)} 人</b></div>
+      <div class="fw-kv"><span>感染率</span><b>${(d.infectRate * 100).toFixed(2)}%</b></div>
+      <div class="fw-kv"><span>当前丧尸</span><b>${fmt(st.zombie)} 只</b></div>
+    </div>
+
+    <div class="fw-card">
+      <div class="fw-sub">医疗压力</div>
+      ${hosp.length
+        ? hosp.map((h) => `<div class="fw-kv"><span>${h.name}</span><b>${fmt(h.near)} 人前往</b></div>`).join('')
+        : '<div class="fw-note">本地没有医院 POI</div>'}
+      <div class="fw-note">医院是双刃剑：救人，也把感染者集中到一起。</div>
+    </div>
+
+    <div class="fw-card">
+      <div class="fw-sub">两条传染路线</div>
+      <div class="fw-kv"><span>咬伤</span><b>被丧尸咬，1–2 游戏小时发作，不会再传人</b></div>
+      <div class="fw-kv"><span>接触</span><b>10m 内待满 10 秒被传，6–24 小时发作</b></div>
+      <div class="fw-kv"><span>接触路线占比</span><b>${(sim.infRoute ? (() => { let a = 0, b = 0; for (let i = 0; i < sim.n; i++) { if (sim.state[i] !== 7) continue; if (sim.infRoute[i] === 1) a++; else if (sim.infRoute[i] === 2) b++; } return (a + b) ? Math.round(b / (a + b) * 100) + '%（' + b + '/' + (a + b) + '）' : '—'; })() : '—')}</b></div>
+    </div>`;
+
+  return `<div class="fw-grid"><div class="fw-col">${left}</div><div class="fw-col">${right}</div></div>`;
+}
+
 function render() {
   if (!curSim) return;
   const el = ensure();
@@ -209,18 +322,12 @@ function render() {
     return;
   }
 
-  // ---- 卫生：仍然是标签 ----
-  tabBar.style.display = '';
-  body.className = 'sp-body';
-  const tabs = sanitTabs(curSim);
-  curTab = Math.max(0, Math.min(curTab, tabs.length - 1));
-  el.querySelector('#sp-title').textContent = '卫生状态 · ' + tabs[curTab].name;
-  tabBar.innerHTML = tabs.map((t, i) =>
-    `<button class="sp-tab ${i === curTab ? 'on' : ''}" data-i="${i}">${t.name}</button>`).join('');
-  tabBar.querySelectorAll('.sp-tab').forEach((b) => {
-    b.onclick = () => { curTab = +b.dataset.i; render(); };
-  });
-  body.innerHTML = tabs[curTab].render();
+  // ---- 卫生：同样两栏铺开 ----
+  tabBar.innerHTML = '';
+  tabBar.style.display = 'none';
+  el.querySelector('#sp-title').textContent = '卫生状态';
+  body.className = 'sp-body sp-body-force';
+  body.innerHTML = sanitView(curSim);
 }
 export function openForce(sim) { curSim = sim; curKind = 'force'; curTab = 0; render(); ensure().classList.remove('hidden'); }
 export function openSanit(sim) { curSim = sim; curKind = 'sanit'; curTab = 0; render(); ensure().classList.remove('hidden'); }

@@ -7,7 +7,7 @@ import { SP, TEAM, SPECIES, SPECIAL_KINDS, CIV_KINDS, ANIMAL_SHARE, ANIMAL_DOG_S
 import { jobOf, jobFor, ageOf, braveOf, JOB_POI, h, attrFor } from './profiles.js';
 import { buildFamilies } from './family.js';
 import { WPN, WEAPONS, ROLE_WEAPON, skillFor, weaponOf } from './weapons.js';
-import { makeStock, makeStationStock, makeHomeStock, takeWeapon, hasWeapon, stockText } from './storage.js';
+import { makeStock, makeStationStock, makeHomeStock, takeWeapon, hasWeapon, stockText, ammoCount, weaponCount } from './storage.js';
 import { STAGE, bodyOf, stageDur, stageAnim } from './bodymap.js';
 import { getNavWorld } from './nav/index.js';
 
@@ -161,6 +161,7 @@ export class Sim {
         // 警局军械库：按面积给（确定性）
         p.store = makeStationStock(p.a || 200);
       }
+
 
       (this.poiByKind[p.k] || (this.poiByKind[p.k] = [])).push(p);
     }
@@ -446,6 +447,8 @@ export class Sim {
     for (const p of (this.poiByKind.police || [])) {
       if (!p.store0) p.store0 = p.store;
       p.store = makeStationStock(p.a || 200);
+      p.initAmmo = ammoCount(p.store);
+      p.initGuns = weaponCount(p.store);
     }
     this.pop0 = Math.max(1, (P.population | 0));
     // 游戏时钟：默认 07:30 开局
@@ -4625,13 +4628,49 @@ export class Sim {
     const burnPerMin = trend ? trend.shotsPerMin : 0;
     const ammoMinutes = burnPerMin > 0.5 ? ammoN / burnPerMin : Infinity;
 
+    // ---- 每个警局：人员分布 + 军械库明细 ----
     const stations = [];
-    for (let k = 0; k < (this.poiByKind.police || []).length; k++) {
-      const p = this.poiByKind.police[k];
+    const P0 = this.poiByKind.police || [];
+    for (let k = 0; k < P0.length; k++) {
+      const p = P0[k];
+      let idle = 0, patrol = 0, onDuty = 0, escort = 0, dead = 0;
+      const idleIds = [];
+      for (let i = 0; i < this.n; i++) {
+        if (this.stationOf[i] !== k + 1) continue;
+        const s = this.state[i];
+        if (s === ST.CORPSE) { dead++; continue; }
+        if (s !== ST.POLICE && s !== ST.SOLDIER) continue;
+        if (this.escortOf[i]) escort++;
+        else if (this.patrol[i]) patrol++;
+        else if (this.goal[i] === GOAL.MOVE_TO) onDuty++;
+        else { idle++; if (idleIds.length < 3) idleIds.push(i); }
+      }
+      // 军械库：按枪种拆开，再给个"还剩多少"的总量
+      const st = p.store;
+      const rows = [];
+      let guns = 0, ammo = 0;
+      if (st) {
+        for (let id = 1; id < st.w.length; id++) {
+          if (!st.w[id] && !st.a[id]) continue;
+          rows.push({ name: weaponOf(id).name, n: st.w[id] || 0, ammo: st.a[id] || 0 });
+          guns += st.w[id] || 0;
+          ammo += st.a[id] || 0;
+        }
+        rows.sort((a, b) => (b.n * 1000 + b.ammo) - (a.n * 1000 + a.ammo));
+      }
+      const initAmmo = p.initAmmo || Math.max(1, ammo);
+      const initGuns = p.initGuns || Math.max(1, guns);
+      const crew = idle + patrol + onDuty + escort;
       stations.push({
         name: p.n || '警察局',
-        stock: p.store ? stockText(p.store) : '—',
-        idle: this.idleAt ? this.idleAt(k) : 0,
+        stock: st ? stockText(st) : '—',
+        idle, patrol, onDuty, escort, dead, idleIds,
+        idleAt: this.idleAt ? this.idleAt(k) : 0,
+        rows, guns, ammo,
+        initGuns, initAmmo,
+        ammoLeft: initAmmo > 0 ? ammo / initAmmo : 0,
+        gunsLeft: initGuns > 0 ? guns / initGuns : 0,
+        perOfficer: crew > 0 ? ammo / crew : 0,
       });
     }
 

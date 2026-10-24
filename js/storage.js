@@ -32,19 +32,19 @@ export function hasWeapon(s) {
   return false;
 }
 
-/** 总共几把枪 */
+/** 总共几把枪（遍历整张武器表；原来写死 id<10，会漏掉双管霰弹枪、十字弩这些 id≥10 的） */
 export function weaponCount(s) {
   if (!s) return 0;
   let n = 0;
-  for (let id = 1; id < 10; id++) n += s.w[id];
+  for (let id = 1; id < s.w.length; id++) n += s.w[id];
   return n;
 }
 
-/** 总共几发子弹 */
+/** 总共几发子弹（同上） */
 export function ammoCount(s) {
   if (!s) return 0;
   let n = 0;
-  for (let id = 1; id < 10; id++) n += s.a[id];
+  for (let id = 1; id < s.a.length; id++) n += s.a[id];
   return n;
 }
 
