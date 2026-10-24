@@ -1,0 +1,18 @@
+修「重新爆发」点击无效：restoreNavBase 里引用了 boot() 的局部变量 nav
+
+原因：
+  本次早前加的 restoreNavBase() 写在模块作用域，里面用了 `nav`，
+  但 `nav` 是 boot() 里的局部变量 —— 模块级函数看不到它，
+  一点「重新爆发」就抛 ReferenceError: nav is not defined，
+  整个 onclick 在 sim.reset() 之前就中断了，表现就是"点了没反应"。
+
+修法：
+  const nv = (sim && sim.nav) || null;   // 用 sim.nav，别再碰 boot() 的局部变量
+  …nv.grid.set(base) / nv.buildDoorField()
+
+验证方式：加了个调试钩子 ?selftest=1（2.5 秒后自动触发一次「重新爆发」并打印结果）：
+  修前：[TEST] restart FAIL nav is not defined
+  修后：[TEST] restart OK
+
+顺带确认：换种子按钮、window.__zosRestart 走的是同一个 restoreNavBase，一并修好。
+test_chain 5/5。

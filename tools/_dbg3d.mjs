@@ -1,5 +1,5 @@
 import { writeFileSync } from 'node:fs';
-const URL0 = process.argv[2], OUT = process.argv[3];
+const URL0 = process.argv[2], OUT = process.argv[3], FX = Number(process.argv[4]), FZ = Number(process.argv[5]);
 const sleeps = (ms) => new Promise((r) => setTimeout(r, ms));
 const targets = await (await fetch('http://127.0.0.1:9333/json')).json();
 const page = targets.find((t) => t.type === 'page');
@@ -16,15 +16,11 @@ await new Promise((r) => { ws.onopen = r; });
 await send('Page.enable'); await send('Runtime.enable');
 await send('Page.navigate', { url: URL0 });
 await sleeps(50000);
-// 切 3D
-await ev("document.dispatchEvent(new KeyboardEvent('keydown',{code:'Tab',key:'Tab',bubbles:true}))");
-await sleeps(800);
 await ev("document.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyB',key:'b',bubbles:true}))");
-await sleeps(1500);
-for (let i = 0; i < 12; i++) { await send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 950, y: 430, deltaX: 0, deltaY: -260 }); await sleeps(160); }
-await sleeps(2000);
+await sleeps(600);
+await ev(`window.dispatchEvent(new CustomEvent('zos:focus',{detail:{x:${FX},z:${FZ}}}))`);
+await sleeps(2500);
 const shot = await send('Page.captureScreenshot', { format: 'png' });
 writeFileSync(OUT, Buffer.from(shot.result.data, 'base64'));
-console.log('title:', await ev('document.title'));
 console.log('errors:', errs.length ? errs.slice(0, 3) : 'none');
 ws.close(); process.exit(0);

@@ -1283,11 +1283,12 @@ window.addEventListener('error', (e) => {
 function restoreNavBase() {
   if (overlay && overlay.clearRubble) overlay.clearRubble();
   const base = layerEdit && layerEdit.ctx && layerEdit.ctx.baseGrid;
-  if (!base || !nav) return false;
-  nav.grid.set(base);
+  const nv = (sim && sim.nav) || null;      // nav 是 boot() 里的局部变量，这里要用 sim.nav
+  if (!base || !nv) return false;
+  nv.grid.set(base);
   if (layerEdit.ops) layerEdit.ops.length = 0;
   try { if (layerEdit.storageKey) localStorage.removeItem(layerEdit.storageKey); } catch (e) {}
-  if (nav.buildDoorField) nav.buildDoorField();
+  if (nv.buildDoorField) nv.buildDoorField();
   return true;
 }
 window.__zosRestart = () => { clearLink(); deselectAgent(); restoreNavBase(); sim.reset(readParams()); resetNews(sim, NEWS_NAMES); buildEscapeMarker(); buildPoiLabels(); hideBanner(); };
@@ -2108,6 +2109,12 @@ async function boot() {
       if (slot) slot.appendChild(sel);
       else tb && tb.appendChild(sel);
     }
+  }
+  if (Q.get('selftest')) {
+    setTimeout(() => {
+      try { $('btn-restart').onclick(); console.log('[TEST] restart OK'); }
+      catch (e) { console.log('[TEST] restart FAIL ' + (e && e.message)); }
+    }, 2500);
   }
   if (Q.get('retro')) setRetro(true);
   if (Q.get('overlay')) setOverlay(true);
