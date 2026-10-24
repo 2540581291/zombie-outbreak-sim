@@ -2271,7 +2271,9 @@ function loop(t) {
     // 而它们的**绿点是被 hide 掉的** —— 所以那一片人会看起来消失了。
     // 因此视距超过阈值就整片退回点阵。
     if (!retroMode) agents.unitsVisible = rig.dist < 700;
-    agents.update(sim, camera.position);
+    // 视高 → 每米多少像素；交给 agents 决定"什么时候全场只剩点"
+  const viewH = retroMode ? rig.dist * 0.095 : rig.dist * 0.975;
+  agents.update(sim, camera.position, window.innerHeight / Math.max(1, viewH));
   }
   updateTracers();
   updateBooms(dtReal);

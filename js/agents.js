@@ -108,13 +108,14 @@ export class AgentRenderer {
     this.dummy = new THREE.Object3D();
   }
 
-  update(sim, camPos) {
+  update(sim, camPos, pxPerM) {
     const n = sim.n;
     this.count = n;
     const px = sim.px, pz = sim.pz;
     const pos = this.pos, col = this.col, size = this.size, hide = this.hide;
     const camX = camPos.x, camZ = camPos.z;
-    const rIn = this.nearRadius;
+    // 屏幕上一个 2m 的人 < 6px 时，近景网格没有意义 → 全场改用点云
+    const rIn = (pxPerM != null && pxPerM * 2 < 6) ? -1 : this.nearRadius;
     const rOut = this.nearRadius * 1.3;      // 出圈要比进圈远 30%，防止抖动
     const rIn2 = rIn * rIn, rOut2 = rOut * rOut;
 
