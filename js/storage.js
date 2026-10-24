@@ -13,7 +13,8 @@ import { WEAPONS } from './weapons.js';
 
 /** 新建一个空的储备（按武器 id 索引，0 号是"徒手"，不用） */
 export function makeStock() {
-  return { w: new Uint8Array(10), a: new Uint16Array(10) };
+  const N = WEAPONS.length;                 // 跟着武器表走（会随新枪增长）
+  return { w: new Uint8Array(N), a: new Uint16Array(N) };
 }
 
 export function addWeapon(s, id, n = 1) {
@@ -27,7 +28,7 @@ export function addAmmo(s, id, n) {
 /** 有没有枪 */
 export function hasWeapon(s) {
   if (!s) return false;
-  for (let id = 1; id < 10; id++) if (s.w[id] > 0) return true;
+  for (let id = 1; id < s.w.length; id++) if (s.w[id] > 0) return true;
   return false;
 }
 
@@ -79,6 +80,19 @@ export function makeStationStock(area) {
     addWeapon(s, 6, big * 2);                             // 2–4 把
     addAmmo(s, 6, big * 60);
   }
+  // 扩充武库：小所也有弩（无声、适合巡逻），大所才有突击步枪 / 轻机枪 / 双管
+  addWeapon(s, 13, 1 + big);                              // 十字弩 1–3 把
+  addAmmo(s, 13, 6 + big * 6);
+  addWeapon(s, 10, 1 + big);                              // 双管霰弹 1–3 把
+  addAmmo(s, 10, 8 + big * 10);
+  if (big > 0) {
+    addWeapon(s, 11, big * 2);                            // 突击步枪 2–4 把
+    addAmmo(s, 11, big * 60);
+  }
+  if (a > 1200) {                                         // 超大型所才有轻机枪
+    addWeapon(s, 12, 1);
+    addAmmo(s, 12, 100);
+  }
   return s;
 }
 
@@ -89,7 +103,9 @@ export function makeHomeStock(hash, rng, rate) {
   if (hash >= pGun) return s;                             // 大多数家庭没枪
   // 民用枪：手枪为主，少量左轮/霰弹枪/大口径
   const roll = rng();
-  const id = roll < 0.58 ? 1 : roll < 0.78 ? 3 : roll < 0.93 ? 4 : 2;
+  // 民用枪：手枪为主；左轮/大口径少量；猎枪（双管）和弩（打猎）偶见
+  const id = roll < 0.50 ? 1 : roll < 0.68 ? 3 : roll < 0.82 ? 4
+           : roll < 0.88 ? 2 : roll < 0.95 ? 10 : 13;
   addWeapon(s, id, 1 + (rng() < 0.15 ? 1 : 0));
   addAmmo(s, id, 4 + Math.round(rng() * 26));             // 4–30 发，各家不同
   return s;
@@ -99,7 +115,7 @@ export function makeHomeStock(hash, rng, rate) {
 export function stockText(s) {
   if (!hasWeapon(s)) return '无';
   const parts = [];
-  for (let id = 1; id < 10; id++) {
+  for (let id = 1; id < s.w.length; id++) {
     if (s.w[id] > 0) parts.push(`${WEAPONS[id].name}×${s.w[id]}（${s.a[id]} 发）`);
   }
   return parts.join(' / ');
