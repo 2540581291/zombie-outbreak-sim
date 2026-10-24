@@ -40,24 +40,29 @@ export const TIME_SEGS = [
 
 // 混乱度权重（0-100 上限）：知情值 1% → 1 点，感染值 1% → 2 点
 export const CHAOS_W = {
-  aware: 0.5,        // 知情值权重（每 1% 知情 = 0.5 点混乱）
-  infect: 2,         // 感染值权重（每 1% 感染 = 2 点混乱）
-  cap: 100,
-  // ---- 事件热度：按来源分开记（面板要能逐条显示），各自衰减 ----
-  heatCap: 40,       // 热度总上限
-  heatTau: 90,       // 衰减时间常数（游戏秒）：90 秒 ≈ 1.5 分钟减半
-  gunCap: 10,        // 枪声这一项单独封顶 10
-  gunHeat: 0.02,     // 每一枪
-  deathHeat: 0.5,    // 每死一个平民
-  infectHeat: 0.15,  // 每新增一个感染者
-  vipHeat: 8,        // 要员死亡
-  stationHeat: 6,    // 一处警局沦陷（每处每局只算一次）
-  killK: 0.6,        // 击杀削减：每杀 1 只 = killK / (平民人口/1000)
-  // ---- 自然平静（独立项，与知情/感染无关）----
-  calmPerHour: 1,    // 每游戏小时降 1 点（一天 24 点）
-  calmCap: 50,       // 自然平静总共最多削掉 50 点
-};
+  // ---- 增长：三项各自有上限，合计 200 ----
+  awareCap: 50,        // 知情项上限（100% 知情 = 50）
+  infectCap: 100,      // 感染项上限（每 1% 感染 = 2 点，50% 感染就顶到 100）
+  heatCap: 50,         // 事件热度总上限
+  heatTau: 90,         // 事件热度衰减时间常数（游戏秒）
+  cap: 100,            // 混乱度最终钳位（0–100）
 
+  // ---- 减少：两项各自有上限，合计 200 ----
+  calmPerHour: 1,      // 自然平静：每游戏小时 +1（一天 24）
+  calmCap: 50,         // 自然平静累计上限
+  killCutCap: 150,     // 击杀削减累计上限
+
+  // ---- 事件量级：全部按「每 1000 人口」归一，不再写死绝对值 ----
+  //   实际每发生一次 = unitK × 1000 / 人口
+  //   举例（2 万人地图）：死亡 10×1000/20000 = 0.5/人
+  gunCap: 10,          // 枪声这一项单独封顶
+  gunUnit: 0.4,        // 每一枪
+  deathUnit: 10,       // 每死一个平民
+  infectUnit: 3,       // 每新增一个感染者
+  vipUnit: 160,        // 每死一个要员
+  stationUnit: 120,    // 每处警局沦陷
+  killUnit: 0.6,       // 每击杀一只丧尸（削减）
+};
 // 个体的「社会目标」：和身体状态（state）正交
 export const GOAL = {
   NONE: 0,         // 原地晃
@@ -2092,8 +2097,8 @@ export class Sim {
       //   三个加项彼此**独立**，不做互相乘的系数；
       //   自然平静是第四个独立项：每游戏小时降 1 点（一天 24 点），最多降到 50。
       const was = this.martialLaw;
-      const awarePart = this.awareRate * 100 * CHAOS_W.aware;
-      const infectPart = this.infectRate * 100 * CHAOS_W.infect;
+      const awarePart = Math.min(CHAOS_W.awareCap, this.awareRate * 100 * 0.5);
+      const infectPart = Math.min(CHAOS_W.infectCap, this.infectRate * 100 * 2);
       const H = this.chaosHeat;
       const heatTotal = Math.min(CHAOS_W.heatCap,
         H.gun + H.death + H.infect + H.vip + H.station);
@@ -2116,7 +2121,8 @@ export class Sim {
         const p = polList[k];
         if (this.policeNear(p.x, p.z, 50) === 0) {
           this.stationFallen[k] = 1;
-          this.chaosHeat.station = Math.min(CHAOS_W.heatCap, this.chaosHeat.station + CHAOS_W.stationHeat);
+          this.chaosHeat.station = Math.min(CHAOS_W.heatCap,
+            this.chaosHeat.station + this.chaosUnit(CHAOS_W.stationUnit));
           this.pushEvent('警局沦陷：' + (p.n || '警察局') + ' 周边 50m 已无警力', 'danger');
         }
       }
@@ -4455,8 +4461,9 @@ export class Sim {
       });
     }
     this.stats.shots++;
-    // 混乱度：枪声单独一项，自己封顶 10
-    this.chaosHeat.gun = Math.min(CHAOS_W.gunCap, this.chaosHeat.gun + CHAOS_W.gunHeat);
+    // 混乱度：枪声单独一项，自己封顶；量级按人口归一
+    this.chaosHeat.gun = Math.min(CHAOS_W.gunCap,
+      this.chaosHeat.gun + this.chaosUnit(CHAOS_W.gunUnit));
     this.pushAudio('shot', this.px[from], this.pz[from], 0.55 + acc);
     if (!hit) return;
     this.stats.hits++;
@@ -4480,7 +4487,8 @@ export class Sim {
     this.state[i] = ST.INFECTED;
     if (!this.chaosHeat) this.chaosHeat = { gun: 0, death: 0, infect: 0, vip: 0, station: 0 };
     // 混乱度：新增感染者单独一项
-    this.chaosHeat.infect = Math.min(CHAOS_W.heatCap, this.chaosHeat.infect + CHAOS_W.infectHeat);
+    this.chaosHeat.infect = Math.min(CHAOS_W.heatCap,
+      this.chaosHeat.infect + this.chaosUnit(CHAOS_W.infectUnit));
     this.everInfected = (this.everInfected || 0) + 1;
     this.infRoute[i] = route || 1;
     this.incTot[i] = seconds;
@@ -4571,17 +4579,18 @@ export class Sim {
     if (wasZombie) {
       this.kills++;
       if (by >= 0) this.killsBy[by] = (this.killsBy[by] || 0) + 1;
-      // 混乱度：打死丧尸记一笔"削减"，按**总平民人口**缩放（会随时间淡去）
-      const per = CHAOS_W.killK / Math.max(1, (this.pop0 || this.n) / 1000);
-      this.chaosKillCut += per;
-      if (this.chaosKillCut > CHAOS_W.heatCap) this.chaosKillCut = CHAOS_W.heatCap;
+      // 混乱度：打死丧尸记一笔"削减"，同样按人口归一（会随时间淡去）
+      this.chaosKillCut = Math.min(CHAOS_W.killCutCap,
+        this.chaosKillCut + this.chaosUnit(CHAOS_W.killUnit));
     } else if (this.stats) {
       this.stats.civKilled = (this.stats.civKilled || 0) + 1;
-      // 混乱度：平民死亡单独一项
-      this.chaosHeat.death = Math.min(CHAOS_W.heatCap, this.chaosHeat.death + CHAOS_W.deathHeat);
+      // 混乱度：平民死亡单独一项（按人口归一）
+      this.chaosHeat.death = Math.min(CHAOS_W.heatCap,
+        this.chaosHeat.death + this.chaosUnit(CHAOS_W.deathUnit));
       // 要员死亡：单独一项
       if (this.vips && this.vips.indexOf(i) >= 0) {
-        this.chaosHeat.vip = Math.min(CHAOS_W.heatCap, this.chaosHeat.vip + CHAOS_W.vipHeat);
+        this.chaosHeat.vip = Math.min(CHAOS_W.heatCap,
+          this.chaosHeat.vip + this.chaosUnit(CHAOS_W.vipUnit));
         this.vipDeaths = (this.vipDeaths || 0) + 1;
         this.pushEvent('要员死亡：全城恐慌加剧', 'danger');
       }
@@ -4845,11 +4854,19 @@ export class Sim {
     };
   }
   /** 混乱度明细（给面板用）：增长项 / 减少项分开列，每一项都带来源计数 */
+  /**
+   * 事件量级换算：所有事件都按「每 1000 人口」定义，
+   * 实际每发生一次 = unitK × 1000 / 人口。
+   * 这样 500 人的地图里 1 个人感染，影响会比 5 万人的地图里大 100 倍。
+   */
+  chaosUnit(k) {
+    return k * 1000 / Math.max(1, this.pop0 || this.n);
+  }
   chaosDetail() {
     const H = this.chaosHeat || { gun: 0, death: 0, infect: 0, vip: 0, station: 0 };
     const heatTotal = Math.min(CHAOS_W.heatCap, H.gun + H.death + H.infect + H.vip + H.station);
-    const awarePart = this.awareRate * 100 * CHAOS_W.aware;
-    const infectPart = this.infectRate * 100 * CHAOS_W.infect;
+    const awarePart = Math.min(CHAOS_W.awareCap, this.awareRate * 100 * 0.5);
+    const infectPart = Math.min(CHAOS_W.infectCap, this.infectRate * 100 * 2);
     const fallen = this.stationFallen
       ? this.stationFallen.reduce((a, b) => a + b, 0) : 0;
     return {
@@ -4875,13 +4892,26 @@ export class Sim {
       shrink: this.chaosCalm + this.chaosKillCut,
       // 两边的理论最大值（增长与减少各自独立，互不影响）
       max: {
-        aware: 100 * CHAOS_W.aware,          // 知情 100%
-        infect: 100 * CHAOS_W.infect,        // 感染 100%
+        aware: CHAOS_W.awareCap,
+        infect: CHAOS_W.infectCap,
         heat: CHAOS_W.heatCap,
-        growth: 100 * CHAOS_W.aware + 100 * CHAOS_W.infect + CHAOS_W.heatCap,
+        growth: CHAOS_W.awareCap + CHAOS_W.infectCap + CHAOS_W.heatCap,
         calm: CHAOS_W.calmCap,
-        kill: CHAOS_W.heatCap,
-        shrink: CHAOS_W.calmCap + CHAOS_W.heatCap,
+        kill: CHAOS_W.killCutCap,
+        shrink: CHAOS_W.calmCap + CHAOS_W.killCutCap,
+      },
+      // 每 1000 人口的量级（面板直接显示这个，和地图大小无关）
+      units: {
+        gun: CHAOS_W.gunUnit, death: CHAOS_W.deathUnit, infect: CHAOS_W.infectUnit,
+        vip: CHAOS_W.vipUnit, station: CHAOS_W.stationUnit, kill: CHAOS_W.killUnit,
+      },
+      perEvent: {
+        gun: this.chaosUnit(CHAOS_W.gunUnit),
+        death: this.chaosUnit(CHAOS_W.deathUnit),
+        infect: this.chaosUnit(CHAOS_W.infectUnit),
+        vip: this.chaosUnit(CHAOS_W.vipUnit),
+        station: this.chaosUnit(CHAOS_W.stationUnit),
+        kill: this.chaosUnit(CHAOS_W.killUnit),
       },
     };
   }

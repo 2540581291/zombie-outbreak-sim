@@ -376,60 +376,58 @@ export function openChaosInfo(sim) {
 
   // ---------------- 增长 ----------------
   h += sec('增长');
-  h += row('知情项', `${pct(d.awareRate)} × 0.5 = ${plus(d.awarePart)}`);
+  h += row('知情项', `${pct(d.awareRate)} × 0.5 = ${plus(d.awarePart)}（上限 ${d.max.aware}）`);
   h += sub(`${d.counts.aware.toLocaleString()} / ${d.counts.total.toLocaleString()} 人知情`);
 
-  h += row('感染项', `${(d.infectRate * 100).toFixed(2)}% × 2 = ${plus(d.infectPart)}`);
+  h += row('感染项', `${(d.infectRate * 100).toFixed(2)}% × 2 = ${plus(d.infectPart)}（上限 ${d.max.infect}）`);
   h += sub(`累计 ${d.counts.infected.toLocaleString()} 人曾被感染`);
 
   h += row('枪声', plus(d.heat.gun));
-  h += sub(`累计 ${d.counts.shots.toLocaleString()} 枪 · 每枪 +0.02 · 本项封顶 ${d.gunCap}`);
+  h += sub(`累计 ${d.counts.shots.toLocaleString()} 枪 · 每千人 +${d.units.gun}（本图 ≈ 每枪 +${d.perEvent.gun.toFixed(3)}）· 本项封顶 ${d.gunCap}`);
 
   h += row('平民死亡', plus(d.heat.death));
-  h += sub(`累计 ${d.counts.civKilled.toLocaleString()} 人 · 每人 +0.5`);
+  h += sub(`累计 ${d.counts.civKilled.toLocaleString()} 人 · 每千人 +${d.units.death}（本图 ≈ 每人 +${d.perEvent.death.toFixed(2)}）`);
 
   h += row('新增感染', plus(d.heat.infect));
-  h += sub(`按人次累加 · 每人 +0.15`);
+  h += sub(`累计 ${d.counts.infected.toLocaleString()} 人次 · 每千人 +${d.units.infect}（本图 ≈ 每人 +${d.perEvent.infect.toFixed(3)}）`);
 
   h += row('要员死亡', plus(d.heat.vip));
-  h += sub(`累计 ${d.counts.vipDeaths} 人 · 每人 +8`);
+  h += sub(`累计 ${d.counts.vipDeaths} 人 · 每千人 +${d.units.vip}（本图 ≈ 每人 +${d.perEvent.vip.toFixed(2)}）`);
 
   h += row('警局沦陷', plus(d.heat.station));
-  h += sub(`${d.counts.fallen} / ${d.counts.stations} 处沦陷（50m 内无警力即认定）· 每处 +6`);
+  h += sub(`${d.counts.fallen} / ${d.counts.stations} 处（50m 内无警力即认定）· 每千人 +${d.units.station}（本图 ≈ 每处 +${d.perEvent.station.toFixed(2)}）`);
 
-  h += `<div class="sp-sum up">增长合计 ${plus(d.growth)}</div>`;
+  h += `<div class="sp-sum up">增长合计 ${plus(d.growth)} / 上限 ${d.max.growth}</div>`;
 
-  // ---------------- 分隔线 ----------------
   h += '<div class="sp-divider"></div>';
 
   // ---------------- 减少 ----------------
   h += sec('减少');
-  h += row('自然平静', '−' + d.calm.toFixed(1));
-  h += sub(`每游戏小时 −1 点（一天 −24），已累积 ${d.calm.toFixed(1)} / 上限 ${d.calmCap}`);
+  h += row('自然平静', '−' + d.calm.toFixed(1) + `（上限 ${d.max.calm}）`);
+  h += sub(`每游戏小时 −1 点（一天 −24），已累积 ${d.calm.toFixed(1)}`);
 
-  h += row('击杀丧尸', '−' + d.killCut.toFixed(1));
-  h += sub(`累计击杀 ${d.counts.kills.toLocaleString()} 只 · 每只 0.6 / (${Math.round(d.counts.pop / 1000)} 千人)`);
+  h += row('击杀丧尸', '−' + d.killCut.toFixed(1) + `（上限 ${d.max.kill}）`);
+  h += sub(`累计击杀 ${d.counts.kills.toLocaleString()} 只 · 每千人 −${d.units.kill}（本图 ≈ 每只 −${d.perEvent.kill.toFixed(3)}）`);
 
-  h += `<div class="sp-sum down">减少合计 −${d.shrink.toFixed(1)}</div>`;
+  h += `<div class="sp-sum down">减少合计 −${d.shrink.toFixed(1)} / 上限 ${d.max.shrink}</div>`;
 
-  // ---------------- 结果 ----------------
   h += '<div class="sp-divider"></div>';
   h += row('最终混乱度', (d.chaos || 0).toFixed(1) + '（钳 0–100）');
+
+  // ---------------- 理论最大 ----------------
+  h += sec('两边的最大（互不影响）');
+  h += row('增长最大', '+' + d.max.growth);
+  h += sub(`知情 ${d.max.aware} + 感染 ${d.max.infect} + 事件热度 ${d.max.heat}`);
+  h += row('减少最大', '−' + d.max.shrink);
+  h += sub(`自然平静 ${d.max.calm} + 击杀削减 ${d.max.kill}`);
+  h += sub('两边都是 200：把丧尸清干净、平静攒满，混乱可以降到 0');
+
+  // ---------------- 门槛 ----------------
   h += sec('门槛');
   h += row('20% · 巡逻警回局', (sim.chaos || 0) >= 20 ? '已触发' : '未触发');
   h += row('35% · 宵禁', (sim.chaos || 0) >= 35 ? '已触发' : '未触发');
   h += row('50% · 秩序崩溃（全城避难 + 警局开库）', (sim.chaos || 0) >= 50 ? '已触发' : '未触发');
   h += row('80% · 要员八人队出城', (sim.chaos || 0) >= 80 ? '已触发' : '未触发');
-
-  // ---------------- 理论最大 ----------------
-  h += '<div class="sp-divider"></div>';
-  h += sec('两边各自的最大值（互不影响）');
-  h += row('增长最大', '+' + d.max.growth.toFixed(0));
-  h += sub(`知情 ${d.max.aware.toFixed(0)}（100% 知情） + 感染 ${d.max.infect.toFixed(0)}（100% 感染） + 热度 ${d.max.heat}`);
-  h += row('减少最大', '−' + d.max.shrink.toFixed(0));
-  h += sub(`自然平静 ${d.max.calm}（50 游戏小时攒满） + 击杀削减 ${d.max.kill}`);
-  h += row('混乱度', '钳(增长 − 减少, 0, 100)');
-
   body.innerHTML = h;
   el.classList.remove('hidden');
 }
