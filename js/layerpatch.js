@@ -5,7 +5,7 @@
 //  河宽不对、桥没接上…… 与其一遍遍重烘，不如允许**手绘修正**，
 //  存成一份纯数据的补丁文件，运行时叠加上去。
 //
-//  文件：data/cities/<id>/collision.edit.json
+//  文件：数据库/cities/<id>/collision.edit.json
 //  {
 //    "version": 1, "city": "berlin",
 //    "ops": [

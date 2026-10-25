@@ -5,7 +5,7 @@
 //    · 把碰撞层叠到地图上（复用 overlay.js 的贴图，只重画改动的那一小块）
 //    · 用鼠标在地面上刷/框/画线，直接改 nav.grid
 //    · 每次改动记成一条补丁 op，存 localStorage（刷新不丢），可导出成
-//      data/cities/<id>/collision.edit.json 与别人/别的机器共享
+//      数据库/cities/<id>/collision.edit.json 与别人/别的机器共享
 //
 //  为什么要手改：OSM 自动烘焙会有假房子、漏房子、河宽按中心线估、桥接不严。
 // ============================================================
@@ -291,7 +291,7 @@ export class LayerEditor {
     a.href = URL.createObjectURL(blob);
     a.download = 'collision.edit.json';
     a.click();
-    this._say(`已导出 ${ops.length} 条 → 放进 data/cities/${this.ctx.cityId}/collision.edit.json`);
+    this._say(`已导出 ${ops.length} 条 → 放进 数据库/cities/${this.ctx.cityId}/collision.edit.json`);
   }
 
   importPatch(text) {

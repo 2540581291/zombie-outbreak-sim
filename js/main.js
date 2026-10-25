@@ -580,7 +580,7 @@ function openCityPicker() {
     const info = cityInfo(c.id, c.name);
     const on = c.id === CID ? ' on' : '';
     return `<button class="cp-card${on}${c.official ? ' official' : ''}" data-city="${c.id}" title="${cityFull(c.id, c.name)}">
-      <img src="data/cities/${c.id}/thumb.jpg" alt="" loading="lazy">
+      <img src="数据库/cities/${c.id}/thumb.jpg" alt="" loading="lazy">
       <span class="cp-name">${cityShort(c.id, c.name)}</span>
       <span class="cp-meta">${areaKm2(c)} km² · ${(c.buildings || 0).toLocaleString()} 栋 · ${(c.cell || 1).toFixed(2)}m</span>
       <span class="cp-flag">${info.country || ''}</span>
@@ -1781,11 +1781,11 @@ async function boot() {
   setL(6, '读取城市数据…');
   // ---------- 多城市：?city=<id>，默认 berlin ----------
   const CID = (Q.get('city') || 'berlin').replace(/[^a-z0-9_-]/gi, '');
-  const CDIR = 'data/cities/' + CID;
+  const CDIR = '数据库/cities/' + CID;
   window.__CID = CID;   // 供模块级函数（城市选择弹窗）读取
   let cityIndex = [];
   try {
-    const ir = await fetch('data/cities/index.json');
+    const ir = await fetch('数据库/cities/index.json');
     if (ir.ok) { cityIndex = await ir.json(); window.__cityIndex = cityIndex; }
   } catch (e) { /* 没有索引就只跑默认城市 */ }
 

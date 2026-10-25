@@ -127,23 +127,23 @@ js/people.js            个体档案（把固有属性 + 当前状态拼成一�
 js/audio.js             全程序化合成的 WebAudio
 vendor/three.module.js  three.js r170（本地，不依赖 CDN）
 
-data/cities/index.json          城市清单（前端下拉用）
-data/cities/berlin/city.json    烘焙好的城市几何 + 碰撞层（3.8 MB）
-data/cities/berlin/sat.jpg      卫星影像（75 MB，16384×12831）
-data/cities/berlin/sat.json     影像的精确经纬度边界
-data/cities/<其它城市>/…        同上（tokyo / zhengzhou / nanyang / zhenping）
+数据库/cities/index.json          城市清单（前端下拉用）
+数据库/cities/berlin/city.json    烘焙好的城市几何 + 碰撞层（3.8 MB）
+数据库/cities/berlin/sat.jpg      卫星影像（75 MB，16384×12831）
+数据库/cities/berlin/sat.json     影像的精确经纬度边界
+数据库/cities/<其它城市>/…        同上（tokyo / zhengzhou / nanyang / zhenping）
 data/ground/                    柏林 z20 原始瓦片（203 MB，分块模式备用）
 
 assets/atlas/atlas.{png,json}   2D 图集 v2（2048×784 / 2,728 帧 / 134 KB / 6.4 MB 显存）
 assets/atlas/README.md          图集格式与重建方法
 src/sprite/                     2D 精灵渲染器（atlas / anim / bodies / layers / index）
 
-pipeline/bake_pbf.py    OSM PBF → city.json（主用，含碰撞层烘焙）
-pipeline/collision.py   碰撞层生成器（纯函数：OSM 几何 → 位域网格）
-pipeline/fetch_sat.py   卫星瓦片 → sat.jpg + sat.json
-pipeline/drone_to_city.py  航测正射 → sat.jpg + sat_mask.png（镂空）+ 碰撞遮罩
-pipeline/fetch_osm_blocks.py  按 bbox 拉两块航测区的 OSM
-pipeline/raw/           原始 OSM（柏林 95 MB + 东京/郑州/南阳/镇平切片）
+数据库/烘焙/bake_pbf.py    OSM PBF → city.json（主用，含碰撞层烘焙）
+数据库/烘焙/collision.py   碰撞层生成器（纯函数：OSM 几何 → 位域网格）
+数据库/烘焙/fetch_sat.py   卫星瓦片 → sat.jpg + sat.json
+数据库/烘焙/drone_to_city.py  航测正射 → sat.jpg + sat_mask.png（镂空）+ 碰撞遮罩
+数据库/烘焙/fetch_osm_blocks.py  按 bbox 拉两块航测区的 OSM
+数据库/烘焙/raw/           原始 OSM（柏林 95 MB + 东京/郑州/南阳/镇平切片）
 
 tools/apply_layer_patch.py  把补丁烘进 city.json（可选，给非浏览器路径用）
 tools/build_city.py     一键重建城市：烘焙 → 拉图 → 定尺寸 → 更新 index.json
@@ -157,11 +157,11 @@ shots/                  截图
 
 ## 换一个城市
 
-已经有 5 座城市（`data/cities/`），右上角下拉直接切。要加新的：
+已经有 5 座城市（`数据库/cities/`），右上角下拉直接切。要加新的：
 
 ```bat
 :: 1. 在 tools/cities.py 里加一条 bbox + PBF 文件名
-:: 2. 把对应地区的 PBF 放进 pipeline/raw/（https://download.geofabrik.de/）
+:: 2. 把对应地区的 PBF 放进 数据库/烘焙/raw/（https://download.geofabrik.de/）
 :: 3. 一条命令走完：烘焙 → 拉卫星图 → 按公式定尺寸 → 写 index.json
 python tools\build_city.py tokyo
 python tools\build_city.py all      :: 全量重建
@@ -181,7 +181,7 @@ python tools\pick_size.py --w-m 3162 --h-m 2401 --res 0.0908 --citydir data\citi
 ```
 
 > ⚠ `bake_pbf.py` 的 `--out` **默认是老的 `data/city.json`**，前端只认
-> `data/cities/<id>/city.json` —— 手动烘焙时一定要显式给 `--out`（`build_city.py` 已经帮你带了）。
+> `数据库/cities/<id>/city.json` —— 手动烘焙时一定要显式给 `--out`（`build_city.py` 已经帮你带了）。
 >
 > 新城市烘焙完后，别忘了在 `js/citymeta.js` 里登记「国家 / 城市 / 区」，
 > 否则界面上只会显示 `city.json` 里的原始名字（见下一节「城市命名」）。
@@ -213,7 +213,7 @@ python tools\pick_size.py --w-m 3162 --h-m 2401 --res 0.0908 --citydir data\citi
 - 遮罩外的地面露出 `buildCity` 那张深灰底板（`0x2c3034`）
 - 没有 `mask` 字段的城市（柏林等）行为完全不变
 
-同时 `pipeline/drone_to_city.py` 会把**碰撞层里没被航测覆盖的格子刷成墙**，
+同时 `数据库/烘焙/drone_to_city.py` 会把**碰撞层里没被航测覆盖的格子刷成墙**，
 所以人和丧尸走不进黑色区域 —— 视觉和可走范围是一致的。
 
 ### 重新烘焙
@@ -251,7 +251,7 @@ python pipeline\bake_pbf.py --pbf pipeline\raw\zhenping_town.osm ^
   --out data\cities\zhenping_town\city.json
 ```
 
-做法（`pipeline/dsm_buildings.py`）：
+做法（`数据库/烘焙/dsm_buildings.py`）：
 
 1. `tifffile` + `zarr` 从 BigTIFF 里**按窗口懒读** DSM（不整包解压），3 倍降采样到 0.47 m/px；
 2. 中值滤波去掉立体匹配的散斑（DSM 有 ±5 m 级的噪声）；
@@ -379,7 +379,7 @@ apocalypse: still alive   containment: CLEARED
 | `test_frames.mjs` | **图集帧覆盖**：每个「体型 × 动画」都有帧、solid/outline 单套帧数一一对齐 |
 | `sweep.mjs` / `curve.mjs` | 参数扫掠与 8 分钟感染曲线 |
 
-> 这些脚本读的是 **`data/cities/<id>/city.json`**，默认柏林。换城市：
+> 这些脚本读的是 **`数据库/cities/<id>/city.json`**，默认柏林。换城市：
 > `set ZOS_CITY=tokyo` 后再跑（可选：berlin / tokyo / zhengzhou / nanyang / zhenping）。
 > 统一入口在 `tools/_city.mjs`。
 
@@ -413,7 +413,7 @@ apocalypse: still alive   containment: CLEARED
 3. **无阴影** —— 建筑像"悬浮的模型"，下一步加 shadow map + 接触阴影会提升巨大。
 4. 无头 Chrome（SwiftShader）下只有 ~10 fps，真显卡上另说；模拟本身 45k 个体 6ms/tick。
 5. **项目没有版本管理**（无 `.git`），`tools/` 里还留着一批一次性的 `fix_*.py` / `patch_*.py`，改坏了不好回退。
-6. **`bake_pbf.py --out` 的默认值仍是老的 `data/city.json`**，前端只读 `data/cities/<id>/city.json` —— 手动烘焙必须显式给 `--out`。
+6. **`bake_pbf.py --out` 的默认值仍是老的 `data/city.json`**，前端只读 `数据库/cities/<id>/city.json` —— 手动烘焙必须显式给 `--out`。
 7. 2D 模式下切到「矢量」地图时只有路网色块（没有卫星图），且树/3D 特效仍是 3D 的表达方式。
 8. **自动烘焙的图层有错**（假建筑、漏建筑、河宽按中心线估、桥接不严）——现在游戏内按 L 就能手绘修；桥已在 berlin 修过一轮（见「图层手绘编辑」）。
 
@@ -445,9 +445,9 @@ apocalypse: still alive   containment: CLEARED
 
 ### 它是怎么做的
 
-1. `pipeline/fetch_sat.py` 读 `data/cities/<id>/city.json` 里的 bbox，算出覆盖范围需要哪些瓦片；
+1. `数据库/烘焙/fetch_sat.py` 读 `数据库/cities/<id>/city.json` 里的 bbox，算出覆盖范围需要哪些瓦片；
 2. 自动选缩放级别（保证拼图长边 ≤ 4096 px；也可以 `--zoom` 强制指定，比如 20）；
-3. 12~24 线程并发下载 → PIL 拼接 → 存 `data/cities/<id>/sat.jpg`；
+3. 12~24 线程并发下载 → PIL 拼接 → 存 `数据库/cities/<id>/sat.jpg`；
 4. 同时写 `sat.json`，记录**这张图覆盖的精确经纬度边界**；
 5. 前端 `buildSatelliteGround()` 把这张图按经纬度边界铺成一块贴地的四边形。
 
@@ -657,7 +657,7 @@ node tools\test_tools.mjs
 - **防穿墙**：一步位移硬上限 0.8 格（原版是 `3200/stepMs` 的等价约束），高速单位不会跳过墙。
 - **玩偶屋视角**：相机 420m 内的屋顶会掀掉，否则楼里的人和门永远被盖住。
 
-生成器：`pipeline/collision.py`（纯函数，输入 OSM 几何，输出碰撞层）
+生成器：`数据库/烘焙/collision.py`（纯函数，输入 OSM 几何，输出碰撞层）
 接入：`js/collision.js` → `main.js` 优先用它，没有 `city.collision` 字段就回退到旧的布尔栅格
 验证：`python tools/check_collision.py` / `node tools/test_collision.mjs`
 
@@ -669,7 +669,7 @@ node tools\test_tools.mjs
 ### 河宽：从卫星影像量，贴着河岸
 
 河道**不是**按 `waterway` 给的宽度画等宽带子——那样岸在哪全凭中心线，看起来就是一条蓝带糊在河上。
-现在的做法（`pipeline/collision.py`）：
+现在的做法（`数据库/烘焙/collision.py`）：
 
 1. 把该城市的 `sat.json` + 卫星图**裁剪到城市 bbox**，再缩到碰撞网格分辨率取亮度
    （第 0 行 = 南，和碰撞网格同一套行序。以前直接 resize 整张图、也没翻转，
@@ -1021,7 +1021,7 @@ w[武器id] = 有几把        a[武器id] = 这类枪还有多少发子弹
 
 ### POI（地点属性）
 
-`pipeline/bake_pbf.py` 现在会从 OSM 抽 `amenity` / `shop` / `railway` / `public_transport` 标签，
+`数据库/烘焙/bake_pbf.py` 现在会从 OSM 抽 `amenity` / `shop` / `railway` / `public_transport` 标签，
 存进 `city.json` 的 `pois: [{k, x, z, n, a}]`（`a` = 面积，节点类 POI 为 0）：
 
 | kind | 来源标签 | 用途（后续） |
@@ -1536,7 +1536,7 @@ event = { id, x, z, t, sev, ack, responders, ids[] }
 **保存与分享**：
 
 - 每次改动自动存进 `localStorage`（键 `zos.layerops.<城市>`），刷新不丢；
-- 「导出 JSON」得到 `collision.edit.json`，放进 `data/cities/<id>/` 就是该城市的正式补丁，
+- 「导出 JSON」得到 `collision.edit.json`，放进 `数据库/cities/<id>/` 就是该城市的正式补丁，
   换机器 / 发给别人都认；启动时先应用文件补丁，再叠加本地未导出的改动；
 - 「载入文件…」可以把已有补丁读回来继续改。
 
@@ -1657,7 +1657,7 @@ node tools/test_nav.mjs（柏林 20,066 人 / 90 秒，1m 格）
 
 | 项 | 值 |
 |---|---|
-| 来源 | `reference/core/`（`zos-core.swf` 反编译导出） |
+| 来源 | `原版/core/`（`zos-core.swf` 反编译导出） |
 | 构建 | `python tools/build_atlas.py` —— 帧序取 `_ir761()`、像素取 `[Embed(source="/_assets/…")]`、帧数/帧长取 `_qk83()`/`_br451()`，对不上直接 exit 1 |
 | 校验 | `python tools/audit_atlas.py` —— 68 支动画的帧数/帧长全量对账，**0 不符** |
 | 规模 | 160 clip（实色 72 / 剪影 72 / 动物 16）、2,890 帧槽、1,788 唯一矩形、2048×784、134 KB、**6.4 MB 显存** |
@@ -1679,7 +1679,7 @@ node tools/test_nav.mjs（柏林 20,066 人 / 90 秒，1m 格）
   表在 `js/bodymap.js`，模拟层和渲染层共用。
 - 感染用的是**绝对死线**（首次被咬时刻 + 感染时长），所以"倒地动画期间"这条钟照走。
 - 转身/倒地/爬起期间**冻结**：不移动、不寻敌、不会被咬。
-- 自测：`node tools/test_chain.mjs`（转身期间位移必须 = 0、活人走 turn01、尸体走 zrise01）。
+- 自测：`node 工具/test_chain.mjs`（转身期间位移必须 = 0、活人走 turn01、尸体走 zrise01）。
 
 ### 画面三层
 
@@ -1853,7 +1853,7 @@ CORPSE      → die01 / zdie01（丧尸用后者）停在最后一帧
 
 ```
 src/sprite/                     2D 渲染器（图集 + 四层实例化 / 远看退化成圆点）
-tools/build_atlas.py            从 reference/core 重建图集（唯一权威构建）
+tools/build_atlas.py            从 原版/core 重建图集（唯一权威构建）
 tools/audit_atlas.py            帧数 / 帧长 / rect 全量对账
 assets/atlas/atlas.{png,json}   2048×784 / 2,728 帧 / 134 KB / 6.4 MB 显存
 ```
@@ -1879,7 +1879,7 @@ assets/atlas/atlas.{png,json}   2048×784 / 2,728 帧 / 134 KB / 6.4 MB 显存
 
 ### 素材怎么来的
 
-**2D 像素图**：`pipeline/make_animal_sprites.py` 用 PIL 现画 16×16 俯视角四足动物，
+**2D 像素图**：`数据库/烘焙/make_animal_sprites.py` 用 PIL 现画 16×16 俯视角四足动物，
 每个 8 帧（6 帧走路 + 2 帧待机），朝向 +X 和原版小人一致。
 4 个变体（狗/猫 × 常态化/尸变化）共 32 帧，并进图集
 （整张现在是 9,760 帧 / 2048×19520 / 734 KB）。
@@ -1888,7 +1888,7 @@ assets/atlas/atlas.{png,json}   2048×784 / 2,728 帧 / 134 KB / 6.4 MB 显存
 狗 0.8m、猫 0.5m。
 
 ```
-pipeline/make_animal_sprites.py   像素动物生成器
+数据库/烘焙/make_animal_sprites.py   像素动物生成器
 js/units.js                       quadruped() 3D 模型
 js/species.js                     DOG/CAT 数值
 js/sim.js                         infectChance / zombiePow / 野生动物刷新
@@ -1941,8 +1941,8 @@ W = {"river": 60, "canal": 30, "stream": 8, "drain": 6}   # 米
 
 ```
 js/overlay.js       DataTexture 覆盖层
-pipeline/bake_pbf.py  河流中心线提取
-pipeline/collision.py _thick() 按宽度盖水面
+数据库/烘焙/bake_pbf.py  河流中心线提取
+数据库/烘焙/collision.py _thick() 按宽度盖水面
 ```
 
 ---
@@ -2149,7 +2149,7 @@ python tools\pick_size.py --w-m 3302 --h-m 2586 --res 0.0908 --apply
 |---|---|
 | 地图 | Google 卫星 z20 源 → **16384 × 12831（210 MP）** |
 | 分辨率 | **0.2015 m/px** |
-| 文件 | `data/cities/berlin/sat.jpg` 75 MB |
+| 文件 | `数据库/cities/berlin/sat.jpg` 75 MB |
 | 加载方式 | **单张贴图，一次性加载**（分块已停用） |
 | 城市 | Berlin Mitte，3162 × 2401 m，4,755 栋建筑（另有东京 / 郑州 / 南阳 / 镇平） |
 
@@ -2162,7 +2162,7 @@ python tools\build_city.py <id>     :: 一条命令走完 1~3 步（定义在 to
 手动版：
 
 ```bat
-1. 改 bbox 重烘城市数据（--out 必须指到 data/cities/<id>/）
+1. 改 bbox 重烘城市数据（--out 必须指到 数据库/cities/<id>/）
    python pipeline\bake_pbf.py --pbf pipeline\raw\berlin.osm.pbf --name "..." ^
      --minlat .. --minlon .. --maxlat .. --maxlon .. ^
      --out data\cities\berlin\city.json
@@ -2175,7 +2175,7 @@ python tools\build_city.py <id>     :: 一条命令走完 1~3 步（定义在 to
    python tools\pick_size.py --w-m 3162 --h-m 2401 --res 0.0908 --citydir data\cities\berlin --apply
 
 4. 更新城市清单（build_city.py 会自动写，手动烘焙时自己补）
-   data/cities/index.json
+   数据库/cities/index.json
 ```
 
 第 3 步的公式参数是从 `tools/gpu_limits.html` 实测来的：
@@ -2447,8 +2447,8 @@ CIV / FLEE / FIGHT
 
 | 来源 | 格子大小 | 谁决定 |
 |---|---|---|
-| 自建城市（OSM 烘焙） | **1.0 m** | `pipeline/collision.py build(cell=1.0)` / `bake_pbf.py --cell 1.0` |
-| 原版地图（资源导入） | **按资源算** | `tools/pull_original_map.py` 里的 `CELL = (整图宽 / 网格宽) × 米每像素` |
+| 自建城市（OSM 烘焙） | **1.0 m** | `数据库/烘焙/collision.py build(cell=1.0)` / `bake_pbf.py --cell 1.0` |
+| 原版地图（资源导入） | **按资源算** | `原版/导入脚本/pull_original_map.py` 里的 `CELL = (整图宽 / 网格宽) × 米每像素` |
 
 例子：原版莱斯特 4608 px ÷ 1152 格 = 4 px/格 × 0.11 m/px = **0.44 m**。
 换成任何一张别的原版图，同一个公式会算出**它自己的**格子大小，不写死。
@@ -2471,11 +2471,11 @@ CIV / FLEE / FIGHT
 ### 导入原版地图的完整流程
 
 ```bash
-python tools/pull_original_map.py --check   # 只校验，不写盘
-python tools/pull_original_map.py           # 生成到 data/cities/leicester
+python 原版/导入脚本/pull_original_map.py --check   # 只校验，不写盘
+python 原版/导入脚本/pull_original_map.py           # 生成到 数据库/cities/leicester
 ```
 
-脚本做的事（全部基于 `reference/core/` 里的原始资源）：
+脚本做的事（全部基于 `原版/core/` 里的原始资源）：
 
 1. **找瓦片**：`images/*.jpg` 里所有 256×256 的图（文件名是资源 id，不含坐标）
 2. **定顺序**：`images/316.jpg` 是整图缩略图，缩到 288×288（=18×18 个 16×16 单元），
@@ -2486,14 +2486,14 @@ python tools/pull_original_map.py           # 生成到 data/cities/leicester
    - 值映射 `0→0x00 3→0x03 7→0x07 15→0x0f 22→0x16 31→0x1f 66→0x42 35→0x43`
    - **上下翻转**（影像第 0 行是北，引擎 row 0 是南）
 5. **建筑**：对"室内"格做连通域，≥25 格取包围盒成矩形
-6. **写出** `data/cities/leicester/{city.json, sat.jpg, sat.json}`
+6. **写出** `数据库/cities/leicester/{city.json, sat.jpg, sat.json}`
 
 尺寸全部从资源推，不写死：
 `PX`（瓦片边长）、`S`（√瓦片数）、`GRID`（√碰撞表字节数）、`CELL`（见上表）。
 
 ### 导入后要手动做的一件事
 
-`data/cities/index.json` 里加一条，否则选择器里看不到：
+`数据库/cities/index.json` 里加一条，否则选择器里看不到：
 
 ```json
 { "id": "leicester", "name": "莱斯特（原版 2009）",
