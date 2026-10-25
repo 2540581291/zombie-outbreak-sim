@@ -1,0 +1,26 @@
+清理旧资源：删掉 284 MB 无人引用的数据 + 死代码
+
+【已删】
+1. data/ground/（202.6 MB）
+   每个城市的分块地面应该在 data/cities/<id>/ground/tileset.json，
+   但实测**没有任何城市有 tileset.json** —— 也就是说 TiledGround 从来没启用过。
+2. data/cities/berlin/sat_z18.jpg + sat_z19.jpg（82.1 MB）
+   多分辨率方案已废弃，代码里搜不到任何 sat_z18/sat_z19 引用。
+3. js/ground.js + main.js 里的 TiledGround 导入/分支/空 if(ground){} 块
+   同样是死代码，删掉后卫星图加载走单图分支，行为不变。
+
+【整理】
+4. 根目录 13 个历史文档移入 docs/archive/
+   （开发报告、规划_*、设计方案_*、技术报告_*、方案_*）
+   根目录只留 README.md / 计划_v1.md / 实施方案_v3_城市尺度定稿.md / 报告_参数对照_我们vs原版.md
+5. 删除 tools/__pycache__
+
+【验证】
+· 无未捕获错误，卫星影像正常，test_chain 5/5
+· data 从 728 MB → 443 MB
+
+【待你决定的清理项】
+· shots/  200 MB / 310 张开发截图
+· pipeline/raw/  约 130 MB（berlin.osm.pbf 95 MB + tokyo *.osm），重新烘焙要用
+· tools/ffdec/  81 个文件（Flash 反编译工具，取 SWF 资源时用过）
+· reference/  87 MB（原版素材 + APK，官方地图的源头，建议保留）

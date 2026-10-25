@@ -4,7 +4,6 @@
 import * as THREE from 'three';
 import { buildCity, buildSatelliteGround, localizeCityNames } from './city.js';
 import { cityFull, cityShort, cityNewspaper, cityInfo } from './citymeta.js';
-import { TiledGround } from './ground.js';
 import { buildNav, Sim, ST, GOAL } from './sim.js';
 import { loadCollision, collisionStats } from './collision.js';
 import { applyLayerPatch } from './layerpatch.js';
@@ -1131,7 +1130,7 @@ let CITY_HALF = null;
 let FIXCAM = false;
 let sim = null;
 let cityRef = null;
-let satMesh = null, ground = null;
+let satMesh = null;
 let agents = null;
 let retro = null, retroMode = false, orthoCam = null;
 let overlay = null, overlayOn = false;
@@ -1863,16 +1862,7 @@ async function boot() {
   // ---------- 卫星影像（有 data/sat.json 就加载）----------
   setL(62, '载入卫星影像…');
   try {
-    const tr = await fetch(CDIR + '/ground/tileset.json');
-    if (tr.ok) {
-      const tileset = await tr.json();
-      tileset.dir = CDIR + '/ground';
-      ground = await new TiledGround(scene, city, tileset).load();
-      satMesh = ground;                       // 沿用旧的开关逻辑
-      console.log('[ZOS-R] 分块地面 ' + tileset.cols + 'x' + tileset.rows +
-        ' 每块 ' + tileset.tileSize + 'px');
-    } else {
-      // 没有分块就退回单张图
+    {
       const sr = await fetch(CDIR + '/sat.json');
       if (sr.ok) {
         const meta = await sr.json();
@@ -2330,10 +2320,6 @@ function loop(t) {
     audio.setView(lx, lz, rx, rz);
     if (sim) { sim.playerX = lx; sim.playerZ = lz; }
     audio.frame(sim);
-  }
-  if (ground) {
-    ground.update({ cx: rig.target.x, cz: rig.target.z, dist: rig.dist,
-      halfW: Math.max(60, rig.dist * 0.9), halfH: Math.max(60, rig.dist * 0.9) });
   }
   // 夜间光照：太阳/环境光/城市夜灯/雾色都跟着夜色走
   if (sim) {
