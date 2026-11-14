@@ -3,7 +3,7 @@
    所以 4K 上就是等比放大、小窗口等比缩小，内容与窗口的宽度比例恒定，
    不会出现"某个宽度下把最左边那块挤掉"的问题。 */
 #topbar{display:flex;align-items:center;gap:1.1em;flex-wrap:nowrap;overflow:hidden;
-  font-size:0.75em;   /* 相对根字号：根字号已随窗口缩放，这里不能再叠加 vw */
+  font-size:0.72em;   /* 相对根字号：根字号已随窗口缩放，这里不能再叠加 vw */
   height:8.7em;padding:0 1.1em;box-sizing:border-box;
   justify-content:flex-start}
 #topbar .tb-left{display:flex;align-items:center;gap:0.7em;flex:0 0 auto}
@@ -97,7 +97,7 @@
 #topbar .tb-sel option{background:#12171d;color:#cfd6dd}
 
 /* ---- 顶栏永远单行：内容由根字号整体缩放来适配，绝不换行 ---- */
-#topbar{flex-wrap:nowrap;height:8.7em;overflow:hidden;white-space:nowrap}
+#topbar{flex-wrap:nowrap;height:auto;min-height:2.9em;padding:0.42em 1.1em;overflow:hidden;white-space:nowrap}
 
 /* ===== 顶部第二栏：显示开关 + 音乐 ===== */
 #subbar{position:fixed;top:var(--tb-h,3.4rem);left:0;right:17rem;z-index:19;
