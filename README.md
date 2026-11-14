@@ -69,7 +69,7 @@ python3 工具/serve.py 8777        # 或 npm run serve
 | 模块 | 状态 |
 |---|---|
 | 真实城市数据（OSM → 3D） | ✅ 28 张地图：柏林 3.16×2.40 km / 4,755 栋，东京 15,184 栋，郑州 3,578 栋，南阳 / 镇平（右上角下拉切换） |
-| **卫星影像底图** | ✅ Google z20 → **16384×12831（210 MP），0.2015 m/px，75 MB**（本机烘焙，仓库不含影像；详见「上线状态」） |
+| **卫星影像底图** | ✅ Google z20 → **16384×12831（210 MP），0.2015 m/px，75 MB**（影像随仓库提供；详见「上线状态」） |
 | 程序化建筑立面 | ✅ 窗格 / 首层商铺 / 夜间随机亮灯 / 远景自动简化 |
 | 个体模拟 | ✅ SoA TypedArray，20Hz 固定步长，面板 2k–45k，上限 62,000 |
 | 状态机 | ✅ 平民 / 逃跑 / 持枪还击 / 警察 / 士兵 / 潜伏 / 丧尸 / 野兽 / 尸体 / 已撤离 |
@@ -119,8 +119,10 @@ assets/atlas/README.md          图集格式与重建方法
 数据库/cities/<id>/city.json      烘焙好的城市几何 + 碰撞层
 数据库/cities/<id>/thumb.jpg      城市卡片缩略图
 数据库/cities/<id>/collision.edit.json   手绘图层补丁（可选，见「图层手绘编辑」）
-数据库/cities/<id>/sat.json       卫星影像的精确经纬度边界 ┐ 本机烘焙，不进仓库
+数据库/cities/<id>/sat.json       卫星影像的精确经纬度边界 ┐ 随仓库提供
 数据库/cities/<id>/sat.jpg        卫星影像（75 MB 级）      ┘ 见「数据与素材」
+数据库/cities/<id>/sat_mask.png   航测图镂空遮罩（镇平两张）
+数据库/cities/<id>/buildings_dsm.json   航测 DSM 反推的建筑（镇平两张）
 
 数据库/烘焙/                      离线烘焙脚本
   bake_pbf.py           OSM PBF → city.json（含碰撞层）
@@ -130,7 +132,7 @@ assets/atlas/README.md          图集格式与重建方法
   dsm_buildings.py      DSM 高程 → 建筑轮廓
   fetch_osm.py / fetch_osm_blocks.py   Overpass 拉 OSM
   cut_pbf.py            从大 PBF 里按 bbox 切一块
-  raw/                  原始 OSM / PBF 下载（不进仓库）
+  raw/                  原始 OSM / PBF（随仓库提供，离线重烘用）
 
 工具/                             通用工具
   serve.py              本地静态服务器（no-store，替代 python -m http.server）
@@ -138,6 +140,12 @@ assets/atlas/README.md          图集格式与重建方法
   test_sim.mjs          性能 + 确定性自检
   test_chain.mjs        主链路 5 项自检
 docs/                             实现说明与截图
+
+原版/                             2009 原版游戏与反编译工程（复刻依据，随仓库提供）
+  导入脚本/             原版地图 / 精灵 → 数据库/cities 的导入工具
+  core/ decompiled/     反编译脚本与二进制资源
+  sprites/              原版精灵帧
+  工具/ffdec/           SWF 反编译工具
 ```
 
 ---
@@ -404,35 +412,41 @@ apocalypse: still alive   containment: CLEARED
 
 ## 数据与素材
 
-仓库里只放**代码 + 可再生的轻量数据**，两类东西刻意没上传：
+**这个仓库是自包含的**：clone 下来就是完整的一局游戏，不需要额外的数据包、不需要联网、不需要自己烘图。
+卫星影像、城市几何、原始 OSM、原版参考素材全部在仓库里。
 
-| 内容 | 体积 | 为什么不在仓库里 |
+| 内容 | 体积 | 说明 |
 |---|---|---|
-| `原版/`：2009 原版游戏（APK / SWF）、反编译脚本、精灵帧、FFDec | ~110 MB | 版权归原作者；只作本机参考 |
-| `数据库/cities/*/sat.jpg` 等卫星影像 | ~440 MB | Google / Esri 影像有各自条款，只在本机缓存自用 |
-| `数据库/烘焙/raw/`：原始 OSM / PBF | ~200 MB | 都能从 Geofabrik / Overpass 重新下载 |
+| `数据库/cities/*/sat.jpg` | ~413 MB（28 张，最大 75 MB） | 卫星 / 航测底图，游戏默认地图模式就是它 |
+| `数据库/cities/*/city.json` | ~20 MB | 烘焙好的建筑几何 + 碰撞层 |
+| `数据库/cities/*/sat.json` `sat_mask.png` `thumb.jpg` | ~6 MB | 影像边界、航测镂空遮罩、城市卡片缩略图 |
+| `数据库/cities/*/buildings_dsm.json` | ~9 MB | 航测 DSM 反推出的建筑（镇平县城 / 唐营村） |
+| `数据库/烘焙/raw/` | ~208 MB | 原始 OSM / PBF，离线重烘城市用 |
+| `原版/` | ~112 MB | 2009 原版游戏（APK / SWF）、反编译脚本、精灵帧、导入脚本 |
 
-所以**clone 下来直接就能玩**（矢量地图模式），但卫星底图要自己烘一次：
+只有惰性生成的东西不进版本库：`shots/`（截图原图）、`__pycache__/`、`node_modules/`、编辑器杂物。
+
+### 想重新烘焙某座城市
 
 ```bat
 python 数据库\烘焙\fetch_sat.py --citydir 数据库\cities\berlin
 python 工具\make_thumbs.py
 ```
 
-没有 `sat.jpg` 时前端会自动回退到矢量地图，`sat.json` / `sat_mask.png` 一起缺席即可，不影响启动：
+万一某座城缺 `sat.jpg`，前端会自动回退到矢量地图（`sat.json` / `sat_mask.png` 一起缺席即可，不影响启动）：
 
 ![矢量模式](docs/img/vector_3d.jpg)
 
-> 没烘卫星图时的样子：OSM 几何 + 程序化立面，楼、路、河都在，只是地面不是航拍。
+> 缺卫星图时的样子：OSM 几何 + 程序化立面，楼、路、河都在，只是地面不是航拍。
 
 ### 数据来源
 
 - 地图几何：OpenStreetMap 贡献者（**ODbL**），Geofabrik extract / Overpass API
 - 渲染：three.js r170（**MIT**）
-- 2D 图集与数值参考：2009 年 Flash 原版《Zombie Outbreak Simulator》（仅本地参考，不随仓库分发）
-- 卫星影像：Esri World Imagery / Google（仅本地缓存，不随仓库分发）
+- 2D 图集与数值参考：2009 年 Flash 原版《Zombie Outbreak Simulator》
+- 卫星影像：Esri World Imagery / Google，版权归各自提供方
 
-> 这个项目是个人怀旧复刻，不发行；若要再分发，`assets/atlas/` 里的原版精灵图请自行替换。
+> 这个项目是个人怀旧复刻，不发行。
 
 
 ---
@@ -475,7 +489,7 @@ python 数据库\烘焙\fetch_sat.py --citydir 数据库\cities\berlin --provide
 | `esri`（默认） | Esri World Imagery，无需 key，个人自用最省事 |
 | `google` | Google 卫星，清晰度略高，但条款上属于非授权使用，仅限本机自娱 |
 
-影像版权归各自提供方；本项目只在本机缓存一份自用，不对外分发。
+影像版权归各自提供方，仓库里的这一份是烘焙好的成品底图。
 
 ### 两个模式的差别
 
@@ -2134,7 +2148,7 @@ im.save("数据库/cities/berlin/sat.jpg", quality=88, optimize=True)
 |---|---|
 | 地图 | Google 卫星 z20 源 → **16384 × 12831（210 MP）** |
 | 分辨率 | **0.2015 m/px** |
-| 文件 | `数据库/cities/berlin/sat.jpg` 75 MB（**本机烘焙，不进仓库**） |
+| 文件 | `数据库/cities/berlin/sat.jpg` 75 MB（**随仓库提供**） |
 | 加载方式 | **单张贴图，一次性加载**（分块已停用） |
 | 城市 | Berlin Mitte，3162 × 2401 m，4,755 栋建筑（另有东京 / 郑州 / 南阳 / 镇平） |
 
@@ -2432,7 +2446,7 @@ CIV / FLEE / FIGHT
 
 ### 导入原版地图的完整流程
 
-> 这一段是**本地流程**：`原版/`（原版资源 + 导入脚本）不在仓库里，见「数据与素材」。
+> 「原版/」原版资源与导入脚本都随仓库提供，可直接重跑。
 
 ```bash
 python 原版/导入脚本/pull_original_map.py --check   # 只校验，不写盘
