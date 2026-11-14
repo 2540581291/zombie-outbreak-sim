@@ -93,7 +93,7 @@ export function goalText(sim, i) {
 export function profileFor(sim, i) {
   const f = firstNameOf(sim, i), l = surnameOf(sim, i);
   let age = ageOfAgent(sim, i, ageOf);       // 平民用家庭分配的年龄，其余按哈希（后面会按身份修正）
-  const male = maleOf(i);
+  const male = (sim.sexFix && sim.sexFix.has(i)) ? !!sim.sexFix.get(i) : maleOf(i);
   // 职业：平民按年龄/哈希算，但动物、警察、军队、要员有固定身份
   let job = jobFor(i, age);
   const kind = sim.kind ? sim.kind[i] : 0;
@@ -113,6 +113,7 @@ export function profileFor(sim, i) {
   else if (kind === 3) age = 24 + Math.floor(h(i, 88) * 30);                 // 警察 24~53
   else if (sim.vip && sim.vip[i]) age = 40 + Math.floor(h(i, 88) * 32);      // 要员 40~71
   else if (kind === 12 || kind === 13) age = 1 + Math.floor(h(i, 88) * 12);  // 猫狗 1~12 岁
+  if (sim.ageFix && sim.ageFix.has(i)) age = sim.ageFix.get(i);            // 彩蛋角色固定年龄
 
   const ST = streetsPool();
   const st1 = pick(ST, i, 6), st2 = pick(ST, i, 7), st3 = pick(ST, i, 8);

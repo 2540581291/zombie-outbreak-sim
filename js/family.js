@@ -99,6 +99,7 @@ export function buildFamilies(sim, civs, hash01) {
 
 /** 取年龄：优先用家庭分配的（平民），否则按哈希（警察/士兵等） */
 export function ageOfAgent(sim, i, fallback) {
+  if (sim && sim.ageFix && sim.ageFix.has(i)) return sim.ageFix.get(i);
   const a = sim && sim.age ? sim.age[i] : 0;
   return a || (fallback ? fallback(i) : 0);
 }

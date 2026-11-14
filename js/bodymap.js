@@ -26,7 +26,8 @@ const TYPE_TO_SPRITE = {
  *   isZombie：是否已经处于丧尸形态（决定用不用 animal 的 _z 变体）
  * 平民按稳定哈希挑体型（不是随机的 —— 同一人必须始终同一副样子）。
  */
-export function bodyOf(i, kind, isZombie) {
+export function bodyOf(i, kind, isZombie, fix) {
+  if (fix && !isZombie) return fix;   // 彩蛋角色指定体型
   const sp = SPECIES[kind] || SPECIES[SP.CIV1];
   let b = TYPE_TO_SPRITE[kind] || 'guy01';
   if (kind === SP.CIV1 || kind === SP.CIV2 || kind === SP.CIV3) {

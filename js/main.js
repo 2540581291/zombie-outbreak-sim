@@ -1281,6 +1281,7 @@ function readParams() {
   const p = {
     seed,
     cityId: window.__CID || '',   // CID 是 boot() 里的局部变量，这里读暴露的副本
+    country: window.__CID ? cityInfo(window.__CID).country : '',
     population: +sPop.value,
     initialZombies: +sZ0.value,
     homeGunRate: +sArm.value / 100,   // 「家庭持枪率」：决定每户有没有枪
@@ -2220,7 +2221,7 @@ async function boot() {
 }
 
 // 构建戳：改动后手动+1，浏览器控制台/页面属性都能看到，用来判断是不是旧缓存
-const BUILD = 'b24-egg-overview';
+const BUILD = 'b25-egg-figure';
 
 // ---------- 主循环 ----------
 let last = 0, acc = 0, frames = 0, fpsT = 0, hudT = 0, fc = 0, cardFrame = 0;

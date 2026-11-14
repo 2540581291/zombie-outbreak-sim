@@ -356,6 +356,9 @@ export class Sim {
     this.regen = 15000;         // 每秒入账 ¥15,000
     this.spentTotal = 0;        // 累计花费
     this.nameFix = new Map();          // 个体下标 → 固定姓名（彩蛋用）
+  this.sexFix = new Map();           // 个体下标 → 性别（1 = 男）
+  this.ageFix = new Map();           // 个体下标 → 年龄
+  this.bodyFix = new Map();          // 个体下标 → 体型贴图名
   this.vip = new Uint8Array(NMAX);   // 要员标记
     this.vips = [];                    // 要员个体下标
     this.vipTotal = 0;
@@ -508,7 +511,7 @@ export class Sim {
     this.budget = 1000000;
     this.spentTotal = 0;
     this.savedVip = 0;
-    this.nameFix.clear();
+    this.nameFix.clear(); this.sexFix.clear(); this.ageFix.clear(); this.bodyFix.clear();
     this.vip.fill(0);
     this.vips.length = 0;
     this.vipTotal = 0;
@@ -760,9 +763,8 @@ export class Sim {
       }
       this.vipTotal = this.vips.length;
       // 彩蛋：镇平县城 / 唐营村固定有一位名叫「魏骜远」的要员（不做任何提示）
-      const cid = String(this.params.cityId || '');
-      if (this.vips.length && (cid.startsWith('zhenping') || cid === 'nanyang')) {
-        this.nameFix.set(this.vips[0], '魏骜远');
+      if (this.vips.length && this.params.country === '中国') {
+        this.applyEggFigure(this.vips[0]);
       }
       // 政府至少有一位要员：把第一位要员安置在政府大楼里
       const gov = (this.poiByKind.gov || [])[0];
@@ -3448,6 +3450,20 @@ export class Sim {
   }
 
   /** 在现有丧尸群附近投放一只特感 */
+  /** 彩蛋角色：魏骜远（中国地图固定出现）—— 男 / 24 岁 / 瘦 / 速度 5 / 手枪 / 1000 血 */
+  applyEggFigure(i) {
+    this.nameFix.set(i, '魏骜远');
+    this.sexFix.set(i, 1);
+    this.ageFix.set(i, 24);
+    this.bodyFix.set(i, 'guy01');
+    this.spd[i] = 5;
+    this.hp[i] = 1000;
+    const mag = WEAPONS[WPN.PISTOL9].mag, res = WEAPONS[WPN.PISTOL9].reserve;
+    this.armed[i] = 1;
+    this.wpn[i] = WPN.PISTOL9;
+    this.ammo[i] = mag + res;
+  }
+
   spawnSpecial(kind) {
     let anchor = -1;
     for (let t = 0; t < 60 && anchor < 0; t++) {
@@ -4517,7 +4533,7 @@ export class Sim {
   /** 站着变：turn01，播完才真的变丧尸。 */
   beginTurn(i) {
     if (this.aStage[i]) return;                       // 已经在播了，别叠
-    const body = bodyOf(i, this.kind[i], false);      // 用**还是人**时的体型
+    const body = bodyOf(i, this.kind[i], false, this.bodyFix.get(i));      // 用**还是人**时的体型
     this.aStage[i] = STAGE.TURN;
     this.aT[i] = 0;
     this.aZ[i] = 0;
@@ -4531,7 +4547,7 @@ export class Sim {
 
   /** 倒地：die01 / zdie01，期间不动。 */
   beginDie(i, wasZombie) {
-    const body = bodyOf(i, this.kind[i], !!wasZombie);
+    const body = bodyOf(i, this.kind[i], !!wasZombie, this.bodyFix.get(i));
     this.aStage[i] = STAGE.DIE;
     this.aT[i] = 0;
     this.aZ[i] = wasZombie ? 1 : 0;
@@ -4540,7 +4556,7 @@ export class Sim {
 
   /** 尸体爬起来：zrise01。 */
   beginRise(i) {
-    const body = bodyOf(i, this.kind[i], false);      // 尸体还是"人"的体型；动物会退到 walk
+    const body = bodyOf(i, this.kind[i], false, this.bodyFix.get(i));      // 尸体还是"人"的体型；动物会退到 walk
     this.aStage[i] = STAGE.RISE;
     this.aT[i] = 0;
     this.aZ[i] = 0;
