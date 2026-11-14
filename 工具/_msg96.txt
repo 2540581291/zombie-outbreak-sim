@@ -1,0 +1,30 @@
+排查「2D/地形 回到顶栏」「姓名未按国家」：当前代码是好的，问题在跑旧文件
+
+检查结果（本目录 C:\项目\生化危机模拟器）：
+
+1) index.html 的「显示」区 = <div class="disp-row" id="disp-slot"></div>，
+   地图（卫星/矢量）与 3D 建筑两行**已不存在**。
+2) js/main.js 把 btn-retro / btn-overlay 挂到 #disp-slot（回退 tb-tools → topbar）。
+   无头浏览器实测 DOM：
+     <div id="disp-slot">
+       <button id="btn-retro" class="disp-btn">🕹 2D 模式</button>
+       <button id="btn-overlay" class="disp-btn">🗺 地形</button>
+     </div>
+   —— 按钮确实在面板里，不在顶栏。
+3) js/profiles.js 有 5 个国家池（中国/日本/德国/英语系/国际）+ setCountry()，
+   main.js 启动即 setCountry(cityInfo(CID).country)；
+   node 实测姓名：中国→王德琳、日本→佐藤咲介、德国→诺拉·米勒、美国→埃塞尔·史密斯。
+
+所以代码层面两个功能都在。看到的旧界面只可能是：
+· 浏览器缓存了旧的 js/main.js / index.html（尤其用 `python -m http.server` 起服务时，
+  它不发 no-store，ES 模块会被强缓存）；
+· 或者打开的是另一份旧拷贝（比如上传 GitHub 之前导出的目录）。
+
+本次新增：构建戳，用来一眼确认跑的是不是新代码
+· main.js 顶部 const BUILD = 'b22-namepools-disp'
+· 启动时 console.log('[ZOS-R] build ' + BUILD)，并写到 <html data-build="...">
+· 实测日志：[ZOS-R] build b22-namepools-disp
+
+排查办法：打开页面 → F12 控制台 → 看有没有 `[ZOS-R] build b22-namepools-disp`。
+没有这行 = 旧缓存/旧拷贝；有这行但界面仍旧 = 再看 <html data-build>。
+强制刷新：Ctrl + F5，或用项目根目录的 生化危机模拟器.bat（它会带 ?v=随机串起服务）。

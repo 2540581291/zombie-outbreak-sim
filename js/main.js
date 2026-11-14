@@ -1762,6 +1762,8 @@ function hideBanner() { $('banner').classList.add('hidden'); bannerShown = false
 
 // ---------- 加载 ----------
 async function boot() {
+  document.documentElement.dataset.build = BUILD;
+  console.log('[ZOS-R] build ' + BUILD);
   const lf = $('ld-fill'), lt = $('ld-txt');
   const Q = new URLSearchParams(location.search);
   if (Q.get('pop')) { sPop.value = Q.get('pop'); syncLabels(); }
@@ -2216,6 +2218,9 @@ async function boot() {
   document.title = '生化危机模拟器 · ' + cityFull(CID, city.name);
   startLoop();
 }
+
+// 构建戳：改动后手动+1，浏览器控制台/页面属性都能看到，用来判断是不是旧缓存
+const BUILD = 'b22-namepools-disp';
 
 // ---------- 主循环 ----------
 let last = 0, acc = 0, frames = 0, fpsT = 0, hudT = 0, fc = 0, cardFrame = 0;
