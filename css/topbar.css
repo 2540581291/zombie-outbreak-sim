@@ -100,7 +100,8 @@
 #topbar{flex-wrap:nowrap;height:8.7em;overflow:hidden;white-space:nowrap}
 
 /* ===== 顶部第二栏：显示开关 + 音乐 ===== */
-#subbar{position:relative;display:flex;align-items:center;gap:0.75rem;
+#subbar{position:fixed;top:var(--tb-h,3.4rem);left:0;right:17rem;z-index:19;
+  display:flex;align-items:center;gap:0.75rem;
   font-size:0.75em;padding:0.35em 1.1em;background:rgba(10,13,17,.82);
   border-bottom:1px solid rgba(255,255,255,.07);backdrop-filter:blur(8px);
   width:calc(100% - 17rem);box-sizing:border-box}

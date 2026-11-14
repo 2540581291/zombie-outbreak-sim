@@ -1803,6 +1803,13 @@ function hideBanner() { $('banner').classList.add('hidden'); bannerShown = false
 // ---------- 加载 ----------
 async function boot() {
   document.documentElement.dataset.build = BUILD;
+  // 第二栏贴在顶栏下方：顶栏高度随字号变化，量出来写进 CSS 变量
+  const syncBars = () => {
+    const tb = document.getElementById('topbar');
+    if (tb) document.documentElement.style.setProperty('--tb-h', tb.getBoundingClientRect().height + 'px');
+  };
+  syncBars();
+  addEventListener('resize', syncBars);
   console.log('[ZOS-R] build ' + BUILD);
   const lf = $('ld-fill'), lt = $('ld-txt');
   const Q = new URLSearchParams(location.search);
