@@ -19,9 +19,9 @@
 
 ## 快速开始
 
-双击 **`生化危机模拟器.bat`**（文件就在根目录）。
+需要 **Python 3**（起静态服务）和一个支持 WebGL2 的现代浏览器。纯前端，没有构建步骤、没有 npm 依赖。
 
-它会做四件事：
+**Windows**：双击根目录的 **`生化危机模拟器.bat`**。它会做四件事：
 
 1. **杀掉占用 8777 端口的旧服务**（还会清掉任何残留的 `python -m http.server 8777` 进程）
    所以改完代码再双击，一定是全新的服务，不会出现"页面还是旧的"的情况；
@@ -31,10 +31,17 @@
 
 停止服务：关掉任务栏里 `ZOS-R-Server` 那个窗口，或直接再双击一次 bat。
 
-> 也可以手动起服务：`python -m http.server 8777 --bind 127.0.0.1`，
-> 然后访问 <http://127.0.0.1:8777/index.html>
->
+**macOS / Linux**：
+
+```bash
+python3 工具/serve.py 8777        # 或 npm run serve
+# 浏览器打开 http://127.0.0.1:8777/index.html
+```
+
 > 必须走 HTTP，不能直接双击 index.html（ES Module + fetch 在 `file://` 下会被浏览器拦）。
+>
+> 用 `python -m http.server` 也能跑，但它不发缓存头，浏览器会按 Last-Modified 猜缓存，
+> 改了 js 却还在跑旧模块；`工具/serve.py` 对 html/js/css/json 一律 `no-store`。
 
 ---
 
