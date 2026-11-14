@@ -1,19 +1,12 @@
 # `assets/atlas/` · v2 精灵图集
 
-> 由 `tools/build_atlas.py` 从 `reference/core`（反编译的 2009 原版）**自动生成，不要手改**。
+> 由开发环境里的 `build_atlas.py` 从 2009 原版的反编译资源**自动生成，不要手改**。
+> 这个可运行包里只带成品图集，生成 / 校验 / 预览脚本不在包内。
 
 | 文件 | 说明 |
 |---|---|
 | `atlas.png` | RGBA，1:1 原像素（**不放大**），变量矩形密排，帧间 1px 缝隙 |
 | `atlas.json` | clip 表 |
-
-## 重建 / 校验 / 预览
-
-```bash
-python tools/build_atlas.py                     # ← 唯一权威构建（读 reference/core）
-python tools/audit_atlas.py                     # 校验帧数/帧长/rect 与源码一致、rect 不重叠
-python tools/preview_atlas.py guy01/turn01 10   # 切出帧条看图（第 2 参是采样帧数）
-```
 
 `build_atlas.py` 的**硬约束**：展开出的帧数必须等于动画类里 `_qk83()` 的声明值，否则 `exit 1`，不产出"差不多"的图集。
 

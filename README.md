@@ -136,36 +136,26 @@ docs/                             实现说明与截图
 
 ## 换一个城市
 
-已经有 **28 张地图**（`数据库/cities/`）：5 座用 OSM 精细烘焙的大城市（柏林 / 东京 / 郑州 / 南阳 / 镇平）
+包里已经有 **28 张地图**（`数据库/cities/`）：5 座用 OSM 精细烘焙的大城市（柏林 / 东京 / 郑州 / 南阳 / 镇平）
 + 2 张无人机航测图（镇平县城 / 唐营村），其余 21 张是原版小地图和官方城市。右上角下拉直接切。
 
 ![中国城市](docs/img/city_nanyang.jpg)
 
 > 同一套代码跑「中国 · 南阳·卧龙」：真实路网 + 5 万人 + 1,630 只初始丧尸（姓名池按国家自动切）。
 
-要加新的：
+想往包里**再加一座城**，需要开发环境里的烘焙流水线（`bake_pbf.py` 烘几何、`fetch_sat.py` 拉影像），
+那套脚本不在这个可运行版本里。加好之后，只要把 `数据库/cities/<id>/` 整个目录连同 `index.json` 里的一条记录带过来即可，
+前端就是按目录名 + 清单读的：
 
-```bat
-:: 1. 把对应地区的 PBF 放进 数据库/烘焙/raw/（https://download.geofabrik.de/）
-:: 2. 烘焙城市几何 + 碰撞层（--out 必填，前端只认 数据库/cities/<id>/city.json）
-python 数据库\烘焙\bake_pbf.py --pbf 数据库\烘焙\raw\berlin.osm.pbf --name "柏林 Mitte" ^
-  --minlat 52.5129 --minlon 13.3786 --maxlat 52.5346 --maxlon 13.4253 ^
-  --out 数据库\cities\berlin\city.json
-
-:: 3. 拉卫星影像（--provider esri / google，或用 --url 换自定义模板）
-python 数据库\烘焙\fetch_sat.py --citydir 数据库\cities\berlin --zoom 20 ^
-  --url "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
-
-:: 4. 生成城市卡片缩略图（扫 数据库/cities/*/sat.jpg）
-python 工具\make_thumbs.py
-
-:: 5. 在 数据库/cities/index.json 里补一条该城市的记录
+```
+数据库/cities/index.json          城市清单（下拉菜单读它）
+数据库/cities/<id>/city.json      地图几何 + 碰撞层（必需）
+数据库/cities/<id>/sat.jpg        卫星底图（可选：缺了自动回退矢量地图）
+数据库/cities/<id>/sat.json       影像边界（和 sat.jpg 成对）
+数据库/cities/<id>/thumb.jpg      下拉卡片缩略图（可选）
 ```
 
-> ⚠ `bake_pbf.py` 的 `--out` 是**必填**的：前端只读 `数据库/cities/<id>/city.json`。
->
-> 新城市烘焙完后，别忘了在 `js/citymeta.js` 里登记「国家 / 城市 / 区」，
-> 否则界面上只会显示 `city.json` 里的原始名字（见下一节「城市命名」）。
+新城市还要在 `js/citymeta.js` 里登记「国家 / 城市 / 区」，否则界面上只会显示 `city.json` 里的原始名字（见「城市命名」）。
 
 ---
 
@@ -197,42 +187,25 @@ python 工具\make_thumbs.py
 同时 `数据库/烘焙/drone_to_city.py` 会把**碰撞层里没被航测覆盖的格子刷成墙**，
 所以人和丧尸走不进黑色区域 —— 视觉和可走范围是一致的。
 
-### 重新烘焙
+### 重新烘焙（开发环境）
 
-```bat
-:: 1. 从航测包拼出带 alpha 的大图（脚本在 F:\zpx_meta\，产物是 *_rgba.png + .pgw）
-:: 2. 拉 OSM（县城 7.8 km² 用官方 API 就够）
-python 数据库\烘焙\fetch_osm_blocks.py
+烘焙脚本不在这个可运行包里，流程记在这里备查：
 
-:: 3. 烘城市骨架（建筑/道路/碰撞）
-python 数据库\烘焙\bake_pbf.py --pbf 数据库\烘焙\raw\zhenping_town.osm --name "镇平 县城" ^
-  --minlat 33.010967 --minlon 112.170410 --maxlat 33.045508 --maxlon 112.254181 ^
-  --out 数据库\cities\zhenping_town\city.json
-
-:: 4. 把正射图裁进城市 bbox，生成 sat.jpg + sat_mask.png，并按遮罩刷碰撞层
-python 数据库\烘焙\drone_to_city.py --city zhenping_town ^
-  --mosaic "F:\zpx\maps\县城_正射_z18_rgba.png" --width 16384
-```
+1. 从航测包拼出带 alpha 的大图（产物是 `*_rgba.png` + `.pgw`）；
+2. `fetch_osm_blocks.py` 拉 OSM（县城 7.8 km² 用官方 API 就够）；
+3. `bake_pbf.py --pbf ... --out 数据库/cities/zhenping_town/city.json` 烘城市骨架（建筑/道路/碰撞）；
+4. `drone_to_city.py --city zhenping_town --mosaic ... --width 16384` 把正射图裁进城市 bbox，
+   生成 `sat.jpg` + `sat_mask.png`，并按遮罩刷碰撞层。
 
 `drone_to_city.py` 会打印刷掉了多少格、`sat.jpg` / `sat_mask.png` 多大。
 底图宽度建议 ≤ 16384（和柏林一致），再大会顶到 GPU 纹理上限。
 
 ### 建筑从 DSM 提（没有 OSM 数据的地方）
 
-镇平的 OSM 几乎是空的（县城 7.8 km² 只有 43 栋），所以建筑改用**航测 DSM 反推**：
+镇平的 OSM 几乎是空的（县城 7.8 km² 只有 43 栋），所以建筑改用**航测 DSM 反推**
+（`dsm_buildings.py` 生成 `buildings_dsm.json`，再喂给 `bake_pbf.py --buildings`；两个脚本同样在开发环境里）。
 
-```bat
-python 数据库\烘焙\dsm_buildings.py --dsm "F:\zpx\data\map\dsm.tif" --tfw "F:\zpx\data\map\dsm.tfw" ^
-  --minlon 112.170410 --minlat 33.010967 --maxlon 112.254181 --maxlat 33.045508 ^
-  --out 数据库\cities\zhenping_town\buildings_dsm.json
-
-python 数据库\烘焙\bake_pbf.py --pbf 数据库\烘焙\raw\zhenping_town.osm ^
-  --buildings 数据库\cities\zhenping_town\buildings_dsm.json ^
-  --name "镇平 县城" --minlat 33.010967 --minlon 112.170410 --maxlat 33.045508 --maxlon 112.254181 ^
-  --out 数据库\cities\zhenping_town\city.json
-```
-
-做法（`数据库/烘焙/dsm_buildings.py`）：
+做法：
 
 1. `tifffile` + `zarr` 从 BigTIFF 里**按窗口懒读** DSM（不整包解压），3 倍降采样到 0.47 m/px；
 2. 中值滤波去掉立体匹配的散斑（DSM 有 ±5 m 级的噪声）；
@@ -394,30 +367,25 @@ apocalypse: still alive   containment: CLEARED
 
 ---
 
-## 数据与素材
+## 包内容
 
-**这个仓库是自包含的**：clone 下来就是完整的一局游戏，不需要额外的数据包、不需要联网、不需要自己烘图。
-卫星影像、城市几何、原始 OSM、原版参考素材全部在仓库里。
+**这个包是自包含的**：解压 / clone 下来就能玩，不需要额外的数据包、不需要联网、不需要自己烘图。
 
 | 内容 | 体积 | 说明 |
 |---|---|---|
-| `数据库/cities/*/sat.jpg` | ~413 MB（28 张，最大 75 MB） | 卫星 / 航测底图，游戏默认地图模式就是它 |
-| `数据库/cities/*/city.json` | ~20 MB | 烘焙好的建筑几何 + 碰撞层 |
-| `数据库/cities/*/sat.json` `sat_mask.png` `thumb.jpg` | ~6 MB | 影像边界、航测镂空遮罩、城市卡片缩略图 |
-| `数据库/cities/*/buildings_dsm.json` | ~9 MB | 航测 DSM 反推出的建筑（镇平县城 / 唐营村） |
-| `数据库/烘焙/raw/` | ~208 MB | 原始 OSM / PBF，离线重烘城市用 |
-| `原版/` | ~112 MB | 2009 原版游戏（APK / SWF）、反编译脚本、精灵帧、导入脚本 |
+| `js/ css/ src/ vendor/ assets/` | ~2 MB | 游戏本体（含 three.js 与 2D 图集） |
+| `数据库/cities/*/city.json` | ~17 MB | 地图几何 + 碰撞层（游戏真正读的数据） |
+| `数据库/cities/*/sat.jpg` | ~413 MB（28 张，最大 75 MB） | 卫星 / 航测底图，默认地图模式就是它 |
+| `数据库/cities/*/sat.json` `sat_mask.png` `thumb.jpg` | ~5 MB | 影像边界、航测镂空遮罩、下拉卡片缩略图 |
 
-只有惰性生成的东西不进版本库：`shots/`（截图原图）、`__pycache__/`、`node_modules/`、编辑器杂物。
+**不在这个包里**的（开发资料，不在运行时用到）：`数据库/烘焙/`（烘地图的 Python 流水线、原始 OSM/PBF）、
+`原版/`（原版游戏、反编译脚本、图集来源）、`数据库/cities/*/buildings_dsm.json`（DSM 反推的中间数据）。
+另外 `shots/`（我截图的原图）、`__pycache__/`、`node_modules/` 也不进版本库。
 
-### 想重新烘焙某座城市
+### 某座城缺底图会怎样
 
-```bat
-python 数据库\烘焙\fetch_sat.py --citydir 数据库\cities\berlin
-python 工具\make_thumbs.py
-```
-
-万一某座城缺 `sat.jpg`，前端会自动回退到矢量地图（`sat.json` / `sat_mask.png` 一起缺席即可，不影响启动）：
+前端会自动回退到矢量地图（`sat.json` / `sat_mask.png` 一起缺席即可，不影响启动）。想补图，需要开发环境里的
+`fetch_sat.py` 烘一次，再 `make_thumbs.py` 生成缩略图——这两个脚本不在本包里：
 
 ![矢量模式](docs/img/vector_3d.jpg)
 
@@ -450,18 +418,11 @@ python 工具\make_thumbs.py
 关键点是第 4 步：图不是按 bbox 铺的，而是按**瓦片对齐后的真实边界**铺的，
 所以影像和 OSM 建筑轮廓是同一套投影，**楼顶和航拍楼顶能严丝合缝对上**（`?3d=1&bld=1` 俯视验证）。
 
-### 重新烘焙
+### 重新烘焙（开发环境）
 
-换城市 / 换图源后重新跑一次：
-
-```bat
-python 数据库\烘焙\fetch_sat.py --citydir 数据库\cities\berlin                    :: 自动选级
-python 数据库\烘焙\fetch_sat.py --citydir 数据库\cities\berlin --zoom 20          :: 强制 20 级（≈0.09m/像素）
-python 数据库\烘焙\fetch_sat.py --citydir 数据库\cities\berlin --provider google  :: 换瓦片源
-```
-
-> 长边超过 GPU 纹理上限时，`fetch_sat.py` 已经会把拼图缩到 ≤4096；需要精确到 16384 这种
-> 大尺寸时用 `--zoom 20` 再自己缩，尺寸计算见「地图尺寸甜点」一节（原 `pick_size.py` 已并入该流程，脚本本身已移除）。
+换城市 / 换图源时用 `fetch_sat.py --citydir 数据库/cities/<id> [--zoom 20] [--provider google]` 重跑一次，
+脚本会把拼图缩到 4096 上限；需要 16384 这种大尺寸时先 `--zoom 20` 再自己缩（尺寸算法见「地图尺寸甜点」）。
+这个脚本不在本包里。
 
 柏林现在是 **z20 原图 → 16384×12831（210 MP），0.2015 m/px，75 MB**
 （从 0.09 m/px 的原图按「地图尺寸甜点公式」缩下来的，见那一节）。
@@ -2138,7 +2099,8 @@ im.save("数据库/cities/berlin/sat.jpg", quality=88, optimize=True)
 
 ### 换城市的标准流程
 
-见上文「换一个城市」，四步：`bake_pbf.py` → `fetch_sat.py` → `make_thumbs.py` → 补 `index.json`。
+本包里是「拿到 `数据库/cities/<id>/` 目录 + 在 `index.json` 里加一条」就能用；
+从零烘一座新城市要开发环境里的流水线（`bake_pbf.py` → `fetch_sat.py` → `make_thumbs.py` → 补 `index.json`），不在本包里。
 
 `E_MAX = 16384`（ANGLE/D3D11 上限，D3D11on12 相同，Vulkan 报 32768 但实际分配失败）。
 
@@ -2407,8 +2369,8 @@ CIV / FLEE / FIGHT
 
 | 来源 | 格子大小 | 谁决定 |
 |---|---|---|
-| 自建城市（OSM 烘焙） | **1.0 m** | `数据库/烘焙/collision.py build(cell=1.0)` / `bake_pbf.py --cell 1.0` |
-| 原版地图（资源导入） | **按资源算** | `原版/导入脚本/pull_original_map.py` 里的 `CELL = (整图宽 / 网格宽) × 米每像素` |
+| 自建城市（OSM 烘焙） | **1.0 m** | `collision.py build(cell=1.0)` / `bake_pbf.py --cell 1.0` |
+| 原版地图（资源导入） | **按资源算** | `pull_original_map.py` 里的 `CELL = (整图宽 / 网格宽) × 米每像素` |
 
 例子：原版莱斯特 4608 px ÷ 1152 格 = 4 px/格 × 0.11 m/px = **0.44 m**。
 换成任何一张别的原版图，同一个公式会算出**它自己的**格子大小，不写死。
@@ -2428,9 +2390,9 @@ CIV / FLEE / FIGHT
 
 所以：小图可以上原版精度，大图保持 1 m 更稳。
 
-### 导入原版地图的完整流程
+### 导入原版地图的完整流程（开发环境）
 
-> 「原版/」原版资源与导入脚本都随仓库提供，可直接重跑。
+> 导入脚本和原版资源（`原版/`）是开发资料，不在本包里；这里记录当时怎么做的。
 
 ```bash
 python 原版/导入脚本/pull_original_map.py --check   # 只校验，不写盘
