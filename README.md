@@ -113,40 +113,24 @@ src/sprite/             2D 渲染器（图集 + 四层实例化：活体/尸体/
 vendor/three.module.js  three.js r170（本地，不依赖 CDN）
 
 assets/atlas/atlas.{png,json}   2D 图集 v2（2048×784 / 2,728 帧 / 134 KB / 6.4 MB 显存）
-assets/atlas/README.md          图集格式与重建方法
+assets/favicon.svg              站点图标
 
 数据库/cities/index.json          城市清单（前端下拉用）
-数据库/cities/<id>/city.json      烘焙好的城市几何 + 碰撞层
+数据库/cities/<id>/city.json      地图几何 + 碰撞层（游戏真正读的数据）
+数据库/cities/<id>/sat.jpg        卫星 / 航测底图
+数据库/cities/<id>/sat.json       影像的精确经纬度边界
+数据库/cities/<id>/sat_mask.png   航测图镂空遮罩（镇平两张）
 数据库/cities/<id>/thumb.jpg      城市卡片缩略图
 数据库/cities/<id>/collision.edit.json   手绘图层补丁（可选，见「图层手绘编辑」）
-数据库/cities/<id>/sat.json       卫星影像的精确经纬度边界 ┐ 随仓库提供
-数据库/cities/<id>/sat.jpg        卫星影像（75 MB 级）      ┘ 见「数据与素材」
-数据库/cities/<id>/sat_mask.png   航测图镂空遮罩（镇平两张）
-数据库/cities/<id>/buildings_dsm.json   航测 DSM 反推的建筑（镇平两张）
 
-数据库/烘焙/                      离线烘焙脚本
-  bake_pbf.py           OSM PBF → city.json（含碰撞层）
-  collision.py          碰撞层生成器（纯函数：OSM 几何 → 位域网格）
-  fetch_sat.py          卫星瓦片 → sat.jpg + sat.json
-  drone_to_city.py      航测正射 → sat.jpg + sat_mask.png（镂空）+ 碰撞遮罩
-  dsm_buildings.py      DSM 高程 → 建筑轮廓
-  fetch_osm.py / fetch_osm_blocks.py   Overpass 拉 OSM
-  cut_pbf.py            从大 PBF 里按 bbox 切一块
-  raw/                  原始 OSM / PBF（随仓库提供，离线重烘用）
-
-工具/                             通用工具
+工具/                             运行与自检
   serve.py              本地静态服务器（no-store，替代 python -m http.server）
-  make_thumbs.py        由 sat.jpg 生成城市缩略图
   test_sim.mjs          性能 + 确定性自检
   test_chain.mjs        主链路 5 项自检
 docs/                             实现说明与截图
-
-原版/                             2009 原版游戏与反编译工程（复刻依据，随仓库提供）
-  导入脚本/             原版地图 / 精灵 → 数据库/cities 的导入工具
-  core/ decompiled/     反编译脚本与二进制资源
-  sprites/              原版精灵帧
-  工具/ffdec/           SWF 反编译工具
 ```
+
+> 这个包里**只有跑起来需要的东西**。烘焙流水线（`数据库/烘焙/`）和原版素材（`原版/`）属于开发资料，不在这个版本里。
 
 ---
 
