@@ -1,0 +1,1 @@
+README 标题去掉缩写：主标题「生化危机模拟器」，副标题用标准英文名 Resident Evil Simulator
