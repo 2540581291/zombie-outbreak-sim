@@ -1280,6 +1280,7 @@ function applyDifficulty(p) {
 function readParams() {
   const p = {
     seed,
+    cityId: CID,
     population: +sPop.value,
     initialZombies: +sZ0.value,
     homeGunRate: +sArm.value / 100,   // 「家庭持枪率」：决定每户有没有枪

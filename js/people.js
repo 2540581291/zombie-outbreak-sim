@@ -142,8 +142,10 @@ export function profileFor(sim, i) {
   const petName = namePool[Math.floor(h(i, 89) * namePool.length) | 0];
   return {
     idx: i,
-    name: (kind === 12 || kind === 13) ? petName : `${f[0]}·${l[0]}`,
-    nameEn: `${f[1]} ${l[1]}`,
+    name: (kind === 12 || kind === 13) ? petName
+      : (sim.nameFix && sim.nameFix.has(i) ? sim.nameFix.get(i)
+        : (surnameFirst() ? `${l[0]}${f[0]}` : `${f[0]}·${l[0]}`)),
+    nameEn: (f[1] && l[1]) ? `${f[1]} ${l[1]}` : null,
     age, male, job, home, work, family,
     isAnimal: !!(sim.kind && sim.kind[i] >= 12),
     animalWild,

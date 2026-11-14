@@ -355,7 +355,8 @@ export class Sim {
     this.budgetMax = 8000000;   // 上限 ¥8,000,000
     this.regen = 15000;         // 每秒入账 ¥15,000
     this.spentTotal = 0;        // 累计花费
-    this.vip = new Uint8Array(NMAX);   // 要员标记
+    this.nameFix = new Map();          // 个体下标 → 固定姓名（彩蛋用）
+  this.vip = new Uint8Array(NMAX);   // 要员标记
     this.vips = [];                    // 要员个体下标
     this.vipTotal = 0;
     this.savedVip = 0;
@@ -507,6 +508,7 @@ export class Sim {
     this.budget = 1000000;
     this.spentTotal = 0;
     this.savedVip = 0;
+    this.nameFix.clear();
     this.vip.fill(0);
     this.vips.length = 0;
     this.vipTotal = 0;
@@ -757,6 +759,10 @@ export class Sim {
         this.vips.push(i);
       }
       this.vipTotal = this.vips.length;
+      // 彩蛋：镇平县城 / 唐营村固定有一位名叫「魏骜远」的要员（不做任何提示）
+      if (this.vips.length && (this.params.cityId === 'zhenping_town' || this.params.cityId === 'zhenping_tangying')) {
+        this.nameFix.set(this.vips[0], '魏骜远');
+      }
       // 政府至少有一位要员：把第一位要员安置在政府大楼里
       const gov = (this.poiByKind.gov || [])[0];
       if (gov && this.vips.length) {

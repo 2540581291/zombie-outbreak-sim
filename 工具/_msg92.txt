@@ -1,0 +1,20 @@
+彩蛋：镇平两城固定出现要员「魏骜远」
+
+规则：每次开局，只要城市是 zhenping_town（镇平县城）或 zhenping_tangying（镇平唐营村），
+第一位要员的名字固定为「魏骜远」。不做任何提示、不在任何界面说明。
+
+实现：
+· main.js 的 readParams() 增加 cityId: CID，把当前地图 id 带进模拟参数
+· sim.js 新增 this.nameFix = new Map()（个体下标 → 固定姓名），reset() 时 clear()
+· 指派完要员后：若 cityId 命中这两座城，nameFix.set(vips[0], '魏骜远')
+· people.js 的 profileFor() 优先取 nameFix，再回落到常规姓名池
+
+顺带修正：profileFor 的 full name 之前没吃到 surnameFirst()，
+中国/日本显示成了「名·姓」；现在按规范「姓+名」（王伟 / 佐藤健太）。
+nameEn 在没有罗马字时返回 null，不再拼出 "undefined undefined"。
+
+验证（node 直接跑 Sim.reset + profileFor）：
+  zhenping_town      要员: 魏骜远、…
+  zhenping_tangying  要员: 魏骜远、…
+  leicester          要员: 随机名（不受影响）
+determinism PASS ✓；test_chain 5/5。
