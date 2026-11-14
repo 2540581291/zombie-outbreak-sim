@@ -760,7 +760,7 @@ export class Sim {
       }
       this.vipTotal = this.vips.length;
       // 彩蛋：镇平县城 / 唐营村固定有一位名叫「魏骜远」的要员（不做任何提示）
-      if (this.vips.length && (this.params.cityId === 'zhenping_town' || this.params.cityId === 'zhenping_tangying')) {
+      if (this.vips.length && (['zhenping_town', 'zhenping_tangying', 'nanyang'].includes(this.params.cityId))) {
         this.nameFix.set(this.vips[0], '魏骜远');
       }
       // 政府至少有一位要员：把第一位要员安置在政府大楼里

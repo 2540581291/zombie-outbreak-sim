@@ -1280,7 +1280,7 @@ function applyDifficulty(p) {
 function readParams() {
   const p = {
     seed,
-    cityId: CID,
+    cityId: window.__CID || '',   // CID 是 boot() 里的局部变量，这里读暴露的副本
     population: +sPop.value,
     initialZombies: +sZ0.value,
     homeGunRate: +sArm.value / 100,   // 「家庭持枪率」：决定每户有没有枪
@@ -1784,7 +1784,7 @@ async function boot() {
   // ---------- 多城市：?city=<id>，默认 berlin ----------
   const CID = (Q.get('city') || 'berlin').replace(/[^a-z0-9_-]/gi, '');
   const CDIR = '数据库/cities/' + CID;
-  setCountry(cityInfo(CID, city && city.name).country);   // 姓名池按国家切换（日本人名也用汉字）
+  setCountry(cityInfo(CID).country);   // 姓名池按国家切换（日本人名也用汉字；此处 city 还没加载，只用 CID）
   window.__CID = CID;   // 供模块级函数（城市选择弹窗）读取
   let cityIndex = [];
   try {
@@ -2147,22 +2147,23 @@ async function boot() {
 
   $('tb-city').textContent = cityFull(CID, city.name);   // 国家在前：德国 · 柏林·米特
   {
-    const tb = $('tb-tools') || $('topbar');   // 顶栏右侧的工具区
+    // 2D 模式 / 地形 两个开关放在右侧「爆发参数 → 显示」里（不再占顶栏）
+    const slot = $('disp-slot') || $('tb-tools') || $('topbar');
     const b = document.createElement('button');
     b.id = 'btn-retro';
-    b.className = 'tb-btn';                    // 尺寸/配色交给 CSS，跟着顶栏等比缩放
+    b.className = 'disp-btn';
     b.textContent = retroMode ? '🕹 2D 模式' : '🧊 3D 模式';   // 按钮显示当前模式
     b.title = '切换 2D / 3D 模式（Tab）';
     b.onclick = () => setRetro(!retroMode);
-    tb && tb.appendChild(b);
+    slot && slot.appendChild(b);
 
     const b2 = document.createElement('button');
     b2.id = 'btn-overlay';
-    b2.className = 'tb-btn';
+    b2.className = 'disp-btn';
     b2.textContent = '🗺 地形';
     b2.title = '叠加地形图层（C）：显示每格能不能走';
     b2.onclick = () => setOverlay(!overlayOn);
-    tb && tb.appendChild(b2);
+    slot && slot.appendChild(b2);
 
     // 城市选择：面板里一个按钮 → 打开大弹窗（缩略图网格 + 按国家分栏）
     if (cityIndex && cityIndex.length > 1) {
