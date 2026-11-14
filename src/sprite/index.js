@@ -263,7 +263,8 @@ export class SpriteView {
         dummy.scale.set(dotWorld, 1, dotWorld);
         dummy.updateMatrix();
         dummy.matrix.toArray(dots.mesh.instanceMatrix.array, pk * 16);
-        const b0 = UNIT_COLOR[colorClassOf(kind, st)] || [1, 1, 1];
+        const b0 = (sim.vip && sim.vip[i] && st !== 5) ? UNIT_COLOR.VIP
+          : (UNIT_COLOR[colorClassOf(kind, st)] || [1, 1, 1]);
         const v = 0.82 + this.seed2[i % CAP] * 0.38;
         dotCol[pk * 3] = b0[0] * v; dotCol[pk * 3 + 1] = b0[1] * v; dotCol[pk * 3 + 2] = b0[2] * v;
         pk++;
