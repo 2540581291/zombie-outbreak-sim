@@ -385,7 +385,8 @@ export function jobOf(i) { return jobFor(i, ageOf(i)); }
 /** 这一行职业对应哪类地点（用来分配「工作地」） */
 export const JOB_POI = {
   // 医疗
-  护士: 'hospital', 药剂师: 'pharmacy', 牙医助理: 'hospital', 牙医助手: 'hospital',
+  护士: 'hospital', 医生: 'hospital', 牙医助理: 'hospital', 牙医助手: 'hospital',
+  兽医助理: 'hospital', 药剂师: 'pharmacy', 药店店员: 'pharmacy',
   // 教育
   中学教师: 'school', 小学教师: 'school', 高中教师: 'school', 教师: 'school',
   大学生: 'school', 学生: 'school', 保育士: 'school',

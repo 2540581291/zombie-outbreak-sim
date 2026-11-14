@@ -90,6 +90,26 @@ export function goalText(sim, i) {
   }
 }
 
+/** 这个人实际分到的机构名（警察局 / 医院 / 学校 / 政府大楼）；没分到返回 null */
+function workPlaceName(sim, i) {
+  if (!sim) return null;
+  const kinds = { 1: 'gov', 2: 'hospital', 3: 'school' };
+  const nameOf = (kind, idx) => {
+    const list = sim.poiByKind && sim.poiByKind[kind];
+    if (!list || !list[idx]) return null;
+    const p = list[idx];
+    return p.n || p.name || null;
+  };
+  // 警察：所属警局
+  if (sim.stationOf && sim.stationOf[i] > 0) return nameOf('police', sim.stationOf[i] - 1);
+  // 要员 / 政府雇员 / 医生 / 教师：按 jobKind + workPoi
+  if (sim.workPoi && sim.workPoi[i] > 0) {
+    const kind = kinds[sim.jobKind ? sim.jobKind[i] : 0];
+    if (kind) return nameOf(kind, sim.workPoi[i] - 1);
+  }
+  return null;
+}
+
 export function profileFor(sim, i) {
   const f = firstNameOf(sim, i), l = surnameOf(sim, i);
   let age = ageOfAgent(sim, i, ageOf);       // 平民用家庭分配的年龄，其余按哈希（后面会按身份修正）
@@ -118,9 +138,13 @@ export function profileFor(sim, i) {
   const ST = streetsPool();
   const st1 = pick(ST, i, 6), st2 = pick(ST, i, 7), st3 = pick(ST, i, 8);
   const home = `${st1} ${1 + Math.floor(h(i, 9) * 140)} 号`;
-  const work = age < 20 || age > 65
-    ? `${st2} ${1 + Math.floor(h(i, 10) * 90)} 号`
-    : `${pick(companiesPool(), i, 11)}（${st3} ${1 + Math.floor(h(i, 12) * 90)} 号）`;
+  // 工作地：优先用真实分配到的机构（警察局 / 医院 / 学校 / 政府大楼）
+  const poiName = workPlaceName(sim, i);
+  const work = poiName
+    ? poiName
+    : (age < 20 || age > 65
+      ? `${st2} ${1 + Math.floor(h(i, 10) * 90)} 号`
+      : `${pick(companiesPool(), i, 11)}（${st3} ${1 + Math.floor(h(i, 12) * 90)} 号）`);
 
   // 家庭：真的按 household 算（配偶 / 子女 / 父母 / 独居 / 旅客）
   const kinAge = (j) => ageOfAgent(sim, j, ageOf);

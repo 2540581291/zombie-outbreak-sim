@@ -747,6 +747,18 @@ export class Sim {
       this.phase[i] = rng(); this.timer[i] = 0; this.cool[i] = rng();
       this.ammo[i] = 40;                       // 一个弹匣，打光就跑
       this.pickWander(i);
+      // 警察的家 = 工作地 = 所属警局（面板上「工作地」必须显示警察局）
+      if (station >= 0) {
+        const s0 = stations0[station];
+        this.homeX[i] = s0.x; this.homeZ[i] = s0.z;
+        this.workX[i] = s0.x; this.workZ[i] = s0.z;
+        this.workPoi[i] = station + 1;
+      } else {
+        this.homeX[i] = x; this.homeZ[i] = z;
+        this.workX[i] = x; this.workZ[i] = z;
+        this.workPoi[i] = station + 1;
+      }
+      this.jobKind[i] = JOB_KIND_CODE.police || 0;
     }
 
     // ---- 指派要员（VIP）：随机挑若干平民 ----
@@ -776,6 +788,10 @@ export class Sim {
         this.idle[v] = 1;
         this.actT[v] = 1e9;              // 待在政府不走
         this.chainStep[v] = 0;
+        // 要员的工作地就是政府大楼（面板要能对上）
+        this.workX[v] = gov.x; this.workZ[v] = gov.z;
+        this.workPoi[v] = 1;
+        this.jobKind[v] = JOB_KIND_CODE.gov;
       }
     }
 
