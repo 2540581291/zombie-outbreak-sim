@@ -48,6 +48,7 @@ function firstNameOf(sim, i) {
 
 /** 短名：中日「姓 + 名」（王伟 / 佐藤健太），其余「名·姓首字」（卢卡斯·米） */
 export function shortName(i, sim) {
+  if (sim && sim.nameFix && sim.nameFix.has(i)) return sim.nameFix.get(i);
   const given = firstNameOf(sim, i);
   const last = surnameOf(sim, i);
   return surnameFirst() ? last + given : given + '·' + last[0];

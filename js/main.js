@@ -2220,7 +2220,7 @@ async function boot() {
 }
 
 // 构建戳：改动后手动+1，浏览器控制台/页面属性都能看到，用来判断是不是旧缓存
-const BUILD = 'b23-disp-names-ok';
+const BUILD = 'b24-egg-overview';
 
 // ---------- 主循环 ----------
 let last = 0, acc = 0, frames = 0, fpsT = 0, hudT = 0, fc = 0, cardFrame = 0;
