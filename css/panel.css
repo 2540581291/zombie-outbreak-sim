@@ -84,3 +84,12 @@
   border-radius:0.4375rem;cursor:pointer;white-space:nowrap}
 .disp-btn:hover{border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff}
 .disp-btn.on{background:#2a6df4;border-color:#2a6df4;color:#fff;font-weight:700}
+
+/* 面板只允许纵向滚动：原来内容略超宽，会出现横向拖动 */
+#p-body{overflow-x:hidden}
+#p-body *{box-sizing:border-box;max-width:100%}
+#p-body .p-row{min-width:0}
+#p-body .p-row>span{min-width:0;flex-shrink:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#p-body input[type=range]{min-width:0;flex:1}
+#p-body .disp-row{min-width:0}
+#p-body .disp-btn{min-width:0}

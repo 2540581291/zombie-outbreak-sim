@@ -200,6 +200,11 @@ function tick() {
       ['在校 ' + num(s.atPost), '死亡 ' + num(s.dead), '感染 ' + num(s.infected),
         s.police ? '警力 ' + s.police : '无警力'])).join('')}</ul>`);
 
+  // 700ms 一次全量重绘会把滚动位置顶回去：重绘前后保存/恢复所有可滚动容器
+  const scrollers = [];
+  for (const n of el.querySelectorAll('*')) {
+    if (n.scrollHeight > n.clientHeight + 2) scrollers.push([n, n.scrollTop]);
+  }
   el.querySelector('#gv-grid').innerHTML = govCard + polCard + hospCard + schCard;
 
   el.querySelector('#gv-sub').textContent =
@@ -210,6 +215,7 @@ function tick() {
     ? '<span class="gv-ft">最近决策</span>' + logs.map((l) =>
       `<span class="gv-log"><b>${clock(l.t)}</b> ${l.text}</span>`).join('')
     : '<span class="gv-ft">系统消息</span><span class="gv-log">还没有触发任何政府决策（混乱度与感染率都没到门槛）</span>';
+  for (const [n, top] of scrollers) n.scrollTop = top;
 }
 
 export function openGov(sim) {
