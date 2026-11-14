@@ -5,7 +5,7 @@
 // ============================================================
 import { ST, GOAL } from './sim.js';
 import {
-  firstNamePool, lastNamePool, surnameFirst, COMPANIES, STREETS,
+  firstNamePool, lastNamePool, surnameFirst, companiesPool, streetsPool,
   h, pick, ageOf, maleOf, jobFor,
 } from './profiles.js';
 import { kinText, ageOfAgent } from './family.js';
@@ -111,11 +111,12 @@ export function profileFor(sim, i) {
   else if (sim.vip && sim.vip[i]) age = 40 + Math.floor(h(i, 88) * 32);      // 要员 40~71
   else if (kind === 12 || kind === 13) age = 1 + Math.floor(h(i, 88) * 12);  // 猫狗 1~12 岁
 
-  const st1 = pick(STREETS, i, 6), st2 = pick(STREETS, i, 7), st3 = pick(STREETS, i, 8);
+  const ST = streetsPool();
+  const st1 = pick(ST, i, 6), st2 = pick(ST, i, 7), st3 = pick(ST, i, 8);
   const home = `${st1} ${1 + Math.floor(h(i, 9) * 140)} 号`;
   const work = age < 20 || age > 65
     ? `${st2} ${1 + Math.floor(h(i, 10) * 90)} 号`
-    : `${pick(COMPANIES, i, 11)}（${st3} ${1 + Math.floor(h(i, 12) * 90)} 号）`;
+    : `${pick(companiesPool(), i, 11)}（${st3} ${1 + Math.floor(h(i, 12) * 90)} 号）`;
 
   // 家庭：真的按 household 算（配偶 / 子女 / 父母 / 独居 / 旅客）
   const kinAge = (j) => ageOfAgent(sim, j, ageOf);

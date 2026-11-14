@@ -97,23 +97,94 @@ export function surnameFirst() { return !!POOL.surnameFirst; }
 export const firstNamePool = () => POOL.first;
 export const lastNamePool = () => POOL.last;
 
-export const JOBS = [
+// ---------------- 职业 / 街道 / 单位：同样按国家切换 ----------------
+// 职业名一律中文；日本用汉字写法（会社员、保育士…）。
+const JOBS_CN = [
+  '会计', '中学教师', '小学教师', '厨师', '软件工程师', '护士', '出租车司机',
+  '网约车司机', '建筑工人', '车间工人', '公务员', '银行柜员', '超市收银员', '外卖骑手',
+  '大学生', '咖啡馆店员', '记者', '药剂师', '地铁司机', '书店老板', '快递员',
+  '面包师', '牙医助理', '景观设计师', '图书管理员', '保安', '个体户', '装修工',
+];
+const JOBS_JP = [
+  '会社员', '银行员', '营业', '教师', '保育士', '厨师', '护士', '出租车司机',
+  '建筑工人', '便利店店员', '配送员', '居酒屋店员', '设计师', '药剂师', '牙医助手',
+  '图书管理员', '警备员', '大学生', '报社记者', '面包师', '铁道员',
+];
+const JOBS_DE = [
   '会计', '中学教师', '厨师', '软件工程师', '护士', '出租车司机', '建筑工人',
-  '大学生', '退休', '咖啡馆店员', '记者', '药剂师', '地铁司机', '书店老板', '快递员',
-  '面包师', '牙医助理', '景观设计师', '舞台灯光师', '图书管理员',
+  '大学生', '咖啡馆店员', '记者', '药剂师', '地铁司机', '书店老板', '快递员',
+  '面包师', '牙医助理', '景观设计师', '舞台灯光师', '图书管理员', '公务员', '机械师',
+];
+const JOBS_EN = [
+  '会计', '高中教师', '厨师', '软件工程师', '护士', '出租车司机', '建筑工人',
+  '大学生', '咖啡店店员', '记者', '药剂师', '面包师', '图书管理员', '消防员',
+  '快递员', '超市收银员', '保险经纪', '社工', '水电工', '健身教练',
+];
+const JOBS_INTL = [
+  '会计', '教师', '厨师', '护士', '司机', '建筑工人', '大学生', '店员',
+  '记者', '药剂师', '面包师', '图书管理员', '快递员', '农民', '技工',
 ];
 
-export const STREETS = [
+const STREETS_CN = [
+  '人民路', '解放路', '建设路', '中山路', '胜利街', '长江路', '黄河路', '文化路',
+  '新华路', '东风路', '光明街', '和平路', '青年路', '工农路', '南京路', '北京路',
+  '朝阳街', '团结路', '振兴路', '金水路', '二七路', '经三路', '纬五路', '学院路',
+];
+const STREETS_JP = [
+  '中央通', '本町通', '樱木町', '荣町', '旭町', '绿町', '大手町', '港町',
+  '新町', '仲町', '北本町', '南本町', '花园町', '站前通', '银座通',
+];
+const STREETS_DE = [
   '亚历山大大街', '卡尔·马克思大道', '罗莎·卢森堡广场', '奥拉宁街', '明斯特街',
   '海因里希·海涅街', '托尔街', '市政厅街', '施潘道街', '腓特烈大街', '罗森街', '林登街',
   '雅各布街', '罗克街', '阿尔特·舍恩豪泽街',
 ];
+const STREETS_EN = [
+  '主街', '高街', '橡树街', '枫树街', '教堂街', '磨坊路', '公园大道', '华盛顿街',
+  '榆树街', '湖滨路', '栗树街', '松树街', '中央大道', '河滨街',
+];
+const STREETS_INTL = [
+  '中央大街', '市场街', '教堂街', '车站路', '河滨路', '公园路', '老街', '新街',
+];
 
-export const COMPANIES = [
+const COMPANIES_CN = [
+  '市第三中学', '区人民医院', '一家连锁超市', '一家川菜馆', '市公交公司', '一家五金店',
+  '快递驿站', '市图书馆', '一家装修公司', '一家社区诊所', '一家汽修厂', '市自来水公司',
+  '一家会计事务所', '一家软件公司', '区派出所', '市第二人民医院',
+];
+const COMPANIES_JP = [
+  '市立医院', '第三中学', '株式会社山田商事', '一家便利店', '一家居酒屋', '市立图书馆',
+  '一家面包坊', '一家药局', '市营公交', '一家设计事务所', '市役所', '一家居酒屋连锁',
+];
+const COMPANIES_DE = [
   '一家会计师事务所', '市立第三中学', '一家泰式餐厅', '一家软件公司', '夏里特医院',
   '一家出租车行', '一个地铁工地', '洪堡大学', '一家独立咖啡馆', '一家地方报社',
   '一家街角药店', '柏林交通公司调度中心', '一家面包房', '一家建筑设计事务所',
 ];
+const COMPANIES_EN = [
+  '一家会计师事务所', '市立医院', '第三中学', '一家连锁超市', '一家咖啡店', '一家面包房',
+  '市警察局', '一家律师事务所', '一家软件公司', '一家健身房', '一家药房', '社区图书馆',
+  '一家五金店', '市消防局',
+];
+const COMPANIES_INTL = [
+  '一家当地公司', '市立医院', '一所中学', '一家超市', '一家咖啡馆', '一家面包房',
+  '市政厅', '一家药店', '社区图书馆', '一家修车厂',
+];
+
+// 把上面这些挂到对应的国家池上
+POOL_CN.jobs = JOBS_CN; POOL_CN.streets = STREETS_CN; POOL_CN.companies = COMPANIES_CN;
+POOL_JP.jobs = JOBS_JP; POOL_JP.streets = STREETS_JP; POOL_JP.companies = COMPANIES_JP;
+POOL_DE.jobs = JOBS_DE; POOL_DE.streets = STREETS_DE; POOL_DE.companies = COMPANIES_DE;
+for (const k of Object.keys(POOLS)) {
+  if (POOLS[k] === POOL_EN || k === '英国' || k === '美国' || k === '澳大利亚' || k === '加拿大') {
+    POOLS[k].jobs = JOBS_EN; POOLS[k].streets = STREETS_EN; POOLS[k].companies = COMPANIES_EN;
+  }
+}
+POOL_INTL.jobs = JOBS_INTL; POOL_INTL.streets = STREETS_INTL; POOL_INTL.companies = COMPANIES_INTL;
+
+export const jobsPool = () => POOL.jobs;
+export const streetsPool = () => POOL.streets;
+export const companiesPool = () => POOL.companies;
 
 /** 稳定哈希：同一下标 + 盐永远得到同一个 [0,1) 值 */
 export function h(i, salt) {
@@ -130,18 +201,27 @@ export function maleOf(i) { return h(i, 4) < 0.5; }
 export function jobFor(i, age) {
   if (age < 20) return '学生';
   if (age > 65) return '退休';
-  return pick(JOBS, i, 5);
+  return pick(POOL.jobs, i, 5);
 }
 
 export function jobOf(i) { return jobFor(i, ageOf(i)); }
 
 /** 这一行职业对应哪类地点（用来分配「工作地」） */
 export const JOB_POI = {
-  护士: 'hospital', 药剂师: 'pharmacy',
-  中学教师: 'school', 大学生: 'school', 学生: 'school',
-  咖啡馆店员: 'market', 面包师: 'market', 书店老板: 'market',
-  地铁司机: 'transit', 出租车司机: 'transit', 快递员: 'transit',
-  会计: 'gov', 记者: 'gov',
+  // 医疗
+  护士: 'hospital', 药剂师: 'pharmacy', 牙医助理: 'hospital', 牙医助手: 'hospital',
+  // 教育
+  中学教师: 'school', 小学教师: 'school', 高中教师: 'school', 教师: 'school',
+  大学生: 'school', 学生: 'school', 保育士: 'school',
+  // 商业 / 服务
+  咖啡馆店员: 'market', 咖啡店店员: 'market', 面包师: 'market', 书店老板: 'market',
+  超市收银员: 'market', 店员: 'market', 便利店店员: 'market', 居酒屋店员: 'market',
+  // 交通
+  地铁司机: 'transit', 出租车司机: 'transit', 网约车司机: 'transit', 快递员: 'transit',
+  外卖骑手: 'transit', 配送员: 'transit', 铁道员: 'transit', 司机: 'transit',
+  // 政府 / 金融 / 媒体
+  会计: 'gov', 公务员: 'gov', 记者: 'gov', 报社记者: 'gov', 银行柜员: 'gov',
+  银行员: 'gov', 保险经纪: 'gov',
 };
 
 /** 家有没有枪（M5 用，先定下来免得以后改公式） */
