@@ -2249,6 +2249,11 @@ async function boot() {
     }, 2500);
   }
   if (Q.get('citypick')) setTimeout(openCityPicker, 1200);   // 调试：直接打开地图选择弹窗
+  // 调试/截图：?panel=gov|force|sanit|overview 直接打开对应面板
+  if (Q.get('panel')) {
+    const p = Q.get('panel');
+    setTimeout(() => { const b = document.getElementById('btn-' + p); if (b) b.click(); }, 1500);
+  }
   if (Q.get('retro')) setRetro(true);
   if (Q.get('overlay')) setOverlay(true);
   if (Q.get('edit') && layerEdit) layerEdit.enable();   // ?edit=1 直接进编辑模式
