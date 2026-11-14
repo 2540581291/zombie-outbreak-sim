@@ -1,0 +1,20 @@
+{
+ "provider": "original-2009",
+ "image": "sat.jpg",
+ "size": [
+  4608,
+  4608
+ ],
+ "cell": 4,
+ "citySize": [
+  506.88,
+  506.88
+ ],
+ "note": "Zombie Outbreak Simulator 2009 (Leicester): 324 tiles stitched via minimap",
+ "bounds": [
+  -0.002276679841897233,
+  -0.002292744707798082,
+  0.002276679841897233,
+  0.002292744707798082
+ ]
+}

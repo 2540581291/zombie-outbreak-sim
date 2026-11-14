@@ -1,0 +1,25 @@
+{
+ "provider": "drone",
+ "image": "sat.jpg",
+ "mask": "sat_mask.png",
+ "maskDiv": 2,
+ "size": [
+  6400,
+  5720
+ ],
+ "bounds": [
+  112.07428,
+  32.898615,
+  112.094879,
+  32.91418
+ ],
+ "origin": [
+  112.0845795,
+  32.9063975
+ ],
+ "citySize": [
+  1925.2,
+  1720.6
+ ],
+ "note": "DJI Terra 正射 TDOM，0.079 m/px 原图；alpha 镂空 = 未测绘区域"
+}
