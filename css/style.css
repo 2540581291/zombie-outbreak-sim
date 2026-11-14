@@ -54,7 +54,7 @@ canvas{display:block}
 .tb-fps{color:#4b5561;font-size:0.6875rem;min-width:2.875rem;text-align:right}
 
 /* ---------- 面板 ---------- */
-#panel{position:fixed;top:calc(8.7 * clamp(0.5938rem, 0.625vw, 1.5rem) + 0.625rem);right:0.875rem;width:16.375rem;z-index:20;background:var(--panel);
+#panel{position:fixed;top:var(--bars-h, 5.2rem);right:0.875rem;width:16.375rem;z-index:20;background:var(--panel);
   border:1px solid var(--line);border-radius:0.625rem;backdrop-filter:blur(0.875rem);overflow:hidden;
   box-shadow:0 1.125rem 3.125rem rgba(0,0,0,.55)}
 .p-head{display:flex;justify-content:space-between;align-items:center;padding:0.6875rem 0.8125rem;

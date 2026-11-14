@@ -1,7 +1,7 @@
 /* ===== 新闻跑马灯（风味文字） ===== */
 #news{
   position: fixed;
-  top: calc(8.7 * clamp(0.5938rem, 0.625vw, 1.5rem) + 0.5rem);   /* 紧贴顶栏下方，跟着等比缩放 */
+  top: var(--bars-h, 5rem);   /* 顶栏 + 第二栏 之下 */
   left: 0.875rem;
   right: calc(0.875rem + 16.375rem + 0.875rem);                      /* 避开右侧「爆发参数」面板 */
   min-height: 1.625rem;

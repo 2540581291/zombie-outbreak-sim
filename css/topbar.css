@@ -102,9 +102,9 @@
 /* ===== 顶部第二栏：显示开关 + 音乐 ===== */
 #subbar{position:fixed;top:var(--tb-h,3.4rem);left:0;right:17rem;z-index:19;
   display:flex;align-items:center;gap:0.75rem;
-  font-size:0.75em;padding:0.35em 1.1em;background:rgba(10,13,17,.82);
-  border-bottom:1px solid rgba(255,255,255,.07);backdrop-filter:blur(8px);
-  width:calc(100% - 17rem);box-sizing:border-box}
+  font-size:0.75em;padding:0.25em 1.1em;
+  background:linear-gradient(180deg,rgba(8,10,13,.92),rgba(8,10,13,.45) 70%,transparent);
+  box-sizing:border-box}
 .sb-group{display:flex;align-items:center;gap:0.4rem}
 .sb-div{width:1px;height:1.4em;background:rgba(255,255,255,.12)}
 .sb-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:#cfd8e2;

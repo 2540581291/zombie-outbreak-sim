@@ -1806,7 +1806,14 @@ async function boot() {
   // 第二栏贴在顶栏下方：顶栏高度随字号变化，量出来写进 CSS 变量
   const syncBars = () => {
     const tb = document.getElementById('topbar');
-    if (tb) document.documentElement.style.setProperty('--tb-h', tb.getBoundingClientRect().height + 'px');
+    const sb = document.getElementById('subbar');
+    const root = document.documentElement;
+    const th = tb ? tb.getBoundingClientRect().height : 42;
+    const sh = sb ? sb.getBoundingClientRect().height : 26;
+    root.style.setProperty('--tb-h', th + 'px');
+    root.style.setProperty('--sb-h', sh + 'px');
+    // 快讯栏 / 参数面板从这里开始，保证不被两根栏压住
+    root.style.setProperty('--bars-h', Math.ceil(th + sh + 8) + 'px');
   };
   syncBars();
   addEventListener('resize', syncBars);
@@ -2285,7 +2292,7 @@ async function boot() {
 }
 
 // 构建戳：改动后手动+1，浏览器控制台/页面属性都能看到，用来判断是不是旧缓存
-const BUILD = 'b31-subbar';
+const BUILD = 'b32-subbar-layout';
 
 // ---------- 主循环 ----------
 let last = 0, acc = 0, frames = 0, fpsT = 0, hudT = 0, fc = 0, cardFrame = 0;
