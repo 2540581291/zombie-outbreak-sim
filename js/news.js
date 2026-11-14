@@ -83,24 +83,35 @@ const STORIES = [
     ],
   },
   {
-    id: 'school', icon: ICON.school, when: (s) => s.govOrders && s.govOrders.schoolClosed,
+    id: 'school', icon: ICON.school, pick: true, when: (s) => s.govOrders && s.govOrders.schoolClosed,
     lines: () => [
+      '全市中小学、幼儿园明日起停课，复课时间另行通知',
+      '教育局紧急通知：所有学校停课，学生居家，教职工待命',
+      '期末考取消，家长群炸锅：「孩子在家没人看」',
+      '部分学校改为临时避难所，操场已搭起帐篷',
+      '校车全部停运，校门口贴出「今日起闭校」的告示',
       '教育局紧急通知：全市学校停课，复课时间另行通知',
       '停课第一天：家长群里一半在谢天谢地，一半在发愁谁看孩子',
       '中学门口贴出告示：请勿在校内聚集，校园已暂停开放',
     ],
   },
   {
-    id: 'hospital', icon: ICON.hospital, when: (s) => s.govOrders && s.govOrders.hospitalClosed,
+    id: 'hospital', icon: ICON.hospital, pick: true, when: (s) => s.govOrders && s.govOrders.hospitalClosed,
     lines: () => [
+      '市立医院停止接收普通门诊，只保留急诊通道',
+      '医院公告：非危重病人请勿前来，院内已无空床',
+      '门诊大厅挤满伤者，保安在门口拉起警戒线',
       '医院停止收治：门口贴出「本院已满，请前往其他医疗机构」',
       '急诊科医生：走廊里全是人，我们已经没有床位，也没有药',
       '护士站的排班表被划掉了大半——有人请假，也有人再没回来',
     ],
   },
   {
-    id: 'curfew', icon: ICON.curfew, when: (s) => s.govOrders && s.govOrders.curfew,
+    id: 'curfew', icon: ICON.curfew, pick: true, when: (s) => s.govOrders && s.govOrders.curfew,
     lines: () => [
+      '宵禁令生效：21 点后禁止外出，巡逻车沿街广播',
+      '市政府宣布全城宵禁，违规外出者将被强制带离',
+      '街灯下只剩军车，居民被要求锁门关窗、不要应门',
       '宵禁令生效：晚八点后非必要不得外出，违者将被强制带离',
       '宵禁第一夜：街道空旷，只有巡逻车的灯光划过',
       '便利店改成「窗口营业」，老板说「别进来，递钱就行」',
@@ -123,7 +134,7 @@ const STORIES = [
     ],
   },
   {
-    id: 'evac', icon: ICON.evacuate, when: (s) => s.govOrders && s.govOrders.evacuate,
+    id: 'evac', icon: ICON.evacuate, pick: true, when: (s) => s.govOrders && s.govOrders.evacuate,
     lines: () => [
       '全城撤离令发布：出城方向车辆排起数十公里长队',
       '广播循环播放：请携带证件与饮水，沿主干道有序撤离',
@@ -145,6 +156,70 @@ const STORIES = [
       '公交恢复部分线路，司机说「路面终于不像昨天那样了」',
     ],
   },
+  // ===== 零号病人（stealth）：前期没有任何"丧尸"字眼，只讲不明疾病与失联 =====
+  {
+    id: 'st_rumor', icon: ICON.infect, mode: 'stealth', pick: true,
+    when: (s) => s.stats.infected >= 1,
+    lines: () => [
+      '某公司员工连续三天没来上班，同事称「电话打不通，家里也没人应门」',
+      '社区卫生服务中心接到报告：一户人家夜里传出持续咳嗽声，白天却毫无动静',
+      '匿名帖称「隔壁邻居最近很怪，白天不拉窗帘，晚上不开灯」',
+      '一名外卖骑手在送餐途中突然晕倒，被送医后自行离开',
+    ],
+  },
+  {
+    id: 'st_fever', icon: ICON.hospital, mode: 'stealth', pick: true,
+    when: (s) => s.awareRate > 0.04,
+    lines: () => [
+      '疾控中心通报：本周不明原因发热病例较上周上升 17%，暂无聚集性结论',
+      '多家药店退烧药销量异常，店员说「这两天像流感季一样」',
+      '门诊医生私下表示：有几个病人血检结果「解释不通」',
+      '卫生热线接到咨询：被咬伤后要不要打狂犬疫苗？接线员答不上来',
+    ],
+  },
+  {
+    id: 'st_missing', icon: ICON.crime || ICON.news, mode: 'stealth', pick: true,
+    when: (s) => s.stats.infected >= 4,
+    lines: () => [
+      '警方证实：近三日接到十余起「人员失联」报案，均无出境记录',
+      '一名夜班保安失踪，监控显示他最后出现在地下车库',
+      '旧城区一处出租屋里传出恶臭，房东称联系不上租客',
+      '医院太平间表示「最近送来的遗体比平时多，原因不明」',
+    ],
+  },
+  {
+    id: 'st_first_bite', icon: ICON.zombie, mode: 'stealth', pick: true,
+    when: (s) => s.stats.zombie >= 1,
+    lines: () => [
+      '有居民报警：邻居「像发疯一样」扑咬路人，警方到场后使用了电击枪',
+      '一段 12 秒的手机视频在网上流传：一名男子在巷口咬住他人手臂',
+      '急救中心记录：同一地址两小时内被呼叫三次，伤者都有咬伤',
+    ],
+  },
+
+  // ===== 要员线：送进警局 / 成功撤离 =====
+  {
+    id: 'vip_station', icon: ICON.vip, pick: true,
+    when: (s) => !!(s.vips && s.vipStation && s.vips.some((v) => s.vipStation[v])),
+    lines: () => [
+      '一名政府要员已由护卫小队送抵市警察局，警方称「暂时安全」',
+      '消息人士：要员车队抵达警局后门，随行武装人员封锁了整个街区',
+      '广播短讯：市政要员已转移至安全地点，请市民勿前往警察局围观',
+      '警察局外围加强警戒，据悉有重要人物在楼内',
+    ],
+  },
+  {
+    id: 'vip_evac', icon: ICON.vip, pick: true,
+    when: (s) => (s.savedVip || 0) > 0,
+    lines: () => [
+      '官方确认：一名要员已由武装车队护送出城，去向保密',
+      '直升机与车队配合，要员撤离行动完成，全程未对外公布路线',
+      '新闻秘书：要员现已安全，市政府工作「由留守人员继续维持」',
+      '有市民拍到八车车队高速驶离城区，车窗全程不透明',
+    ],
+  },
+
+  // ===== 学校 / 医院 / 宵禁 / 撤离：改成多变种 =====
   {
     id: 'late', icon: ICON.radio, when: (s) => s.stats.dead >= 500,
     lines: () => [
@@ -155,6 +230,16 @@ const STORIES = [
 ];
 
 /* ---------------- 氛围句（循环） ---------------- */
+/* 零号病人的氛围句：不提丧尸，只讲异常与不安 */
+const IDLE_STEALTH = [
+  ['🌫️', '天气：阴，局部有雾，气温 12℃，能见度偏低'],
+  ['📻', '电台：市民如发现邻居长时间无回应，可拨打社区热线'],
+  ['💊', '药店提示：退烧药与消毒用品限量供应'],
+  ['🚑', '急救中心：近期非急救类呼叫请尽量自行前往社区诊所'],
+  ['🧾', '社区公告：请如实报告近期不明原因发热与咬伤情况'],
+  ['🌙', '夜间巡逻加强，偏僻路段建议结伴通行'],
+];
+
 const IDLE = [
   ['🌤️', '天气：多云转阴，气温 14℃，能见度一般'],
   ['🚦', '交通：主干道多处封闭，公交线路临时调整'],
@@ -287,18 +372,29 @@ function next() {
 }
 
 function poll(sim) {
+  const MODE = (sim.params && sim.params.mode) || 'single';
   for (const st of STORIES) {
     if (fired.has(st.id)) continue;
+    // mode: 'stealth' 只给零号病人；mode: 'normal' 只在普通爆发里播
+    if (st.mode === 'stealth' && MODE !== 'stealth') continue;
+    if (st.mode === 'normal' && MODE === 'stealth') continue;
     let ok = false;
     try { ok = !!st.when(sim); } catch { ok = false; }
     if (!ok) continue;
     fired.add(st.id);
     currentIcon = st.icon;
-    for (const line of st.lines(sim)) pushNews(line, st.icon);
+    const list = st.lines(sim);
+    if (st.pick) {
+      // 变种说法：只播一句，随机挑（用 Math.random，不碰 sim 的随机数）
+      pushNews(list[(Math.random() * list.length) | 0], st.icon);
+    } else {
+      for (const line of list) pushNews(line, st.icon);
+    }
   }
   if (queue.length === 0 && sim.time - lastShown > 45) {
     lastShown = sim.time;
-    const [ic, text] = IDLE[idleIdx % IDLE.length];
+    const pool = MODE === 'stealth' ? IDLE_STEALTH : IDLE;
+    const [ic, text] = pool[idleIdx % pool.length];
     idleIdx++;
     pushNews(text, ic);
   }
