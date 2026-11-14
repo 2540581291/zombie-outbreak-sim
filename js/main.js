@@ -11,6 +11,7 @@ import { AgentRenderer } from './agents.js';
 import { TOOLS, TOOL_BY_ID, HOTKEYS, fmtWan, fmtMoney } from './tools.js';
 import { profileFor, shortName } from './people.js';
 import { setCountry } from './profiles.js';
+import { initMusic, toggleMusic, next as nextMusic, setVolume, musicState } from './music.js';
 import { kinList, ageOfAgent } from './family.js';
 import { SPECIES, SP } from './species.js';
 import { weaponOf } from './weapons.js';
@@ -1774,6 +1775,26 @@ async function boot() {
   // ---------- 多城市：?city=<id>，默认 berlin ----------
   const CID = (Q.get('city') || 'berlin').replace(/[^a-z0-9_-]/gi, '');
   const CDIR = '数据库/cities/' + CID;
+  // ---- 背景音乐：默认开启、随机循环，首次交互后开始播 ----
+  initMusic({
+    onState: (st) => {
+      const b = document.getElementById('btn-music');
+      if (b) b.textContent = st.enabled ? (st.playing ? '⏸ 暂停' : '▶ 播放') : '▶ 播放';
+      const tEl = document.getElementById('mus-title');
+      if (tEl) tEl.textContent = st.enabled ? st.title : '音乐已关闭';
+    },
+  });
+  {
+    const b = document.getElementById('btn-music');
+    if (b) b.onclick = () => { toggleMusic(); };
+    const nb = document.getElementById('btn-nextmusic');
+    if (nb) nb.onclick = () => { nextMusic(); };
+    const vol = document.getElementById('mus-vol');
+    if (vol) {
+      vol.value = String(Math.round(musicState().volume * 100));
+      vol.oninput = () => setVolume(+vol.value / 100);
+    }
+  }
   setCountry(cityInfo(CID).country);   // 姓名池按国家切换（日本人名也用汉字；此处 city 还没加载，只用 CID）
   window.__CID = CID;   // 供模块级函数（城市选择弹窗）读取
   let cityIndex = [];
@@ -2221,7 +2242,7 @@ async function boot() {
 }
 
 // 构建戳：改动后手动+1，浏览器控制台/页面属性都能看到，用来判断是不是旧缓存
-const BUILD = 'b29-ui-fix';
+const BUILD = 'b30-music';
 
 // ---------- 主循环 ----------
 let last = 0, acc = 0, frames = 0, fpsT = 0, hudT = 0, fc = 0, cardFrame = 0;
