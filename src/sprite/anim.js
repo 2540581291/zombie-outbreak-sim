@@ -16,13 +16,13 @@ export function frameAt(clip, t) {
 }
 
 /** 阶段动画的进度（0..1），给透明度/时序判断用。 */
-export function stageProgress(clip, t) {
+function stageProgress(clip, t) {
   const d = (clip.n * clip.ms) / 1000;
   if (d <= 0) return 1;
   return Math.min(1, Math.max(0, t / d));
 }
 
 /** 一次性动画的总秒数。 */
-export function duration(clip) {
+function duration(clip) {
   return (clip.n * clip.ms) / 1000;
 }

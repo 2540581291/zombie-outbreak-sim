@@ -498,5 +498,5 @@ export function openAwareInfo(sim) {
   el.classList.remove('hidden');
 }
 
-export function closeStatus() { if (root) root.classList.add('hidden'); }
-export function isStatusOpen() { return !!root && !root.classList.contains('hidden'); }
+function closeStatus() { if (root) root.classList.add('hidden'); }
+function isStatusOpen() { return !!root && !root.classList.contains('hidden'); }

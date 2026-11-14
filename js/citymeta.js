@@ -84,6 +84,6 @@ export function cityNewspaper(id, fallback) {
 }
 
 /** 下拉框用：「德国 · 柏林·米特」 */
-export function cityOption(id, fallback) {
+function cityOption(id, fallback) {
   return cityFull(id, fallback);
 }

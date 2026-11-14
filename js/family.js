@@ -125,7 +125,7 @@ export function familyOf(sim, i) {
  *   · 最年长 > 60 且有中间代 + 孙辈 → 祖辈
  * 返回 { role: 'self'|'spouse'|'parent'|'child'|'grandparent'|'sibling', of: idx }
  */
-export function relationTo(sim, i, j, ageOf) {
+function relationTo(sim, i, j, ageOf) {
   if (i === j) return 'self';
   const ai = ageOf(i), aj = ageOf(j);
   const both = ai >= 18 && aj >= 18;

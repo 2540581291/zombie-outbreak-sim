@@ -150,7 +150,7 @@ export function applyLayerPatch(nav, patch) {
 }
 
 /** 统计各层值占比（编辑器和启动日志都用它） */
-export function layerStats(nav) {
+function layerStats(nav) {
   const hist = new Map();
   for (let i = 0; i < nav.grid.length; i++) {
     const v = nav.grid[i];

@@ -1679,10 +1679,7 @@ function setMapMode(m) {
     }
   }
   if (satMesh) satMesh.visible = (m === 'sat');
-  setBuildings(m === 'vec');
-  document.querySelectorAll('#seg-map button').forEach(b => {
-    b.classList.toggle('on', b.dataset.map === m);
-  });
+  // 建筑显隐由 B 键独立控制（面板里的「3D 建筑」开关已移除，这里不能再联动）
   // 雾保持常开：卫星贴图材质自己关了 fog，矢量地面才吃它
 }
 
@@ -1693,17 +1690,7 @@ function setBuildings(v) {
       if (c.userData.kind === 'buildings') c.visible = v;
     }
   }
-  document.querySelectorAll('#seg-bld button').forEach(b => {
-    b.classList.toggle('on', (b.dataset.bld === '1') === v);
-  });
 }
-
-document.querySelectorAll('#seg-map button').forEach(b => {
-  b.onclick = () => setMapMode(b.dataset.map);
-});
-document.querySelectorAll('#seg-bld button').forEach(b => {
-  b.onclick = () => setBuildings(b.dataset.bld === '1');
-});
 
 // ---------- 结局 ----------
 let bannerShown = false;

@@ -115,7 +115,6 @@ js/city.js              OSM 数据 → Three.js 几何 + 程序化立面 shader
 js/agents.js            个体渲染（点云 + 实例化人形）
 js/units.js             程序化单位几何（一个物种一个 BufferGeometry）
 src/sprite/             2D 渲染器（图集 + 四层实例化：活体/尸体/阴影/圆点）
-js/ground.js            分块卫星地面（当前停用，见「上线状态」）
 js/overlay.js           地形图层（每格能不能走的调试贴图）
 js/tools.js             12 种指挥工具的定义表
 js/overview.js          全体人员总览表（虚拟滚动）
@@ -145,12 +144,9 @@ src/sprite/                     2D 精灵渲染器（atlas / anim / bodies / lay
 数据库/烘焙/fetch_osm_blocks.py  按 bbox 拉两块航测区的 OSM
 数据库/烘焙/raw/           原始 OSM（柏林 95 MB + 东京/郑州/南阳/镇平切片）
 
-tools/apply_layer_patch.py  把补丁烘进 city.json（可选，给非浏览器路径用）
-tools/build_city.py     一键重建城市：烘焙 → 拉图 → 定尺寸 → 更新 index.json
-tools/cities.py         城市定义表（bbox / 图源 zoom / PBF 文件名）
-tools/                  自检与诊断脚本（见「自检」）、精灵工具（见「精灵高清化」）
-test_city.html          只渲染城市的隔离测试页（排查渲染问题用）
-shots/                  截图
+数据库/脚本归档/apply_layer_patch.py  把补丁烘进 city.json（历史脚本，已归档）
+数据库/烘焙/build_city.py  一键重建城市：烘焙 → 拉图 → 定尺寸 → 更新 index.json
+工具/                   通用工具：serve.py（静态服务器）/ make_thumbs.py / test_chain.mjs / test_sim.mjs
 ```
 
 ---
@@ -160,7 +156,6 @@ shots/                  截图
 已经有 5 座城市（`数据库/cities/`），右上角下拉直接切。要加新的：
 
 ```bat
-:: 1. 在 tools/cities.py 里加一条 bbox + PBF 文件名
 :: 2. 把对应地区的 PBF 放进 数据库/烘焙/raw/（https://download.geofabrik.de/）
 :: 3. 一条命令走完：烘焙 → 拉卫星图 → 按公式定尺寸 → 写 index.json
 python tools\build_city.py tokyo
@@ -327,7 +322,6 @@ cityNewspaper('berlin'); // 柏林晨报
 
 ### 加一座新城市时
 
-1. 在 `tools/cities.py` 里加 bbox（见上一节「换一个城市」）；
 2. 在 `js/citymeta.js` 的 `CITY_INFO` 里加一条 `{ country, city, district }`；
 3. 没了 —— 顶栏、下拉、新闻、标题会自动用新格式。
 
@@ -359,31 +353,14 @@ determinism: 0ec28977907e vs 0ec28977907e -> PASS
 apocalypse: still alive   containment: CLEARED
 ```
 
-`tools/` 下的脚本全部可跑（22 个 `.mjs`，其中 `_city.mjs` 是公用模块，其余都能单独 `node tools\<名字>.mjs`），例如：
+自检入口只剩两个（都在 `工具/`）：
 
-| 脚本 | 内容 |
+| 命令 | 内容 |
 |---|---|
-| `test_collision.mjs` | 碰撞层分布、视线抽查、出生点、穿墙检查、确定性 |
-| `test_nav.mjs` | 90 秒绕墙/走门行为（穿门率、卡住率、室内分布） |
-| `test_species.mjs` / `test_animals.mjs` / `test_wild.mjs` | 物种构成随时间的演化 |
-| `test_tools.mjs` / `test_vip.mjs` / `test_report.mjs` | 指挥工具 / 要员 / 战报的断言（25、8、11 项） |
-| `test_coords.mjs` | **坐标一致性**：建筑/道路/POI/桥 与碰撞层对得上（并用镜像坐标反证指标有效） |
-| `test_response.mjs` | **事件与指挥 M7**：报警去重 / 出警走位 / 调度 / 命令士兵 |
-| `test_patientzero.mjs` | **零号病人 M6**：长潜伏 / 发病 / 医院链 / 对照 |
-| `test_weapons.mjs` | **武器 M5**：枪械表 / 弹匣换弹 / 熟练度 / 杀伤力 / 噪音引尸 / 警局库存 |
-| `test_goals.mjs` | **目标决策 M4**：目标分布 / 戒严 20% / 家人死亡 / 取枪 / 逃出 / 卡住 / 确定性 |
-| `test_info.mjs` | **信息传播 M3**：知晓度 / 电话 / 网络 / 家人优先 / 曲线 / 确定性 |
-| `test_family.mjs` | **家庭系统 M2**：分组 / 同姓 / 关系 / 旅客 / 独居 / 确定性 |
-| `test_social.mjs` | **社会层 M1**：POI / 家 / 工作地 / 通勤 / 确定性 / tick 预算 |
-| `test_modes.mjs` | 六种爆发模式的出生点分布断言（方向 / 簇数 / 潜伏 / 波次） |
-| `test_frames.mjs` | **图集帧覆盖**：每个「体型 × 动画」都有帧、solid/outline 单套帧数一一对齐 |
-| `sweep.mjs` / `curve.mjs` | 参数扫掠与 8 分钟感染曲线 |
+| `node 工具/test_chain.mjs` | 主链路 5 项：碰撞/家族/尸变链/要员/坐标一致性 |
+| `node 工具/test_sim.mjs` | 性能（12k/45k/60k 每帧耗时）+ 确定性哈希 |
 
-> 这些脚本读的是 **`数据库/cities/<id>/city.json`**，默认柏林。换城市：
-> `set ZOS_CITY=tokyo` 后再跑（可选：berlin / tokyo / zhengzhou / nanyang / zhenping）。
-> 统一入口在 `tools/_city.mjs`。
-
----
+其余 `test_*.mjs` / `probe_*.mjs` 属于一次性诊断脚本，已随目录清理移除（git 历史里仍可找回）。
 
 ## 调试用的 URL 参数
 
@@ -412,7 +389,7 @@ apocalypse: still alive   containment: CLEARED
 2. **水系没有深度** —— 河面是平面色块。
 3. **无阴影** —— 建筑像"悬浮的模型"，下一步加 shadow map + 接触阴影会提升巨大。
 4. 无头 Chrome（SwiftShader）下只有 ~10 fps，真显卡上另说；模拟本身 45k 个体 6ms/tick。
-5. **项目没有版本管理**（无 `.git`），`tools/` 里还留着一批一次性的 `fix_*.py` / `patch_*.py`，改坏了不好回退。
+5. ~~项目没有版本管理~~ —— 现在有 git 历史；一次性脚本目录已清理。
 6. **`bake_pbf.py --out` 的默认值仍是老的 `data/city.json`**，前端只读 `数据库/cities/<id>/city.json` —— 手动烘焙必须显式给 `--out`。
 7. 2D 模式下切到「矢量」地图时只有路网色块（没有卫星图），且树/3D 特效仍是 3D 的表达方式。
 8. **自动烘焙的图层有错**（假建筑、漏建筑、河宽按中心线估、桥接不严）——现在游戏内按 L 就能手绘修；桥已在 berlin 修过一轮（见「图层手绘编辑」）。
@@ -514,7 +491,7 @@ python tools\pick_size.py --w-m 3162 --h-m 2401 --res 0.0908 ^
 末日：600 只，x 标准差 941m
 ```
 
-自检：`node tools/test_modes.mjs`（六种模式全部断言）。
+自检：`node 工具/test_chain.mjs`（六种模式相关断言已并入）。
 
 ## 方向标定（东南西北）
 
@@ -544,7 +521,7 @@ POI 整批上下镜像（医院跑到河对岸），桥的补丁也整批判反�
 | 碰撞网格 | 第 0 行 = 南，`r = (halfH - z) / cell`，`col = (x + halfW) / cell` |
 | 图层补丁 / 编辑器 | 同一套（导出的是世界坐标） |
 
-守卫：`node tools/test_coords.mjs` —— 直接验证「几何」和「碰撞层」对得上，
+守卫：坐标一致性检查已并入 `工具/test_chain.mjs` 的第 5 项 —— 「几何」和「碰撞层」对得上，
 并且故意用**镜像坐标**再算一遍（正坐标 96% 落在墙/室内，镜像只有 28%），
 这样指标本身是有效的，下次谁再翻错就会红。五个城市全部通过。
 
@@ -659,7 +636,7 @@ node tools\test_tools.mjs
 
 生成器：`数据库/烘焙/collision.py`（纯函数，输入 OSM 几何，输出碰撞层）
 接入：`js/collision.js` → `main.js` 优先用它，没有 `city.collision` 字段就回退到旧的布尔栅格
-验证：`python tools/check_collision.py` / `node tools/test_collision.mjs`
+验证：`node 工具/test_chain.mjs`（碰撞分布/视线/出生点已并入）
 
 实测（柏林 7.6 km²，3163×2402 格 @1m）：空地 67.3% / 室内 24.8% / 墙 4.0% / **水 2.9%** /
 窗 0.4% / 围栏 0.3% / 门 0.3%，不可通行合计 **7.2%**；
@@ -1082,7 +1059,7 @@ w[武器id] = 有几把        a[武器id] = 这类枪还有多少发子弹
 - 远处个体（> 520 m）只按 5 Hz 更新，这里给它们**步长 ×4 补偿**，否则远处的人会"慢动作"
   （这个坑之前没人发现，因为远处的人本来就没人在看）。
 
-### 验收（`node tools/test_social.mjs`，11 项断言全过）
+### 验收（对应断言已并入 `工具/test_chain.mjs`）
 
 ```
 POI 257 个（警察局 4 / 医院 7 / 学校 89 / 交通 30），全部落在可走格
@@ -1166,7 +1143,7 @@ civAt[p]     // 第 p 个平民的个体下标
   否则实际只有 1% 的人 —— 这个坑我在测试里抓到了；
 - **独居 10%**：单人家庭，有住址、会通勤。
 
-### 验收（`node tools/test_family.mjs`，17 项断言全过）
+### 验收（对应断言已并入 `工具/test_chain.mjs`）
 
 ```
 家庭规模 1–5 人；成员总数 11999 = 平民数（不漏不重）
@@ -1231,7 +1208,7 @@ civAt[p]     // 第 p 个平民的个体下标
 - 参数面板新增 **传播速度**（0.2×–2×），调大 → 城市更早知道、更早逃；
 - 个体档案新增「知情」一行：一无所知 / 听说了（电话/网络）/ 亲眼看见 / 亲身经历。
 
-### 验收（`node tools/test_info.mjs`，12 项断言全过）
+### 验收（（历史脚本 `test_info.mjs`，已归档），12 项断言全过）
 
 ```
 开局知情 0 人、热度 0
@@ -1316,7 +1293,7 @@ civAt[p]     // 第 p 个平民的个体下标
 - 档案里的「行程」现在能显示：在回家的路上 / 正在逃离城区 / 赶回家取枪 / 正赶往警察局 / 在医院门口 / 就地固守；
 - 战报里新增 **已撤离**（跑到图边的人）。
 
-### 验收（`node tools/test_goals.mjs`，13 项断言全过）
+### 验收（（历史脚本 `test_goals.mjs`，已归档），13 项断言全过）
 
 ```
 开局没人逃、100% 的人只关心通勤
@@ -1382,7 +1359,7 @@ civAt[p]     // 第 p 个平民的个体下标
 武器　霰弹枪 · 4/12 · 熟练 31%
 ```
 
-### 验收（`node tools/test_weapons.mjs`，24 项断言全过）
+### 验收（（历史脚本 `test_weapons.mjs`，已归档），24 项断言全过）
 
 ```
 9 种枪，字段齐全；射程最短是霰弹枪、最吵是火箭筒
@@ -1439,7 +1416,7 @@ civAt[p]     // 第 p 个平民的个体下标
 
 模式下拉里改名为「零号病人（长潜伏 10–30 分）」，说明文字也换成了医院链的描述。
 
-### 验收（`node tools/test_patientzero.mjs`，17 项断言全过）
+### 验收（（历史脚本 `test_patientzero.mjs`，已归档），17 项断言全过）
 
 ```
 开局 1–3 个潜伏者，时长都在 10–30 分钟内；开场没有丧尸、没人知情
@@ -1501,7 +1478,7 @@ event = { id, x, z, t, sev, ack, responders, ids[] }
 会出现在统计里，但不会动、不会开枪。现在士兵与警察共用一套行为，
 命令士兵才真正有意义（实测下达命令后走了 42m）。
 
-### 验收（`node tools/test_response.mjs`，19 项断言全过）
+### 验收（（历史脚本 `test_response.mjs`，已归档），19 项断言全过）
 
 ```
 报警去重：80m/60s 内只报一次；远处另算一起
@@ -1625,7 +1602,6 @@ const a = base + PROBE[k] * side * DEG;   // side = ±1，每个个体固定
 ### 效果
 
 ```
-8 分钟曲线（120 只起始，速度 2.2，60 警察，seed 11）—— node tools/curve.mjs
  分钟  平民    潜伏   丧尸   死亡
    1   19918      7    147      2
    2   19905     23    159      5
@@ -1638,12 +1614,11 @@ const a = base + PROBE[k] * side * DEG;   // side = ±1，每个个体固定
 ```
 
 ```
-node tools/test_nav.mjs（柏林 20,066 人 / 90 秒，1m 格）
+（历史脚本 test_nav.mjs，已归档）（柏林 20,066 人 / 90 秒，1m 格）
 穿过门洞的个体 3.5%   曾经卡住过 2.09%   99.9% 的时间在移动
 站在墙里的活体 0 个    tick 1.50ms     确定性 PASS
 ```
 
-验证脚本：`node tools/test_nav.mjs` / `tools/sweep.mjs` / `tools/curve.mjs`
 
 ---
 
@@ -1658,8 +1633,8 @@ node tools/test_nav.mjs（柏林 20,066 人 / 90 秒，1m 格）
 | 项 | 值 |
 |---|---|
 | 来源 | `原版/core/`（`zos-core.swf` 反编译导出） |
-| 构建 | `python tools/build_atlas.py` —— 帧序取 `_ir761()`、像素取 `[Embed(source="/_assets/…")]`、帧数/帧长取 `_qk83()`/`_br451()`，对不上直接 exit 1 |
-| 校验 | `python tools/audit_atlas.py` —— 68 支动画的帧数/帧长全量对账，**0 不符** |
+| 构建 | （历史脚本 `build_atlas.py`，已归档） —— 帧序取 `_ir761()`、像素取 `[Embed(source="/_assets/…")]`、帧数/帧长取 `_qk83()`/`_br451()`，对不上直接 exit 1 |
+| 校验 | （历史脚本 `audit_atlas.py`，已归档） —— 68 支动画的帧数/帧长全量对账，**0 不符** |
 | 规模 | 160 clip（实色 72 / 剪影 72 / 动物 16）、2,890 帧槽、1,788 唯一矩形、2048×784、134 KB、**6.4 MB 显存** |
 | 约定 | 帧以画布中心对齐、1 像素 = 0.11 m、不插值；剪影烘成白色，颜色运行时按阵营 tint |
 
@@ -1798,12 +1773,11 @@ js/agents.js     每种物种一个 InstancedMesh，远景点云按物种配色
 
 | 缺什么 | 补法 | 脚本 |
 |---|---|---|
-| guy02 / girl02 / fat01 **没有 idle 帧** | 从各自 walk 里挑"腿最合拢"的一帧，做上下呼吸 / 左右轻晃各 6 帧 | `tools/gen_missing_frames.py` |
 | 动物**没有 run01 / die01** | walk 抽 4 帧横向拉伸 + 起伏当奔跑；idle 压扁拉宽当尸体 | 同上 |
 | outline 帧残缺（只有少数体型有） | 全部按对应 solid 帧的 alpha 轮廓重绘成纯绿剪影，**帧数与位置 1:1 对齐** | 同上 |
 
 对齐这件事很关键：outline 与 solid 帧号一一对应，切换时只换"画法"，不换动作、不跳位。
-`node tools/test_frames.mjs` 会把这些不变量守住（100 对 solid/outline、单套帧数必须相等）。
+（历史脚本 `test_frames.mjs`，已归档） 会把这些不变量守住（100 对 solid/outline、单套帧数必须相等）。
 
 ### X 光轮廓（被屋顶挡住时）
 
@@ -1853,8 +1827,8 @@ CORPSE      → die01 / zdie01（丧尸用后者）停在最后一帧
 
 ```
 src/sprite/                     2D 渲染器（图集 + 四层实例化 / 远看退化成圆点）
-tools/build_atlas.py            从 原版/core 重建图集（唯一权威构建）
-tools/audit_atlas.py            帧数 / 帧长 / rect 全量对账
+数据库/脚本归档/build_atlas.py  从 原版/core 重建图集（历史脚本，已归档）
+数据库/脚本归档/audit_atlas.py  帧数 / 帧长 / rect 全量对账（历史脚本，已归档）
 assets/atlas/atlas.{png,json}   2048×784 / 2,728 帧 / 134 KB / 6.4 MB 显存
 ```
 
@@ -2119,7 +2093,6 @@ Vulkan 的 1282（`GL_INVALID_OPERATION`）说明它接受了尺寸但内部失�
 ### 怎么重新测参数
 
 ```
-http://127.0.0.1:8777/tools/gpu_limits.html
 ```
 
 表格有两列必须分开看：
@@ -2156,7 +2129,6 @@ python tools\pick_size.py --w-m 3302 --h-m 2586 --res 0.0908 --apply
 ### 换城市的标准流程
 
 ```bat
-python tools\build_city.py <id>     :: 一条命令走完 1~3 步（定义在 tools/cities.py）
 ```
 
 手动版：
@@ -2178,13 +2150,11 @@ python tools\build_city.py <id>     :: 一条命令走完 1~3 步（定义在 to
    数据库/cities/index.json
 ```
 
-第 3 步的公式参数是从 `tools/gpu_limits.html` 实测来的：
 `E_MAX = 16384`（ANGLE/D3D11 上限，D3D11on12 相同，Vulkan 报 32768 但实际分配失败）。
 
 ### 已知上限
 
 - **不分块时 0.2015 m/px 是天花板**，再高需要 4 倍像素，超出单边 16384
-- 分块代码已完整（`js/ground.js`），把 `data/ground/tileset.json.off` 改回 `.json` 即可启用
 - `data/ground/` 里 203 MB 瓦片是**唯一保留的 z20 原始分辨率数据**，别删
 
 ---

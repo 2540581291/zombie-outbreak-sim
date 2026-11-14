@@ -330,7 +330,7 @@ export function unitGeometry(kind) {
 }
 
 /** 每种单位的近似高度，用来做点云大小 / 阴影贴片 */
-export function unitHeight(kind) {
+function unitHeight(kind) {
   switch (kind) {
     case SP.TANK: return 3.4;
     case SP.BOOMER: return 1.6;

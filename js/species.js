@@ -137,7 +137,7 @@ export const SPECIES = {
   },
 };
 
-export const ANIMAL_KINDS = [SP.DOG, SP.CAT];
+const ANIMAL_KINDS = [SP.DOG, SP.CAT];
 
 // 动物不单列参数表：按人口比例混在人群里生成，属性和逻辑都走同一套。
 // 20,000 人里 2% = 400 只，其中 6 成是狗（≈240 狗 + 160 猫）。
@@ -150,7 +150,7 @@ export function speciesOf(kind) {
 
 export const SPECIAL_KINDS = [SP.TANK, SP.CHARGER, SP.BOOMER, SP.SPITTER];
 export const CIV_KINDS = [SP.CIV1, SP.CIV2, SP.CIV3];
-export const ZOMBIE_KINDS = [SP.ZOMBIE];
+const ZOMBIE_KINDS = [SP.ZOMBIE];
 
 
 // ============================================================

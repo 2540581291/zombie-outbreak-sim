@@ -358,7 +358,7 @@ export function surnameFirst() { return !!POOL.surnameFirst; }
 /** 当前国家的名 / 姓 / 职业 / 街道 / 单位池 */
 export const firstNamePool = () => POOL.first;
 export const lastNamePool = () => POOL.last;
-export const jobsPool = () => POOL.jobs;
+const jobsPool = () => POOL.jobs;
 export const streetsPool = () => POOL.streets;
 export const companiesPool = () => POOL.companies;
 
@@ -401,7 +401,7 @@ export const JOB_POI = {
 };
 
 /** 家有没有枪（M5 用，先定下来免得以后改公式） */
-export function hasGunAtHome(i) { return h(i, 21) < 0.12; }
+function hasGunAtHome(i) { return h(i, 21) < 0.12; }
 
 /** 性格：0 = 胆小，1 = 莽 */
 export function braveOf(i) { return h(i, 22); }
