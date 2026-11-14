@@ -5,7 +5,7 @@
 // ============================================================
 import { ST, GOAL } from './sim.js';
 import {
-  FIRST, LAST, COMPANIES, STREETS,
+  firstNamePool, lastNamePool, surnameFirst, COMPANIES, STREETS,
   h, pick, ageOf, maleOf, jobFor,
 } from './profiles.js';
 import { kinText, ageOfAgent } from './family.js';
@@ -13,6 +13,7 @@ import { WEAPONS } from './weapons.js';
 
 /** 姓氏：平民按家庭取（一家人同姓），警察/士兵等按个体取 */
 function surnameOf(sim, i) {
+  const LAST = lastNamePool();
   if (sim && sim.hh && sim.civAt && sim.nHh && sim.hh[i] < sim.nHh) {
     return LAST[sim.hh[i] % LAST.length];
   }
@@ -32,6 +33,7 @@ function posInFamily(sim, i) {
  * 只有 20 个名字、家庭最多 5 人，错开足够。
  */
 function firstNameOf(sim, i) {
+  const FIRST = firstNamePool();
   if (!sim || !sim.hh || !sim.hhStart || !sim.civAt || !sim.nHh) return pick(FIRST, i, 1);
   const hid = sim.hh[i];
   if (hid >= sim.nHh) return pick(FIRST, i, 1);
@@ -45,7 +47,8 @@ function firstNameOf(sim, i) {
 /** 短名（名 + 姓首字），总览表和亲属列表用 */
 export function shortName(i, sim) {
   const f = firstNameOf(sim, i);
-  return f[0] + '·' + surnameOf(sim, i)[0];
+  const ln = surnameOf(sim, i)[0], fn = f[0];
+  return surnameFirst() ? ln + fn : fn + '·' + ln;
 }
 
 const STATE_TXT = {

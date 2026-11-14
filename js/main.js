@@ -10,6 +10,7 @@ import { applyLayerPatch } from './layerpatch.js';
 import { AgentRenderer } from './agents.js';
 import { TOOLS, TOOL_BY_ID, HOTKEYS, fmtWan, fmtMoney } from './tools.js';
 import { profileFor, shortName } from './people.js';
+import { setCountry } from './profiles.js';
 import { kinList, ageOfAgent } from './family.js';
 import { SPECIES, SP } from './species.js';
 import { weaponOf } from './weapons.js';
@@ -1782,6 +1783,7 @@ async function boot() {
   // ---------- 多城市：?city=<id>，默认 berlin ----------
   const CID = (Q.get('city') || 'berlin').replace(/[^a-z0-9_-]/gi, '');
   const CDIR = '数据库/cities/' + CID;
+  setCountry(cityInfo(CID, city && city.name).country);   // 姓名池按国家切换（日本人名也用汉字）
   window.__CID = CID;   // 供模块级函数（城市选择弹窗）读取
   let cityIndex = [];
   try {
