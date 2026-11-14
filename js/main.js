@@ -1805,7 +1805,8 @@ async function boot() {
       const r = v <= 100 ? Math.round(v) : Math.round(v / st) * st;
       return Math.max(+el.min, Math.min(+el.max, r));
     };
-    sPop.value = cl(50000 * k, sPop, 100);
+    // 自动生成的人口上限 50000（手动拖动滑块不受此限制）
+    sPop.value = cl(Math.min(50000, 50000 * k), sPop, 100);
     sZ0.value  = cl(1000 * k, sZ0, 10);
     sPol.value = cl(1000 * k, sPol, 10);
     if (typeof syncLabels === 'function') syncLabels();
