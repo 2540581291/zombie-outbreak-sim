@@ -41,14 +41,16 @@ function firstNameOf(sim, i) {
   const start = sim.civAt[sim.hhStart[hid]];
   if (start === undefined) return pick(FIRST, i, 1);
   const base = Math.floor(h(start, 1) * FIRST.length) % FIRST.length;
-  return FIRST[(base + (i - start)) % FIRST.length];
+  // 户内错开用大步长（质数），否则相邻下标会取到"德琳/德蕾"这种只差一字的连号
+  const STRIDE = 97;
+  return FIRST[(base + (i - start) * STRIDE) % FIRST.length];
 }
 
-/** 短名（名 + 姓首字），总览表和亲属列表用 */
+/** 短名：中日「姓 + 名」（王伟 / 佐藤健太），其余「名·姓首字」（卢卡斯·米） */
 export function shortName(i, sim) {
-  const f = firstNameOf(sim, i);
-  const ln = surnameOf(sim, i)[0], fn = f[0];
-  return surnameFirst() ? ln + fn : fn + '·' + ln;
+  const given = firstNameOf(sim, i);
+  const last = surnameOf(sim, i);
+  return surnameFirst() ? last + given : given + '·' + last[0];
 }
 
 const STATE_TXT = {
@@ -144,8 +146,9 @@ export function profileFor(sim, i) {
     idx: i,
     name: (kind === 12 || kind === 13) ? petName
       : (sim.nameFix && sim.nameFix.has(i) ? sim.nameFix.get(i)
-        : (surnameFirst() ? `${l[0]}${f[0]}` : `${f[0]}·${l[0]}`)),
-    nameEn: (f[1] && l[1]) ? `${f[1]} ${l[1]}` : null,
+        : (surnameFirst() ? `${l}${f}` : `${f}·${l}`)),
+    nameEn: null,                       // 姓名池里没有罗马字，不再拼 "undefined"
+
     age, male, job, home, work, family,
     isAnimal: !!(sim.kind && sim.kind[i] >= 12),
     animalWild,
