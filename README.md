@@ -1,6 +1,6 @@
 # 生化危机模拟器
 
-### Zombie Outbreak Simulator
+### Zombie Outbreak Simulator - Way
 
 #### 粉丝重置版 · Fan Remake
 
