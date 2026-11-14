@@ -2134,6 +2134,10 @@ async function boot() {
     if (l) l.style.display = 'none';
   }, 650);
 
+  { // 面板标题后缀：构建戳，肉眼可确认是否加载了最新代码
+    const h = document.querySelector('#panel .p-head span');
+    if (h) h.textContent = '爆发参数 · ' + BUILD.replace(/^b(\d+).*$/, 'b$1');
+  }
   $('tb-city').textContent = cityFull(CID, city.name);   // 国家在前：德国 · 柏林·米特
   {
     // 2D 模式 / 地形 两个开关放在右侧「爆发参数 → 显示」里（不再占顶栏）
