@@ -1,0 +1,418 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
+<title>README 预览</title>
+<style>
+body{margin:0;background:#0d1117;color:#c9d1d9;font:16px/1.75 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:56px 40px 80px}
+h1{font-size:2.2em;border-bottom:1px solid #30363d;padding-bottom:.35em;margin:.2em 0 .8em;color:#e6edf3}
+h2{font-size:1.6em;border-bottom:1px solid #21262d;padding-bottom:.3em;margin:1.8em 0 .7em;color:#e6edf3}
+h3{font-size:1.22em;margin:1.4em 0 .6em;color:#e6edf3}
+blockquote{margin:1em 0;padding:0 1em;color:#8b949e;border-left:.25em solid #30363d}
+blockquote strong{color:#c9d1d9}
+img{max-width:100%;border-radius:8px;margin:.4em 0;display:block}
+p>em{color:#8b949e;font-style:normal;font-size:.94em}
+code{background:rgba(110,118,129,.25);padding:.15em .4em;border-radius:4px;font-size:.9em}
+pre{background:#161b22;padding:14px;border-radius:8px;overflow:auto}
+pre code{background:none;padding:0}
+table{border-collapse:collapse;margin:1em 0;display:block;overflow:auto}
+th,td{border:1px solid #30363d;padding:6px 13px;text-align:left}
+th{background:#161b22;font-weight:600}
+tr:nth-child(2n){background:#0f151c}
+hr{border:0;height:1px;background:#30363d;margin:2em 0}
+a{color:#58a6ff;text-decoration:none}
+a:hover{text-decoration:underline}
+ul,ol{padding-left:1.6em}
+li{margin:.25em 0}
+</style></head><body><div class="wrap"><h1 id="zos-r">生化危机模拟器 · ZOS-R</h1>
+<blockquote>
+<p>一个跑在浏览器里的<strong>大规模丧尸爆发模拟器</strong>：把整座城市的人、警察、军队、丧尸放进同一个
+20 Hz 的模拟里，几万个体各自决定去哪、跟谁走、什么时候逃、什么时候开火。
+用卫星影像当底图，按真实街道的碰撞几何行走 —— 但<strong>不是</strong>策略游戏，你只能"发动"一场爆发，
+然后看着它自己演化。</p>
+</blockquote>
+<p><img alt="正常运行的界面" src="img/01-3d.jpg" /></p>
+<blockquote>
+<p><strong>一张正在运行的地图</strong>：柏林·米特，49,000 平民在街区里通勤，63 感染、133 死亡，
+混乱度 40（顶部实时读数）。点开任意一个人就有档案卡，画面上那些小点就是每一个个体。</p>
+</blockquote>
+<hr />
+<h2 id="iphone-4">致谢 · 献给那台 iPhone 4</h2>
+<p>小时候，我在 <strong>iPhone 4</strong> 上第一次玩到了它。</p>
+<p>那个年代的手游还很粗糙，但它不一样：地图是真实的街区，几百个小人各有各的走法，
+你可以把丧尸丢进任何一条街，然后看着整座城市在几十分钟里崩掉。
+我能盯着那个屏幕看一整个下午 —— 看着一个小区从"没人知道"到"全城狂奔"，
+看着警察举枪、看着人被咬、看着一小队人往城外跑。</p>
+<p>后来，它<strong>没有再更新</strong>。</p>
+<p>系统一年年往上走，那个 App 停在原地，直到我换了一台新的 iPhone —— 它就这样
+从我的生活里消失了，连一句告别都没有。再后来想找，只剩一些模糊的截图和几条论坛帖子。</p>
+<p><strong>这个项目，就是把那台手机上消失的东西，重新做出来。</strong></p>
+<h3 id="_1">所以，先说清楚一件事</h3>
+<blockquote>
+<p><strong>本作品严格来说不是"基于原版制作"的。</strong>
+它没有使用原版的任何一行代码，也不是对原版程序的移植或反编译复刻。</p>
+<p>但它的<strong>全部设计思路与灵感来源，都来自原版</strong>：最基本的行走与感知逻辑、
+感染扩散的规则、警察与军队的行为方式、界面的信息组织，以及<strong>21 张原作地图</strong>
+与部分贴图素材。</p>
+<p>换句话说：<strong>想法是他们的，代码是我们的。</strong> 我们只是用现代浏览器技术，
+把当年那个 Flash 小游戏想做但受限于时代的事，重新实现了一遍。</p>
+</blockquote>
+<hr />
+<h2 id="_2">原作的来历</h2>
+<p>那款游戏是 2009 年的 Flash 作品 <strong>Zombie Outbreak Simulator</strong>，以及它的续作
+<strong>Class 3 Outbreak</strong>（2010）：</p>
+<ul>
+<li>开发：<strong><a href="https://www.binaryspacegames.com/about/">Binary Space</a></strong> —— 澳大利亚珀斯的独立游戏工作室，2009 年 2 月成立</li>
+<li><strong>Saxon Druce</strong> —— 技术总监 / 程序</li>
+<li><strong>Jay Weston</strong> —— 创意总监 / 美术与玩法设计</li>
+<li>两人此前在 <strong>Ratbag Games</strong> 合作过《Powerslide》(1998)、《Dirt Track Racing》(1999)</li>
+<li>ZOS 原版：把 Google 地图上的<strong>华盛顿特区</strong>变成丧尸沙盒，可调丧尸速度、感染率、平民数量、
+  射击精度，最多 1.5 万人被几百上千只丧尸追咬</li>
+<li>C3O 原版：同一张地图上的即时战略版，指挥警察守住 1 km²，在<strong>华盛顿特区</strong>与<strong>英国莱斯特</strong>两张图里拖延疫情</li>
+<li>2012 年 12 月 Jay 离开后，Saxon 继续做到 2016；2014 年的 <strong>Android 版</strong>由 Saxon 与
+  James Filippone、Tim Mutton 合作发布</li>
+</ul>
+<p><strong>没有他们做的那个 Flash 小游戏，就没有这个项目。</strong> 本项目是对它的研究与重制，
+所有原始美术、音效、地图瓦片的著作权归 Binary Space 所有。</p>
+<ul>
+<li>官网：<a href="https://www.binaryspacegames.com/">https://www.binaryspacegames.com/</a></li>
+<li>作者访谈（2017）：<a href="https://gamecloud.net.au/features/interviews/pgf2017-land-of-hope-and-gory">Land of Hope and Gory — Saxon Druce</a></li>
+<li>C3O 回顾演讲：<a href="https://www.binaryspacegames.com/page/10/">Binary Space 博客</a></li>
+</ul>
+<h3 id="zos-3ds">🔧 ZOS-3DS（社区反编译）</h3>
+<p>原版手游是 <strong>Cocos2d-x + C++ 的原生 APK</strong>，没有开源。我们能读到它的"规则原文"，
+靠的是社区的 3DS 移植项目 <strong>ZOS-3DS</strong> —— 它对 APK 做了一次完整反编译并移植到任天堂 3DS：</p>
+<ul>
+<li>发布贴：<a href="https://gbatemp.net/threads/zombie-outbreak-simulator-for-the-nintendo-3ds-zos-3ds-is-here.685335/">Zombie Outbreak Simulator for the Nintendo 3DS (ZOS-3DS) is here!</a></li>
+</ul>
+<p>本项目从它身上读到的关键数据（<strong>没有复制它的代码</strong>）：</p>
+<table>
+<thead>
+<tr>
+<th>数据</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MapConfigFactory</code> 的 20 条地图配置</td>
+<td>15 张 Google 地图的精确经纬度、5 张内嵌图的尺寸</td>
+</tr>
+<tr>
+<td>碰撞值语义（0/3/7/15/22/31/66/35）</td>
+<td>与 2009 版 <code>355_*.bin</code> 完全一致</td>
+</tr>
+<tr>
+<td>队伍 / 物种 / 武器参数表</td>
+<td>校准我们的数值</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_3">🛰️ 地图与影像</h3>
+<ul>
+<li>自建城市：<strong>OpenStreetMap</strong> 数据（ODbL）+ 公开瓦片</li>
+<li>原版 15 张 Google 地图的影像：<strong>Esri World Imagery</strong>（原版当年是运行时从 Google 拉的，我们换了公开源）</li>
+<li>原版莱斯特与 5 张内嵌图：从原版 SWF / APK 内提取的买断影像</li>
+</ul>
+<hr />
+<h2 id="_4">它在模拟什么 —— 我们真正花力气的地方</h2>
+<p>不是"你打丧尸"，而是<strong>一座城市如何在十几个小时里一步步垮掉</strong>。
+下面这些系统互相咬合，任何一项调到极端，结局都会完全不同。</p>
+<h3 id="_5">🧑‍🤝‍🧑 个体：每个人都有一张"人设"</h3>
+<p>每个居民都有独立的<strong>姓名、年龄、性别、家庭、住址、工作地、职业</strong>，以及<strong>四维性格</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>性格维度</th>
+<th>影响</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>政府信任</strong></td>
+<td>高的人听到广播会配合撤离；低的人第一反应是"官方在骗人"，自己跑</td>
+</tr>
+<tr>
+<td><strong>家庭责任</strong></td>
+<td>决定他会不会为了找家人<strong>逆着人流往回走</strong></td>
+</tr>
+<tr>
+<td><strong>意志</strong></td>
+<td>抵抗恐慌的能力，低的人一有风吹草动就崩</td>
+</tr>
+<tr>
+<td><strong>勇猛</strong></td>
+<td>敢不敢留下来持枪硬顶</td>
+</tr>
+</tbody>
+</table>
+<p>性格不是纯随机：职业与年龄会先定一个基准，再加个人噪声 —— <strong>警察不会普遍不信任政府</strong>，
+退休老人不会普遍莽撞。所以把人点开，你会觉得"这个人挺合理"。</p>
+<p>在此基础上派生出：</p>
+<ul>
+<li><strong>通勤</strong>：早出晚归，家与单位是两个真实坐标，通勤路线要绕开墙</li>
+<li><strong>感知</strong>：平民 40 m / 警察 50 m / 丧尸 60 m / 军队 80 m —— <strong>看不见就不会跑</strong></li>
+<li><strong>两类逃跑</strong>：50 m 内的<strong>瞬间四散</strong>；更远的会<strong>有目标地撤</strong>（回家 / 去警局 / 出城），
+  而且目标会随局势变化（家没了就改去警局）</li>
+<li><strong>家庭纽带</strong>：一家人同姓、住一起；父母会回头找孩子，孩子跟着大人跑，一家人的死活是连锁的</li>
+<li><strong>身份差异</strong>：警察、士兵、重装兵、装甲车组、要员、游客、流浪狗、家猫、家养宠物 —— 各有各的规则</li>
+</ul>
+<h3 id="_6">🦠 感染链：这是整个模拟的发动机</h3>
+<ul>
+<li><strong>咬合 → 潜伏 → 尸变</strong>：被咬后进入 60–120 秒潜伏期，这段时间他会<strong>被当成病人送医</strong>，
+  也可能在街上突然倒下；潜伏期的人还会继续走动、继续传染</li>
+<li><strong>接触传播</strong>：潜伏期与正常人长时间接触也会被感染（360–1440 秒），所以"人挤人的避难所"很危险</li>
+<li><strong>特殊感染体</strong>：不同变种有不同的血量、伤害、速度，普通丧尸伤害恒为 20 —— 只有特殊体例外</li>
+<li><strong>死亡不等于结束</strong>：尸体有概率<strong>重新爬起来</strong></li>
+<li><strong>尸变会传染恐慌</strong>：附近的人看见同类倒下，知情值会跳</li>
+</ul>
+<h3 id="_7">📣 信息与混乱度：城市的"神经系统"</h3>
+<p>这是最复杂、也最像真实灾难的一块：</p>
+<ul>
+<li><strong>知情值</strong>：谁知道了、知道到什么程度，直接决定他逃不逃</li>
+<li><strong>信息传播</strong>：<strong>电话（家人优先）+ 网络</strong>两条通道，速度可调
+  —— 调快就是"全城更早知道、更早逃"，调慢就是"人都死了隔壁还在买菜"</li>
+<li><strong>混乱度</strong>（0–100）= 知情值 × 0.5 + 感染值 × 2，每一条都推着城市往三个方向走：
+  <strong>抢购囤积 → 社会秩序松动 → 大规模逃亡</strong></li>
+<li>混乱度会触发<strong>阶段事件</strong>：超市被抢空、加油站排队、银行挤兑、学校停课、医院停诊、
+  宵禁、军队进驻、清剿行动、全城撤离令</li>
+<li>混乱度越高，<strong>要员护送的出动门槛越低</strong>（20 就派四人小队送警局，80 才派八人小队出城）</li>
+</ul>
+<h3 id="_8">🚓 武力：警察不是无限刷出来的</h3>
+<ul>
+<li>警察<strong>驻在警局里</strong>，出警是<strong>把局里的人派出去</strong>，警力是真实消耗品</li>
+<li>每座城市的<strong>警察局军械库</strong>独立配置：手枪、霰弹枪、步枪按面积与等级发放，
+  打光了就得回去补</li>
+<li><strong>射击精度严格区分</strong>：平民 10% / 警察 30% / 军队 80%</li>
+<li><strong>家庭持枪率</strong>可调，决定平民是"待宰"还是"能还手"；家里有枪的人会<strong>回家取枪</strong></li>
+<li>军队是独立系统：进驻、巡逻、清剿，火力强但反应慢，误伤与惊扰会进一步推高混乱</li>
+</ul>
+<p><img alt="武力状态" src="img/06-force.jpg" /></p>
+<blockquote>
+<p><strong>武力</strong>：城市里还剩多少把枪、多少发子弹、多少在岗警力，谁在开火、命中率如何 ——
+一局打下来，弹药是会真的见底的。</p>
+</blockquote>
+<h3 id="_9">🏥 卫生与医疗：撑不住的第二个战场</h3>
+<ul>
+<li>医院收治潜伏期病人 —— 但<strong>床位与警力是有限的</strong>，收得越多，被咬穿的风险越大</li>
+<li><strong>医院停诊</strong>后，病人只能回家，感染者由此回到社区</li>
+<li>尸体不及时处理会<strong>堆在医院与街道</strong>，进一步推动恐慌与感染</li>
+<li>停课会让孩子集中在家（家庭内部传染 ↑），但也会减少学校聚集（校园爆发 ↓）
+  —— 每个决策都是<strong>双向的</strong></li>
+</ul>
+<p><img alt="卫生状态" src="img/07-sanit.jpg" /></p>
+<blockquote>
+<p><strong>卫生</strong>：医院的收治能力（床位数）、停尸压力、垃圾与水质、干净水源覆盖、
+以及"停收"之后病人回流到社区的速度。城市不是直接被丧尸打垮的，是先被卫生系统拖垮的。</p>
+</blockquote>
+<h3 id="_10">🏛️ 政府行动：四类设施，一条决策链</h3>
+<p>政府面板把城市拆成 <strong>政府 / 警察 / 医院 / 学校</strong> 四类设施，实时显示每处的
+<strong>在校（在岗）人数、死亡、感染、警力</strong>，并按混乱度与感染率触发决策：</p>
+<p>停课 → 停诊 → 宵禁 → 军队进驻 → 清剿 → 撤离令</p>
+<p>每一步都会写进"最近决策"日志，也会立刻改变街上的行为 ——
+<strong>停课之后，你会看到成群的学生往家跑</strong>。</p>
+<p><img alt="政府行动面板" src="img/05-gov.jpg" /></p>
+<blockquote>
+<p><strong>政府行动</strong>（只读仪表盘）：左上角是城市总账（混乱 39、感染 4.0%、死亡 1,948），
+四张卡片分别是政府 / 警察 / 医院 / 学校 —— 每张都列出在岗人数、死亡、感染分化、
+以及"当前决策"为什么还没触发（例如"混乱 ≥ 35 袭击商店"）。右下角是最近决策日志：
+「混乱 35% → 全城宵禁（22 人挤回家）」「感染 1.3% → 医院停止收治」。</p>
+</blockquote>
+<h3 id="_11">📊 总览、档案与结算</h3>
+<ul>
+<li><strong>总览表</strong>：几万人可搜索、可排序、可筛（平民/警察/丧尸/感染/死亡/要员），点一行就跟随镜头</li>
+<li><strong>档案卡</strong>：姓名、年龄、职业、家庭关系（配偶/子女/父母/宠物）、当前目标、可见的连线</li>
+<li><strong>结算报告</strong>：人口曲线、感染曲线、死亡分布、要员结局、评分 —— 一局打完知道自己"输得多惨"</li>
+</ul>
+<p><img alt="全体总览" src="img/08-overview.jpg" /></p>
+<blockquote>
+<p><strong>总览</strong>：几万人一张表，可按平民 / 警察 / 丧尸 / 感染 / 死亡 / 要员筛选，
+可搜索姓名、按任意列排序，点一行镜头就飞过去跟着他。</p>
+</blockquote>
+<h3 id="_12">📰 快讯：只播真实发生的事</h3>
+<p>跑马灯不是随机文案，每条都由<strong>实际局势</strong>触发；同一起事件还有<strong>多种说法</strong>（随机挑一条），
+所以每局看到的报纸口吻都不一样。<strong>零号病人模式</strong>有一整套独立文案：
+前期完全不提"丧尸"，只有失联、发热门诊、不明原因死亡 —— 直到第一起咬人事件。</p>
+<h3 id="_13">🧱 还有这些细节</h3>
+<ul>
+<li><strong>墙会被撞塌</strong>：同一格墙被撞 10 次就塌，之后能穿过去（不是穿墙，是真塌）</li>
+<li><strong>门是可走的、窗不可走但通视线</strong>，室内外是两套寻路</li>
+<li><strong>地形图层</strong>（<code>C</code>）：每一格的墙/门/窗/水/林地可视化，用来检查碰撞层对不对</li>
+<li><strong>图层编辑器</strong>（历史功能）：手绘修正碰撞层，改动存在本地</li>
+</ul>
+<hr />
+<h2 id="_14">地图</h2>
+<p><strong>27 张</strong>，全部自带碰撞几何与卫星/航拍底图：</p>
+<table>
+<thead>
+<tr>
+<th>来源</th>
+<th>张数</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>原版官方地图</strong></td>
+<td><strong>21</strong></td>
+<td>从原版 SWF 与手游 APK 中提取：买断影像 + 内嵌碰撞层 + 精确坐标</td>
+</tr>
+<tr>
+<td><strong>自建城市</strong></td>
+<td><strong>6</strong></td>
+<td>用 OSM 数据烘焙，覆盖亚洲、欧洲、北美不同尺度</td>
+</tr>
+</tbody>
+</table>
+<p><img alt="城市选择" src="img/03-picker.jpg" /></p>
+<p>每张图按<strong>自己的原始网格</strong>走：自建城市统一 1 m/格；从原版导入的按其资源算
+（例如那张 4608 px ÷ 1152 格 × 0.11 m = <strong>0.44 m/格</strong> 的图）。</p>
+<p><img alt="地形图层" src="img/04-terrain.jpg" /></p>
+<blockquote>
+<p>地形图层：红=墙/栅栏，蓝=水，青=窗，绿=门，橙=室内，深绿=林地。</p>
+</blockquote>
+<hr />
+<h2 id="_15">快速开始</h2>
+<p><strong>唯一要求：Python 3</strong>（只用来起一个本地静态服务器，游戏本身是纯前端）。</p>
+<h3 id="windows">Windows</h3>
+<p>双击根目录的 <strong><code>生化危机模拟器.bat</code></strong> —— 它会自动重启服务、开浏览器、带上防缓存参数。</p>
+<h3 id="macos-linux">macOS / Linux</h3>
+<pre><code class="language-bash">python3 工具/serve.py 8777
+# 打开 http://127.0.0.1:8777/
+</code></pre>
+<blockquote>
+<p>⚠️ <strong>不要用 <code>python -m http.server</code></strong>：它不返回 <code>Cache-Control</code>，浏览器会缓存 ES 模块，
+改了代码却还在跑旧的。<code>工具/serve.py</code> 专门对 html/js/css/json 发 <code>no-store</code>。</p>
+</blockquote>
+<hr />
+<h2 id="_16">操作</h2>
+<table>
+<thead>
+<tr>
+<th>键</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>右键拖拽 / WASD</td>
+<td>平移</td>
+</tr>
+<tr>
+<td>滚轮</td>
+<td>缩放</td>
+</tr>
+<tr>
+<td>中键拖拽 / Q E / R F</td>
+<td>旋转 / 俯仰</td>
+</tr>
+<tr>
+<td><code>Tab</code></td>
+<td>2D 像素模式 ↔ 3D</td>
+</tr>
+<tr>
+<td><code>C</code></td>
+<td>地形图层</td>
+</tr>
+<tr>
+<td><code>M</code> / <code>B</code></td>
+<td>卫星↔矢量 / 3D 建筑显隐</td>
+</tr>
+<tr>
+<td><code>O</code></td>
+<td>总览表（可搜索、可排序）</td>
+</tr>
+<tr>
+<td><code>1</code>–<code>9</code> <code>0</code> <code>-</code> <code>=</code></td>
+<td>选指挥工具 → 点地面投放</td>
+</tr>
+<tr>
+<td>点击人物</td>
+<td>打开档案卡（姓名/年龄/职业/家庭/疫情状态/连线）</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_17">技术要点</h2>
+<table>
+<thead>
+<tr>
+<th>项</th>
+<th>实现</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>模拟规模</td>
+<td>单地图上限 62,000 个体，20 Hz 固定步长（<code>DT = 1/20</code>）</td>
+</tr>
+<tr>
+<td>数据布局</td>
+<td>全部 SoA（Struct of Arrays），<code>Uint8Array</code> / <code>Float32Array</code> 平铺，无对象分配</td>
+</tr>
+<tr>
+<td>寻路</td>
+<td>碰撞位网格 + 门场 BFS + 视线查询，<code>WALK/SIGHT/INDOOR</code> 位掩码</td>
+</tr>
+<tr>
+<td>确定性</td>
+<td>mulberry32 种子随机，同种子同开局必定同样结局（有测试）</td>
+</tr>
+<tr>
+<td>渲染</td>
+<td>three.js；3D 点云 + 2D 图集精灵（四层实例化）。另有一个简单的 2D 像素视角可切（Tab），算是致敬原版，做得比较随意</td>
+</tr>
+<tr>
+<td>音效</td>
+<td>全程序化合成，无音频文件；事件驱动，100 m 范围，室内过滤高频</td>
+</tr>
+<tr>
+<td>音乐</td>
+<td>5 首原创曲目，随机循环，可在第二栏切换</td>
+</tr>
+<tr>
+<td>大地图优化</td>
+<td>远处个体降频（<code>dt × 4</code>），所有冷却计时统一走 <code>cdt</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_18">目录</h2>
+<pre><code>index.html            入口
+js/                   模拟与渲染（sim.js 是核心）
+  sim.js              世界状态 + 每帧推进（SoA）
+  people.js           个体档案（纯函数，同一个人处处一致）
+  profiles.js         姓名/职业/街道/单位池（按国家切换）
+  citymeta.js         城市命名唯一来源
+  collision.js        碰撞层解码 + 门场
+  city.js             城市几何 + 卫星地面
+  agents.js           3D 点云
+  src/sprite/         2D 像素渲染
+  gov.js / status.js  政府行动 / 武力卫生面板
+  overview.js         全体总览
+  report.js           结算报告
+  news.js             快讯跑马灯
+  music.js            背景音乐
+css/                  样式（整体随窗口缩放）
+数据库/cities/        27 张地图：city.json + sat.jpg + thumb.jpg
+assets/               精灵图集 + 背景音乐
+工具/                 本地服务器 + 两个测试
+vendor/               three.js
+</code></pre>
+<h2 id="_19">测试</h2>
+<pre><code class="language-bash">node 工具/test_chain.mjs   # 主链路：尸变链、爬起、行为 5 项
+node 工具/test_sim.mjs     # 性能 + 确定性（同种子必须同哈希）
+</code></pre>
+<hr />
+<h2 id="_20">许可与声明</h2>
+<ul>
+<li><strong>代码</strong>：本仓库代码可自由阅读、学习、修改。</li>
+<li><strong>原作素材</strong>（<code>数据库/cities/leicester</code>、5 张内嵌图的影像与碰撞表、
+  以及项目历史中出现过的原版美术/音效）著作权归 <strong>Binary Space</strong> 所有，
+  仅作研究与学习用途，<strong>不得商用</strong>。</li>
+<li><strong>地图数据</strong>：自建城市来自 OpenStreetMap（© OpenStreetMap contributors, ODbL）；
+  15 张原版地图的底图为 Esri World Imagery，仅供个人研究使用。</li>
+<li><strong>背景音乐</strong>：本项目自制。</li>
+</ul>
+<blockquote>
+<p>这是一个粉丝性质的重制/研究项目，与 Binary Space 无隶属关系。
+如果你喜欢这套玩法，请去玩一次原版 —— 它只有几百 KB，但你会看到我们所有设计的源头。</p>
+</blockquote></div></body></html>
