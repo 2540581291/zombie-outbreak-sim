@@ -98,3 +98,33 @@
 
 /* ---- 顶栏永远单行：内容由根字号整体缩放来适配，绝不换行 ---- */
 #topbar{flex-wrap:nowrap;height:8.7em;overflow:hidden;white-space:nowrap}
+
+/* ===== 顶部第二栏：显示开关 + 音乐 ===== */
+#subbar{position:relative;display:flex;align-items:center;gap:0.75rem;
+  font-size:0.75em;padding:0.35em 1.1em;background:rgba(10,13,17,.82);
+  border-bottom:1px solid rgba(255,255,255,.07);backdrop-filter:blur(8px);
+  width:calc(100% - 17rem);box-sizing:border-box}
+.sb-group{display:flex;align-items:center;gap:0.4rem}
+.sb-div{width:1px;height:1.4em;background:rgba(255,255,255,.12)}
+.sb-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:#cfd8e2;
+  font-size:0.9em;font-family:inherit;padding:0.28em 0.7em;border-radius:0.45em;cursor:pointer;white-space:nowrap}
+.sb-btn:hover{border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff}
+.sb-btn.on{background:#2a6df4;border-color:#2a6df4;color:#fff;font-weight:700}
+.sb-hint{color:#6b7785;font-size:0.85em;margin-left:auto}
+.sb-music{position:relative}
+.sb-pop{display:none;position:absolute;top:calc(100% + 0.35em);left:0;z-index:60;width:15rem;
+  background:rgba(14,18,23,.98);border:1px solid rgba(255,255,255,.14);border-radius:0.6em;
+  box-shadow:0 1em 2.5em rgba(0,0,0,.65);padding:0.5em}
+.sb-pop.open{display:block}
+.mp-head{display:flex;align-items:center;gap:0.4em;padding-bottom:0.35em;border-bottom:1px solid rgba(255,255,255,.08)}
+.mp-play,.mp-next{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);color:#e8eef4;
+  font-size:0.78rem;font-family:inherit;padding:0.2em 0.5em;border-radius:0.35em;cursor:pointer}
+.mp-play:hover,.mp-next:hover{background:rgba(255,255,255,.16)}
+.mp-now{flex:1;min-width:0;font-size:0.75rem;color:#9aa7b5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mp-list{max-height:12rem;overflow-y:auto;margin:0.35em 0}
+.mp-item{display:block;width:100%;text-align:left;background:none;border:0;color:#c6d2de;
+  font-size:0.78rem;font-family:inherit;padding:0.3em 0.45em;border-radius:0.3em;cursor:pointer}
+.mp-item:hover{background:rgba(255,255,255,.08);color:#fff}
+.mp-item.on{background:rgba(42,109,244,.25);color:#fff;font-weight:700}
+.mp-vol{display:flex;align-items:center;gap:0.4em;font-size:0.72rem;color:#8b97a3}
+.mp-vol input{flex:1;min-width:0}

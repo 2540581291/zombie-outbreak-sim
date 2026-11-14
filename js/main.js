@@ -11,7 +11,7 @@ import { AgentRenderer } from './agents.js';
 import { TOOLS, TOOL_BY_ID, HOTKEYS, fmtWan, fmtMoney } from './tools.js';
 import { profileFor, shortName } from './people.js';
 import { setCountry } from './profiles.js';
-import { initMusic, toggleMusic, next as nextMusic, setVolume, musicState } from './music.js';
+import { initMusic, toggleMusic, next as nextMusic, setVolume, musicState, playTrack, playCurrentTrack, TRACKS } from './music.js';
 import { kinList, ageOfAgent } from './family.js';
 import { SPECIES, SP } from './species.js';
 import { weaponOf } from './weapons.js';
@@ -551,6 +551,44 @@ function areaKm2(c) {
   if (!s || s.length < 2) return '—';
   const a = (s[0] * s[1]) / 1e6;
   return a >= 10 ? a.toFixed(1) : a >= 1 ? a.toFixed(2) : a.toFixed(3);
+}
+
+/** 音乐弹窗：曲目列表 + 播放/暂停 + 音量 */
+function renderMusicPop() {
+  const pop = document.getElementById('mus-pop');
+  if (!pop) return;
+  const st = musicState();
+  pop.innerHTML =
+    `<div class="mp-head">
+       <button class="mp-play" id="mp-toggle">${st.playing ? '⏸ 暂停' : '▶ 播放'}</button>
+       <span class="mp-now">${st.enabled ? st.title : '已关闭'}</span>
+       <button class="mp-next" id="mp-next" title="下一首">⏭</button>
+     </div>
+     <div class="mp-list">${TRACKS.map((t, i) =>
+       `<button class="mp-item${st.enabled && t.title === st.title ? ' on' : ''}" data-i="${i}">${t.title}</button>`).join('')}</div>
+     <div class="mp-vol"><span>音量</span><input type="range" id="mp-vol" min="0" max="100" value="${Math.round(st.volume * 100)}"></div>`;
+  const tg = pop.querySelector('#mp-toggle');
+  if (tg) tg.onclick = () => { if (st.playing) toggleMusic(); else playCurrentTrack(); };
+  const nx = pop.querySelector('#mp-next');
+  if (nx) nx.onclick = () => { nextMusic(); };
+  const vol = pop.querySelector('#mp-vol');
+  if (vol) vol.oninput = () => setVolume(+vol.value / 100);
+  pop.querySelectorAll('.mp-item').forEach((el) => {
+    el.onclick = () => { playTrack(+el.dataset.i); };
+  });
+}
+
+function toggleMusicPop() {
+  const pop = document.getElementById('mus-pop');
+  if (!pop) return;
+  if (pop.classList.contains('open')) { closeMusicPop(); return; }
+  pop.classList.add('open');
+  renderMusicPop();
+}
+
+function closeMusicPop() {
+  const pop = document.getElementById('mus-pop');
+  if (pop) pop.classList.remove('open');
 }
 
 function openCityPicker() {
@@ -1775,25 +1813,23 @@ async function boot() {
   // ---------- 多城市：?city=<id>，默认 berlin ----------
   const CID = (Q.get('city') || 'berlin').replace(/[^a-z0-9_-]/gi, '');
   const CDIR = '数据库/cities/' + CID;
-  // ---- 背景音乐：默认开启、随机循环，首次交互后开始播 ----
+  // ---- 顶部第二栏：音乐播放器（点按钮展开曲目列表） ----
   initMusic({
     onState: (st) => {
-      const b = document.getElementById('btn-music');
-      if (b) b.textContent = st.enabled ? (st.playing ? '⏸ 暂停' : '▶ 播放') : '▶ 播放';
-      const tEl = document.getElementById('mus-title');
-      if (tEl) tEl.textContent = st.enabled ? st.title : '音乐已关闭';
+      const b = $('btn-music');
+      if (b) {
+        b.innerHTML = (st.enabled ? (st.playing ? '♫' : '♪') : '♪') + ' 音乐 · ' +
+          (st.enabled ? st.title : '已关闭');
+      }
+      const pop = $('mus-pop');
+      if (pop && pop.classList.contains('open')) renderMusicPop();
     },
   });
   {
-    const b = document.getElementById('btn-music');
-    if (b) b.onclick = () => { toggleMusic(); };
-    const nb = document.getElementById('btn-nextmusic');
-    if (nb) nb.onclick = () => { nextMusic(); };
-    const vol = document.getElementById('mus-vol');
-    if (vol) {
-      vol.value = String(Math.round(musicState().volume * 100));
-      vol.oninput = () => setVolume(+vol.value / 100);
-    }
+    const b = $('btn-music');
+    if (b) b.onclick = (ev) => { ev.stopPropagation(); toggleMusicPop(); };
+    document.addEventListener('click', () => closeMusicPop());
+    $('mus-pop') && $('mus-pop').addEventListener('click', (ev) => ev.stopPropagation());
   }
   setCountry(cityInfo(CID).country);   // 姓名池按国家切换（日本人名也用汉字；此处 city 还没加载，只用 CID）
   window.__CID = CID;   // 供模块级函数（城市选择弹窗）读取
@@ -2159,10 +2195,10 @@ async function boot() {
   $('tb-city').textContent = cityFull(CID, city.name);   // 国家在前：德国 · 柏林·米特
   {
     // 2D 模式 / 地形 两个开关放在右侧「爆发参数 → 显示」里（不再占顶栏）
-    const slot = $('disp-slot') || $('tb-tools') || $('topbar');
+    const slot = $('sb-display') || $('tb-tools') || $('topbar');
     const b = document.createElement('button');
     b.id = 'btn-retro';
-    b.className = 'disp-btn';
+    b.className = 'sb-btn';
     b.textContent = retroMode ? '🕹 2D 模式' : '🧊 3D 模式';   // 按钮显示当前模式
     b.title = '切换 2D / 3D 模式（Tab）';
     b.onclick = () => setRetro(!retroMode);
@@ -2170,7 +2206,7 @@ async function boot() {
 
     const b2 = document.createElement('button');
     b2.id = 'btn-overlay';
-    b2.className = 'disp-btn';
+    b2.className = 'sb-btn';
     b2.textContent = '🗺 地形';
     b2.title = '叠加地形图层（C）：显示每格能不能走';
     b2.onclick = () => setOverlay(!overlayOn);
@@ -2242,7 +2278,7 @@ async function boot() {
 }
 
 // 构建戳：改动后手动+1，浏览器控制台/页面属性都能看到，用来判断是不是旧缓存
-const BUILD = 'b30-music';
+const BUILD = 'b31-subbar';
 
 // ---------- 主循环 ----------
 let last = 0, acc = 0, frames = 0, fpsT = 0, hudT = 0, fc = 0, cardFrame = 0;

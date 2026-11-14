@@ -92,6 +92,17 @@
   <span class="tb-fps" id="fps">—</span>
 </div>
 
+<!-- 顶部第二栏：显示开关 + 音乐播放器 -->
+<div id="subbar">
+  <div class="sb-group" id="sb-display"></div>
+  <span class="sb-div"></span>
+  <div class="sb-group sb-music">
+    <button class="sb-btn" id="btn-music">♪ 音乐</button>
+    <div class="sb-pop" id="mus-pop"></div>
+  </div>
+  <span class="sb-hint" id="sb-hint"></span>
+</div>
+
 <!-- 参数面板 -->
 <div id="panel">
   <div class="p-head">
@@ -106,17 +117,6 @@
     <label class="p-row"><span>初始丧尸</span><input type="range" id="s-z0" min="1" max="10000" step="1" value="1000"><b id="v-z0">120</b></label>
     <label class="p-row"><span>家庭持枪率</span><input type="range" id="s-arm" min="0" max="100" step="1" value="10"><b id="v-arm">10%</b></label>
     <label class="p-row"><span>警察数量</span><input type="range" id="s-pol" min="0" max="10000" step="1" value="1000"><b id="v-pol">60</b></label>
-    <div class="p-sec">显示</div>
-    <div class="disp-row" id="disp-slot"></div>
-    <div class="p-sec">音乐</div>
-    <div class="mus-row" id="mus-row">
-      <button class="disp-btn" id="btn-music">▶ 播放</button>
-      <button class="disp-btn" id="btn-nextmusic">⏭ 下一首</button>
-    </div>
-    <div class="mus-meta">
-      <span id="mus-title">—</span>
-      <input type="range" id="mus-vol" min="0" max="100" step="1" value="45" title="音量">
-    </div>
     <div class="p-sec">信息传播</div>
     <label class="p-row"><span>传播速度</span><input type="range" id="s-info" min="0.2" max="2" step="0.1" value="1"><b id="v-info">1.0×</b></label>
     <div class="p-hint2">电话（家人优先）+ 网络。调大 → 城市更快知道、更早逃。</div>

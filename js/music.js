@@ -77,6 +77,13 @@ function armFirstGesture() {
   window.addEventListener('keydown', go, true);
 }
 
+export function playCurrentTrack() {
+  enabled = true;
+  started = true;
+  try { localStorage.setItem(KEY_ON, '1'); } catch (e) {}
+  playCurrent();
+}
+
 export function initMusic(hooks) {
   onState = hooks && hooks.onState;
   try {
@@ -120,6 +127,22 @@ export function setVolume(v) {
   if (audio) audio.volume = volume;
   try { localStorage.setItem(KEY_VOL, String(volume)); } catch (e) {}
   emit();
+}
+
+/** 指定播放某一首（按下标，顺序为 TRACKS 顺序） */
+export function playTrack(idx) {
+  const t = TRACKS[idx];
+  if (!t) return;
+  if (!order.length) shuffle();
+  const pos = order.indexOf(idx);
+  cursor = pos >= 0 ? pos : 0;
+  enabled = true;
+  try { localStorage.setItem(KEY_ON, '1'); } catch (e) {}
+  started = true;
+  const a = ensureAudio();
+  a.pause();
+  a.src = t.file;
+  playCurrent();
 }
 
 export function musicState() {
