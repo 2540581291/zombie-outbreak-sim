@@ -20,8 +20,8 @@ if not exist "index.html" (
     pause
     exit /b 1
 )
-if not exist "data\city.json" (
-    echo   [!] 警告：data\city.json 不存在，游戏会提示缺少城市数据
+if not exist "数据库\cities\berlin\city.json" (
+    echo   [!] 警告：数据库\cities\berlin\city.json 不存在，游戏会提示缺少城市数据
     echo.
 )
 
@@ -52,8 +52,8 @@ if "!KILLED!"=="1" (
 
 ping -n 2 -w 300 127.0.0.1 >nul
 
-if exist "tools\serve.py" (
-    start "%TITLE%" /min %PY% "tools\serve.py" %PORT%
+if exist "工具\serve.py" (
+    start "%TITLE%" /min %PY% "工具\serve.py" %PORT%
 ) else (
     start "%TITLE%" /min %PY% -m http.server %PORT% --bind 127.0.0.1
 )

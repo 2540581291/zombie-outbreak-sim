@@ -5,16 +5,8 @@
   "type": "module",
   "description": "Zombie Outbreak Simulator - Remake (personal nostalgia project)",
   "scripts": {
-    "test": "node tools/test_sim.mjs",
-    "test:nav": "node tools/test_nav.mjs",
-    "test:navgrid": "node tools/test_navgrid.mjs",
-    "test:navplanner": "node tools/test_navplanner.mjs",
-    "test:navportal": "node tools/test_navportal.mjs",
-    "bench": "node tools/bench_nav.mjs",
-    "serve": "python -m http.server 8777",
-    "test:navflow": "node tools/test_navflow.mjs",
-    "test:navdyn": "node tools/test_navdyn.mjs",
-    "test:navflick": "node tools/test_navflick.mjs",
-    "test:gov": "node tools/test_gov.mjs"
+    "test": "node 工具/test_sim.mjs",
+    "test:chain": "node 工具/test_chain.mjs",
+    "serve": "python 工具/serve.py 8777"
   }
 }

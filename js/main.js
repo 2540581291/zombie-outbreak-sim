@@ -1780,7 +1780,7 @@ async function boot() {
   } catch (e) { /* 没有索引就只跑默认城市 */ }
 
   const res = await fetch(CDIR + '/city.json');
-  if (!res.ok) { fail('找不到 ' + CDIR + '/city.json —— 请先运行 pipeline/bake_pbf.py'); return; }
+  if (!res.ok) { fail('找不到 ' + CDIR + '/city.json —— 请先运行 数据库/烘焙/bake_pbf.py'); return; }
   const city = await res.json();
   // 默认三件套按面积等比缩放，基准 = 柏林（7.594 km² / 5 万人 / 1000 丧尸 / 1000 警察）
   // URL 显式给了 ?pop= 就不覆盖

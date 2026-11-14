@@ -5,14 +5,14 @@
 
 **真实城市 + 两万个独立个体 + 可调爆发参数**，在一张真实的柏林地图上看着感染扩散。
 
-![screenshot](shots/sat_final.png)
+![3D 卫星视角](docs/img/sat_final.jpg)
 
-> **启动默认是 2D 模式**（俯视 + 原版像素小人，`Tab` 切 3D）。下面是 3D 模式：
+> 3D 模式 · 柏林·米特：z20 卫星底图 + 4,755 栋真实建筑 + 5 万个独立个体（绿色是平民，红色是感染者）。
 
-![2D 拉到最远](shots/2d_zoomout.png)
+> **启动默认是 2D 模式**（俯视 + 原版像素小人，`Tab` 切 3D）。同一座城的 2D 视角：
 
-> 2D 模式拉到最远：整座柏林 + 红点是正在扩散的疫情。
->
+![2D 卫星模式](docs/img/2d_zoomout.jpg)
+
 > 左上「地图」可在 **卫星** / **矢量** 之间切换，M 键同理；B 键切 3D 建筑（仅 3D）。
 
 ---
@@ -96,87 +96,74 @@
 
 ```
 index.html              页面骨架（HUD / 参数面板 / 加载屏 / 工具栏）
-css/style.css           基础样式
-css/topbar.css          顶栏（等比缩放，全部用 em）
-css/modal.css           各类弹窗的统一尺寸
-css/gov.css             政府行动面板
-css/news.css            新闻快讯条 + 历史列表
-js/main.js              装配、相机机架、主循环、UI、2D/3D 切换
+css/                    样式：style / topbar / panel / gov / modal / news
+js/                     前端主程序：装配、相机机架、主循环、UI、各面板
 js/sim.js               模拟内核（纯 JS，零依赖，可在 Node 里跑）
-js/citymeta.js          城市名统一格式化（国家 → 城市 → 区，见「城市命名」）
-js/news.js              新闻快讯跑马灯（风味文案，跟局势联动）
-js/gov.js               政府行动面板（只读仪表盘）
-js/status.js            武力 / 卫生 / 混乱度这些"明细"面板
-js/species.js           物种表（人 / 特感 / 载具 / 动物的全部数值）
-js/collision.js         碰撞层解码 + 门场 BFS + 视线查询
-js/layerpatch.js        图层补丁：手绘修正的 op 应用（编辑器与游戏共用）
-js/editmode.js          游戏内图层编辑模式（L 键，改动存 localStorage）
+js/main.js              装配 + 主循环 + 2D/3D 切换（唯一入口）
 js/city.js              OSM 数据 → Three.js 几何 + 程序化立面 shader
 js/agents.js            个体渲染（点云 + 实例化人形）
-js/units.js             程序化单位几何（一个物种一个 BufferGeometry）
 src/sprite/             2D 渲染器（图集 + 四层实例化：活体/尸体/阴影/圆点）
-js/overlay.js           地形图层（每格能不能走的调试贴图）
-js/tools.js             12 种指挥工具的定义表
-js/overview.js          全体人员总览表（虚拟滚动）
-js/report.js            行动后报告 / 评分 / 人口曲线
-js/profiles.js          个体固有属性：姓名/年龄/职业（纯函数，sim 与档案共用）
-js/family.js            家庭系统：家庭分组（区间制）/ 年龄分配 / 关系推断 / 旅客
-js/weapons.js           武器表：9 种枪的伤害/射程/弹匣/精度/噪音/装填
-js/people.js            个体档案（把固有属性 + 当前状态拼成一张卡）
-js/audio.js             全程序化合成的 WebAudio
 vendor/three.module.js  three.js r170（本地，不依赖 CDN）
-
-数据库/cities/index.json          城市清单（前端下拉用）
-数据库/cities/berlin/city.json    烘焙好的城市几何 + 碰撞层（3.8 MB）
-数据库/cities/berlin/sat.jpg      卫星影像（75 MB，16384×12831）
-数据库/cities/berlin/sat.json     影像的精确经纬度边界
-数据库/cities/<其它城市>/…        同上（tokyo / zhengzhou / nanyang / zhenping）
-data/ground/                    柏林 z20 原始瓦片（203 MB，分块模式备用）
 
 assets/atlas/atlas.{png,json}   2D 图集 v2（2048×784 / 2,728 帧 / 134 KB / 6.4 MB 显存）
 assets/atlas/README.md          图集格式与重建方法
-src/sprite/                     2D 精灵渲染器（atlas / anim / bodies / layers / index）
 
-数据库/烘焙/bake_pbf.py    OSM PBF → city.json（主用，含碰撞层烘焙）
-数据库/烘焙/collision.py   碰撞层生成器（纯函数：OSM 几何 → 位域网格）
-数据库/烘焙/fetch_sat.py   卫星瓦片 → sat.jpg + sat.json
-数据库/烘焙/drone_to_city.py  航测正射 → sat.jpg + sat_mask.png（镂空）+ 碰撞遮罩
-数据库/烘焙/fetch_osm_blocks.py  按 bbox 拉两块航测区的 OSM
-数据库/烘焙/raw/           原始 OSM（柏林 95 MB + 东京/郑州/南阳/镇平切片）
+数据库/cities/index.json          城市清单（前端下拉用）
+数据库/cities/<id>/city.json      烘焙好的城市几何 + 碰撞层
+数据库/cities/<id>/thumb.jpg      城市卡片缩略图
+数据库/cities/<id>/collision.edit.json   手绘图层补丁（可选，见「图层手绘编辑」）
+数据库/cities/<id>/sat.json       卫星影像的精确经纬度边界 ┐ 本机烘焙，不进仓库
+数据库/cities/<id>/sat.jpg        卫星影像（75 MB 级）      ┘ 见「数据与素材」
 
-数据库/脚本归档/apply_layer_patch.py  把补丁烘进 city.json（历史脚本，已归档）
-数据库/烘焙/build_city.py  一键重建城市：烘焙 → 拉图 → 定尺寸 → 更新 index.json
-工具/                   通用工具：serve.py（静态服务器）/ make_thumbs.py / test_chain.mjs / test_sim.mjs
+数据库/烘焙/                      离线烘焙脚本
+  bake_pbf.py           OSM PBF → city.json（含碰撞层）
+  collision.py          碰撞层生成器（纯函数：OSM 几何 → 位域网格）
+  fetch_sat.py          卫星瓦片 → sat.jpg + sat.json
+  drone_to_city.py      航测正射 → sat.jpg + sat_mask.png（镂空）+ 碰撞遮罩
+  dsm_buildings.py      DSM 高程 → 建筑轮廓
+  fetch_osm.py / fetch_osm_blocks.py   Overpass 拉 OSM
+  cut_pbf.py            从大 PBF 里按 bbox 切一块
+  raw/                  原始 OSM / PBF 下载（不进仓库）
+
+工具/                             通用工具
+  serve.py              本地静态服务器（no-store，替代 python -m http.server）
+  make_thumbs.py        由 sat.jpg 生成城市缩略图
+  test_sim.mjs          性能 + 确定性自检
+  test_chain.mjs        主链路 5 项自检
+docs/                             实现说明与截图
 ```
 
 ---
 
 ## 换一个城市
 
-已经有 5 座城市（`数据库/cities/`），右上角下拉直接切。要加新的：
+已经有 **28 张地图**（`数据库/cities/`）：5 座用 OSM 精细烘焙的大城市（柏林 / 东京 / 郑州 / 南阳 / 镇平）
++ 2 张无人机航测图（镇平县城 / 唐营村），其余 21 张是原版小地图和官方城市。右上角下拉直接切。
+
+![中国城市](docs/img/city_nanyang.jpg)
+
+> 同一套代码跑「中国 · 南阳·卧龙」：真实路网 + 5 万人 + 1,630 只初始丧尸（姓名池按国家自动切）。
+
+要加新的：
 
 ```bat
-:: 2. 把对应地区的 PBF 放进 数据库/烘焙/raw/（https://download.geofabrik.de/）
-:: 3. 一条命令走完：烘焙 → 拉卫星图 → 按公式定尺寸 → 写 index.json
-python tools\build_city.py tokyo
-python tools\build_city.py all      :: 全量重建
-```
-
-单步等价于：
-
-```bat
-python pipeline\bake_pbf.py --pbf pipeline\raw\berlin.osm.pbf --name "柏林 Mitte" ^
+:: 1. 把对应地区的 PBF 放进 数据库/烘焙/raw/（https://download.geofabrik.de/）
+:: 2. 烘焙城市几何 + 碰撞层（--out 必填，前端只认 数据库/cities/<id>/city.json）
+python 数据库\烘焙\bake_pbf.py --pbf 数据库\烘焙\raw\berlin.osm.pbf --name "柏林 Mitte" ^
   --minlat 52.5129 --minlon 13.3786 --maxlat 52.5346 --maxlon 13.4253 ^
-  --out data\cities\berlin\city.json
+  --out 数据库\cities\berlin\city.json
 
-python pipeline\fetch_sat.py --citydir data\cities\berlin --zoom 20 ^
+:: 3. 拉卫星影像（--provider esri / google，或用 --url 换自定义模板）
+python 数据库\烘焙\fetch_sat.py --citydir 数据库\cities\berlin --zoom 20 ^
   --url "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
 
-python tools\pick_size.py --w-m 3162 --h-m 2401 --res 0.0908 --citydir data\cities\berlin --apply
+:: 4. 生成城市卡片缩略图（扫 数据库/cities/*/sat.jpg）
+python 工具\make_thumbs.py
+
+:: 5. 在 数据库/cities/index.json 里补一条该城市的记录
 ```
 
-> ⚠ `bake_pbf.py` 的 `--out` **默认是老的 `data/city.json`**，前端只认
-> `数据库/cities/<id>/city.json` —— 手动烘焙时一定要显式给 `--out`（`build_city.py` 已经帮你带了）。
+> ⚠ `bake_pbf.py` 的 `--out` 是**必填**的：前端只读 `数据库/cities/<id>/city.json`。
 >
 > 新城市烘焙完后，别忘了在 `js/citymeta.js` 里登记「国家 / 城市 / 区」，
 > 否则界面上只会显示 `city.json` 里的原始名字（见下一节「城市命名」）。
@@ -216,15 +203,15 @@ python tools\pick_size.py --w-m 3162 --h-m 2401 --res 0.0908 --citydir data\citi
 ```bat
 :: 1. 从航测包拼出带 alpha 的大图（脚本在 F:\zpx_meta\，产物是 *_rgba.png + .pgw）
 :: 2. 拉 OSM（县城 7.8 km² 用官方 API 就够）
-python pipeline\fetch_osm_blocks.py
+python 数据库\烘焙\fetch_osm_blocks.py
 
 :: 3. 烘城市骨架（建筑/道路/碰撞）
-python pipeline\bake_pbf.py --pbf pipeline\raw\zhenping_town.osm --name "镇平 县城" ^
+python 数据库\烘焙\bake_pbf.py --pbf 数据库\烘焙\raw\zhenping_town.osm --name "镇平 县城" ^
   --minlat 33.010967 --minlon 112.170410 --maxlat 33.045508 --maxlon 112.254181 ^
-  --out data\cities\zhenping_town\city.json
+  --out 数据库\cities\zhenping_town\city.json
 
 :: 4. 把正射图裁进城市 bbox，生成 sat.jpg + sat_mask.png，并按遮罩刷碰撞层
-python pipeline\drone_to_city.py --city zhenping_town ^
+python 数据库\烘焙\drone_to_city.py --city zhenping_town ^
   --mosaic "F:\zpx\maps\县城_正射_z18_rgba.png" --width 16384
 ```
 
@@ -236,14 +223,14 @@ python pipeline\drone_to_city.py --city zhenping_town ^
 镇平的 OSM 几乎是空的（县城 7.8 km² 只有 43 栋），所以建筑改用**航测 DSM 反推**：
 
 ```bat
-python pipeline\dsm_buildings.py --dsm "F:\zpx\data\map\dsm.tif" --tfw "F:\zpx\data\map\dsm.tfw" ^
+python 数据库\烘焙\dsm_buildings.py --dsm "F:\zpx\data\map\dsm.tif" --tfw "F:\zpx\data\map\dsm.tfw" ^
   --minlon 112.170410 --minlat 33.010967 --maxlon 112.254181 --maxlat 33.045508 ^
-  --out data\cities\zhenping_town\buildings_dsm.json
+  --out 数据库\cities\zhenping_town\buildings_dsm.json
 
-python pipeline\bake_pbf.py --pbf pipeline\raw\zhenping_town.osm ^
-  --buildings data\cities\zhenping_town\buildings_dsm.json ^
+python 数据库\烘焙\bake_pbf.py --pbf 数据库\烘焙\raw\zhenping_town.osm ^
+  --buildings 数据库\cities\zhenping_town\buildings_dsm.json ^
   --name "镇平 县城" --minlat 33.010967 --minlon 112.170410 --maxlat 33.045508 --maxlon 112.254181 ^
-  --out data\cities\zhenping_town\city.json
+  --out 数据库\cities\zhenping_town\city.json
 ```
 
 做法（`数据库/烘焙/dsm_buildings.py`）：
@@ -340,7 +327,7 @@ cityNewspaper('berlin'); // 柏林晨报
 ## 自检
 
 ```bat
-node tools\test_sim.mjs
+node 工具\test_sim.mjs
 ```
 
 会输出：导航栅格规模、12k/45k/60k 三档的每 tick 耗时、确定性校验、两种极端参数的结局判定。
@@ -390,7 +377,7 @@ apocalypse: still alive   containment: CLEARED
 3. **无阴影** —— 建筑像"悬浮的模型"，下一步加 shadow map + 接触阴影会提升巨大。
 4. 无头 Chrome（SwiftShader）下只有 ~10 fps，真显卡上另说；模拟本身 45k 个体 6ms/tick。
 5. ~~项目没有版本管理~~ —— 现在有 git 历史；一次性脚本目录已清理。
-6. **`bake_pbf.py --out` 的默认值仍是老的 `data/city.json`**，前端只读 `数据库/cities/<id>/city.json` —— 手动烘焙必须显式给 `--out`。
+6. ~~`bake_pbf.py --out` 默认写到老的 `data/city.json`~~ —— 已改成必填参数，不会再写错地方。
 7. 2D 模式下切到「矢量」地图时只有路网色块（没有卫星图），且树/3D 特效仍是 3D 的表达方式。
 8. **自动烘焙的图层有错**（假建筑、漏建筑、河宽按中心线估、桥接不严）——现在游戏内按 L 就能手绘修；桥已在 berlin 修过一轮（见「图层手绘编辑」）。
 
@@ -408,10 +395,37 @@ apocalypse: still alive   containment: CLEARED
 
 ---
 
-## 数据来源
+## 数据与素材
 
-- 地图几何：OpenStreetMap 贡献者（ODbL），Geofabrik 柏林 extract
-- 渲染：three.js r170（MIT）
+仓库里只放**代码 + 可再生的轻量数据**，两类东西刻意没上传：
+
+| 内容 | 体积 | 为什么不在仓库里 |
+|---|---|---|
+| `原版/`：2009 原版游戏（APK / SWF）、反编译脚本、精灵帧、FFDec | ~110 MB | 版权归原作者；只作本机参考 |
+| `数据库/cities/*/sat.jpg` 等卫星影像 | ~440 MB | Google / Esri 影像有各自条款，只在本机缓存自用 |
+| `数据库/烘焙/raw/`：原始 OSM / PBF | ~200 MB | 都能从 Geofabrik / Overpass 重新下载 |
+
+所以**clone 下来直接就能玩**（矢量地图模式），但卫星底图要自己烘一次：
+
+```bat
+python 数据库\烘焙\fetch_sat.py --citydir 数据库\cities\berlin
+python 工具\make_thumbs.py
+```
+
+没有 `sat.jpg` 时前端会自动回退到矢量地图，`sat.json` / `sat_mask.png` 一起缺席即可，不影响启动：
+
+![矢量模式](docs/img/vector_3d.jpg)
+
+> 没烘卫星图时的样子：OSM 几何 + 程序化立面，楼、路、河都在，只是地面不是航拍。
+
+### 数据来源
+
+- 地图几何：OpenStreetMap 贡献者（**ODbL**），Geofabrik extract / Overpass API
+- 渲染：three.js r170（**MIT**）
+- 2D 图集与数值参考：2009 年 Flash 原版《Zombie Outbreak Simulator》（仅本地参考，不随仓库分发）
+- 卫星影像：Esri World Imagery / Google（仅本地缓存，不随仓库分发）
+
+> 这个项目是个人怀旧复刻，不发行；若要再分发，`assets/atlas/` 里的原版精灵图请自行替换。
 
 
 ---
@@ -436,12 +450,13 @@ apocalypse: still alive   containment: CLEARED
 换城市 / 换图源后重新跑一次：
 
 ```bat
-python pipeline\fetch_sat.py --citydir data\cities\berlin                    :: 自动选级
-python pipeline\fetch_sat.py --citydir data\cities\berlin --zoom 20          :: 强制 20 级（≈0.09m/像素）
-python pipeline\fetch_sat.py --citydir data\cities\berlin --provider google  :: 换瓦片源
-python tools\pick_size.py --w-m 3162 --h-m 2401 --res 0.0908 ^
-  --citydir data\cities\berlin --apply                                       :: 按 16384 上限定尺寸
+python 数据库\烘焙\fetch_sat.py --citydir 数据库\cities\berlin                    :: 自动选级
+python 数据库\烘焙\fetch_sat.py --citydir 数据库\cities\berlin --zoom 20          :: 强制 20 级（≈0.09m/像素）
+python 数据库\烘焙\fetch_sat.py --citydir 数据库\cities\berlin --provider google  :: 换瓦片源
 ```
+
+> 长边超过 GPU 纹理上限时，`fetch_sat.py` 已经会把拼图缩到 ≤4096；需要精确到 16384 这种
+> 大尺寸时用 `--zoom 20` 再自己缩，尺寸计算见「地图尺寸甜点」一节（原 `pick_size.py` 已并入该流程，脚本本身已移除）。
 
 柏林现在是 **z20 原图 → 16384×12831（210 MP），0.2015 m/px，75 MB**
 （从 0.09 m/px 的原图按「地图尺寸甜点公式」缩下来的，见那一节）。
@@ -525,8 +540,6 @@ POI 整批上下镜像（医院跑到河对岸），桥的补丁也整批判反�
 并且故意用**镜像坐标**再算一遍（正坐标 96% 落在墙/室内，镜像只有 28%），
 这样指标本身是有效的，下次谁再翻错就会红。五个城市全部通过。
 
-![爆发模式](shots/modes.png)
-
 ---
 
 ## 指挥工具（12 种）
@@ -566,11 +579,8 @@ POI 整批上下镜像（医院跑到河对岸），桥的补丁也整批判反�
 
 ### 自检
 
-```bat
-node tools\test_tools.mjs
-```
-
-25 项断言：点数扣除与回复、冷却、部署数量与命中率、直升机救人、疫苗治愈、路障写入与还原、火区烧尸、12 个工具全量执行。
+工具校验脚本 `test_tools.mjs` 是一次性诊断脚本，已移除（12 个工具现在由游戏里直接点验）。
+主链路回归走 `node 工具\test_chain.mjs`。
 
 ---
 
@@ -601,7 +611,7 @@ node tools\test_tools.mjs
 
 一局结束（或随时点顶栏「📋 战报」）会弹出：
 
-![report](shots/report2.png)
+![战报](docs/img/report2.jpg)
 
 - **结局判定**：感染已清除 / 城市沦陷 / 人尸对峙
 - **评分**：存活率 70 分 + 击杀效率 20 分 + 坚持时长 10 分 → S/A/B/C/D
@@ -873,8 +883,6 @@ node tools\test_tools.mjs
 | 城市材质 `uNight` | 0.30 → 0.95（楼里的灯更亮、墙面更暗） |
 | 雾色 | 冷色加深 |
 | 2D 覆盖层 | 径向暗角 + 淡蓝，最深 34%（不遮情报） |
-
-![夜间](shots/night.png)
 
 ### 关于"快进时时钟怎么走"
 
@@ -1497,8 +1505,6 @@ event = { id, x, z, t, sev, ack, responders, ids[] }
 自动烘焙**一定会有错**——OSM 里有的东西被当成楼、有的楼没画、河岸形状怪、桥接不严。
 所以编辑模式直接长在游戏里：按 **L**（或顶栏「✏️ 图层」）进入，把碰撞层叠在地图上边看边涂。
 
-![编辑模式](shots/editmode.png)
-
 | 操作 | 作用 |
 |---|---|
 | 左键拖拽 | 按当前笔刷涂（半径 1–40 m） |
@@ -1529,12 +1535,9 @@ event = { id, x, z, t, sev, ack, responders, ids[] }
 ] }
 ```
 
-想让 Node 测试或其它读 `city.json` 的地方也看到修正后的图层，可以把补丁烘进数据（会先备份 `city.json.bak`）：
-
-```bat
-python tools\apply_layer_patch.py berlin --dry-run      :: 只看会改多少格
-python tools\apply_layer_patch.py berlin                :: 烘进 city.json
-```
+想让 Node 测试或其它读 `city.json` 的地方也看到修正后的图层，可以在游戏里「导出 JSON」后
+用 `js/layerpatch.js` 的 `applyLayerPatch()` 自己烘进 `city.json`
+（原 `apply_layer_patch.py` 已移除；这次改动只影响 `city.json`，记得先备份）。
 
 - 编辑器：`js/editmode.js`（游戏内模式）+ `js/layerpatch.js`（op 应用，浏览器 / Node 同一套语义）
 - 接线：`main.js` 在 `new Sim(nav)` **之前**应用文件补丁，保证门场用修正后的门
@@ -1827,9 +1830,8 @@ CORPSE      → die01 / zdie01（丧尸用后者）停在最后一帧
 
 ```
 src/sprite/                     2D 渲染器（图集 + 四层实例化 / 远看退化成圆点）
-数据库/脚本归档/build_atlas.py  从 原版/core 重建图集（历史脚本，已归档）
-数据库/脚本归档/audit_atlas.py  帧数 / 帧长 / rect 全量对账（历史脚本，已归档）
 assets/atlas/atlas.{png,json}   2048×784 / 2,728 帧 / 134 KB / 6.4 MB 显存
+assets/atlas/README.md          图集格式与重建方法
 ```
 
 ---
@@ -2105,14 +2107,17 @@ Vulkan 的 1282（`GL_INVALID_OPERATION`）说明它接受了尺寸但内部失�
 
 ### 用法
 
-```bat
-python tools\pick_size.py --w-m 3302 --h-m 2586 --res 0.0908 --apply
+尺寸公式当年由一个独立脚本 `pick_size.py` 算（`--w-m/--h-m/--res` → 甜点尺寸 → `--apply` 缩放 `sat.jpg`）。
+这个脚本已随目录清理移除；现在需要精确控制尺寸时，按上面公式手算后用 Pillow 缩一次即可：
+
+```python
+from PIL import Image
+im = Image.open("数据库/cities/berlin/sat.jpg")
+im.thumbnail((16384, 16384), Image.LANCZOS)
+im.save("数据库/cities/berlin/sat.jpg", quality=88, optimize=True)
 ```
 
-`--apply` 会把 `data/sat.jpg` 缩放到该尺寸并写回 `sat.json`（含 `sweetSpot` 字段）。
-不加 `--apply` 只打印计算结果。
-
-脚本在取整后会做一次回收（`while W*H > n_use`），避免舍入把尺寸顶出上限。
+档位取整时记得回收（`while W*H > n_use`），避免舍入把尺寸顶出上限。
 
 ---
 
@@ -2122,40 +2127,20 @@ python tools\pick_size.py --w-m 3302 --h-m 2586 --res 0.0908 --apply
 |---|---|
 | 地图 | Google 卫星 z20 源 → **16384 × 12831（210 MP）** |
 | 分辨率 | **0.2015 m/px** |
-| 文件 | `数据库/cities/berlin/sat.jpg` 75 MB |
+| 文件 | `数据库/cities/berlin/sat.jpg` 75 MB（**本机烘焙，不进仓库**） |
 | 加载方式 | **单张贴图，一次性加载**（分块已停用） |
 | 城市 | Berlin Mitte，3162 × 2401 m，4,755 栋建筑（另有东京 / 郑州 / 南阳 / 镇平） |
 
 ### 换城市的标准流程
 
-```bat
-```
-
-手动版：
-
-```bat
-1. 改 bbox 重烘城市数据（--out 必须指到 数据库/cities/<id>/）
-   python pipeline\bake_pbf.py --pbf pipeline\raw\berlin.osm.pbf --name "..." ^
-     --minlat .. --minlon .. --maxlat .. --maxlon .. ^
-     --out data\cities\berlin\city.json
-
-2. 拉卫星图（任意图源，--url 换成社区分享的模板即可）
-   python pipeline\fetch_sat.py --citydir data\cities\berlin --zoom 20 ^
-     --url "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
-
-3. 按公式定尺寸并缩放
-   python tools\pick_size.py --w-m 3162 --h-m 2401 --res 0.0908 --citydir data\cities\berlin --apply
-
-4. 更新城市清单（build_city.py 会自动写，手动烘焙时自己补）
-   数据库/cities/index.json
-```
+见上文「换一个城市」，四步：`bake_pbf.py` → `fetch_sat.py` → `make_thumbs.py` → 补 `index.json`。
 
 `E_MAX = 16384`（ANGLE/D3D11 上限，D3D11on12 相同，Vulkan 报 32768 但实际分配失败）。
 
 ### 已知上限
 
 - **不分块时 0.2015 m/px 是天花板**，再高需要 4 倍像素，超出单边 16384
-- `data/ground/` 里 203 MB 瓦片是**唯一保留的 z20 原始分辨率数据**，别删
+- 更高分辨率只能靠分块（分块代码已停用，历史 `data/ground/` 瓦片也已清理）
 
 ---
 
@@ -2163,7 +2148,7 @@ python tools\pick_size.py --w-m 3302 --h-m 2586 --res 0.0908 --apply
 
 顶栏 **📊 总览**（快捷键 `O`）打开。两万人一张表，**可排序 / 可筛选 / 可搜索**。
 
-![overview](shots/overview1.png)
+![总览](docs/img/overview1.jpg)
 
 | 列 | 说明 |
 |---|---|
@@ -2439,6 +2424,8 @@ CIV / FLEE / FIGHT
 所以：小图可以上原版精度，大图保持 1 m 更稳。
 
 ### 导入原版地图的完整流程
+
+> 这一段是**本地流程**：`原版/`（原版资源 + 导入脚本）不在仓库里，见「数据与素材」。
 
 ```bash
 python 原版/导入脚本/pull_original_map.py --check   # 只校验，不写盘
